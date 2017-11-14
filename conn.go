@@ -291,7 +291,6 @@ func (l *Locale) Dial(network, address string) (net.Conn, error) {
 	}
 	ip := ipList[0]
 	if NativeNetwork.Contains(ip) {
-		log.Println("Connect", 0, address)
 		return net.Dial(network, address)
 	}
 	return l.Dialer.Dial(network, address)
