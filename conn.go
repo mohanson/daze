@@ -182,7 +182,7 @@ var (
 // A Dialer is a means to establish a connection.
 type Dialer interface {
 	// Dial connects to the given address
-	Dial(string, string) (net.Conn, error)
+	Dial(network, address string) (net.Conn, error)
 }
 
 // A Client makes connections to the given address with Server.
@@ -259,18 +259,18 @@ const (
 
 // NativeNetwork is a network that uses private IP address space.
 // Note that localhost has also been joined.
-var NativeNetwork = func() (n IPNetList) {
-	cidrs := []string{
+var NativeNetwork = func() IPNetList {
+	l := IPNetList{}
+	for _, n := range []string{
 		LoopbackNetwork,
 		ClassAPrivateNetwork,
 		ClassBPrivateNetwork,
 		ClassCPrivateNetwork,
+	} {
+		_, e, _ := net.ParseCIDR(n)
+		l = append(l, e)
 	}
-	for _, entry := range cidrs {
-		_, ipnet, _ := net.ParseCIDR(entry)
-		n = append(n, ipnet)
-	}
-	return
+	return l
 }()
 
 // A Locale responds to socks5 request and proxy to Server.
@@ -291,6 +291,7 @@ func (l *Locale) Dial(network, address string) (net.Conn, error) {
 	}
 	ip := ipList[0]
 	if NativeNetwork.Contains(ip) {
+		log.Println("Connect", 0, address)
 		return net.Dial(network, address)
 	}
 	return l.Dialer.Dial(network, address)
