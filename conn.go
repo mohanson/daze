@@ -237,64 +237,10 @@ func NewClient(server string) *Client {
 	}
 }
 
-// IPNetList.
-type IPNetList []*net.IPNet
-
-// Contains reports whether the network list includes host.
-func (n IPNetList) Contains(ip net.IP) bool {
-	for _, entry := range n {
-		if entry.Contains(ip) {
-			return true
-		}
-	}
-	return false
-}
-
-const (
-	LoopbackNetwork      = "127.0.0.0/8"
-	ClassAPrivateNetwork = "10.0.0.0/8"
-	ClassBPrivateNetwork = "172.16.0.0/12"
-	ClassCPrivateNetwork = "192.168.0.0/16"
-)
-
-// NativeNetwork is a network that uses private IP address space.
-// Note that localhost has also been joined.
-var NativeNetwork = func() IPNetList {
-	l := IPNetList{}
-	for _, n := range []string{
-		LoopbackNetwork,
-		ClassAPrivateNetwork,
-		ClassBPrivateNetwork,
-		ClassCPrivateNetwork,
-	} {
-		_, e, _ := net.ParseCIDR(n)
-		l = append(l, e)
-	}
-	return l
-}()
-
 // A Locale responds to socks5 request and proxy to Server.
 type Locale struct {
 	Listen string
 	Dialer Dialer
-}
-
-// Dial.
-func (l *Locale) Dial(network, address string) (net.Conn, error) {
-	host, _, err := net.SplitHostPort(address)
-	if err != nil {
-		return nil, err
-	}
-	ipList, err := net.LookupIP(host)
-	if err != nil {
-		return nil, err
-	}
-	ip := ipList[0]
-	if NativeNetwork.Contains(ip) {
-		log.Println("Connect", 0, address)
-		return net.Dial(network, address)
-	}
-	return l.Dialer.Dial(network, address)
 }
 
 // ServProxy handle requests on incoming connections using HTTP proxy parser.
@@ -318,7 +264,7 @@ func (l *Locale) ServProxy(pre []byte, connl net.Conn) error {
 			port = r.URL.Port()
 		}
 
-		connr, err := l.Dial("tcp", r.URL.Hostname()+":"+port)
+		connr, err := l.Dialer.Dial("tcp", r.URL.Hostname()+":"+port)
 		if err != nil {
 			return err
 		}
@@ -423,7 +369,7 @@ func (l *Locale) ServSocks(pre []byte, connl net.Conn) error {
 	var (
 		connr net.Conn
 	)
-	connr, err = l.Dial("tcp", dst)
+	connr, err = l.Dialer.Dial("tcp", dst)
 	if err != nil {
 		connl.Write(socks5RepGeneralFailure)
 		return err
@@ -491,9 +437,41 @@ func NewLocale(listen string, dialer Dialer) *Locale {
 	}
 }
 
-// ============================================================================
-// Filters
-// ============================================================================
+// IPNetList.
+type IPNetList []*net.IPNet
+
+// Contains reports whether the network list includes host.
+func (n IPNetList) Contains(ip net.IP) bool {
+	for _, entry := range n {
+		if entry.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+const (
+	LoopbackNetwork      = "127.0.0.0/8"
+	ClassAPrivateNetwork = "10.0.0.0/8"
+	ClassBPrivateNetwork = "172.16.0.0/12"
+	ClassCPrivateNetwork = "192.168.0.0/16"
+)
+
+// NativeNetwork is a network that uses private IP address space.
+// Note that localhost has also been joined.
+var NativeNetwork = func() IPNetList {
+	l := IPNetList{}
+	for _, n := range []string{
+		LoopbackNetwork,
+		ClassAPrivateNetwork,
+		ClassBPrivateNetwork,
+		ClassCPrivateNetwork,
+	} {
+		_, e, _ := net.ParseCIDR(n)
+		l = append(l, e)
+	}
+	return l
+}()
 
 // CIDRFilter implements Dialer.
 type CIDRFilter struct {
@@ -551,7 +529,7 @@ func (c *CIDRFilter) Look(host string) int {
 		return 2
 	}
 	ip := ipList[0]
-	if c.CIDRList.Contains(ip) {
+	if NativeNetwork.Contains(ip) || c.CIDRList.Contains(ip) {
 		return 0
 	}
 	return 1
