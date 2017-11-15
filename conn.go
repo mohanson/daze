@@ -476,10 +476,10 @@ var NativeNetwork = func() IPNetList {
 
 // CIDRFilter implements Dialer.
 type CIDRFilter struct {
-	Client   *Client
-	CIDRList IPNetList
-	LPath    string
-	RPath    string
+	Client     *Client
+	CIDRList   IPNetList
+	CachedFile string
+	URL        string
 }
 
 // LoadCIDR from a reader.
@@ -505,15 +505,15 @@ func (c *CIDRFilter) LoadCIDRReader(r io.Reader) error {
 	return nil
 }
 
-// LoadCIDR from FileName or Internet automatically.
+// LoadCIDR from cached file or URL.
 func (c *CIDRFilter) LoadCIDR() error {
 	var update bool
-	fileinfo, err := os.Stat(c.LPath)
+	fileinfo, err := os.Stat(c.CachedFile)
 	if err != nil {
 		if os.IsExist(err) {
 			return err
 		}
-		if err := os.MkdirAll(path.Dir(c.LPath), 0666); err != nil {
+		if err := os.MkdirAll(path.Dir(c.CachedFile), 0666); err != nil {
 			return err
 		}
 		update = true
@@ -524,13 +524,13 @@ func (c *CIDRFilter) LoadCIDR() error {
 	}
 	if update {
 		err := func() error {
-			r, err := http.Get(c.RPath)
+			r, err := http.Get(c.URL)
 			if err != nil {
 				return err
 			}
 			defer r.Body.Close()
 
-			file, err := os.OpenFile(c.LPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
+			file, err := os.OpenFile(c.CachedFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
 			if err != nil {
 				return err
 			}
@@ -543,7 +543,7 @@ func (c *CIDRFilter) LoadCIDR() error {
 			return err
 		}
 	}
-	file, err := os.Open(c.LPath)
+	file, err := os.Open(c.CachedFile)
 	if err != nil {
 		return err
 	}
@@ -589,11 +589,10 @@ func (c *CIDRFilter) Dial(network, address string) (net.Conn, error) {
 
 // NewCIDRFilter returns a CIDRFilter.
 func NewCIDRFilter(client *Client) *CIDRFilter {
-	r := &CIDRFilter{
-		Client:   client,
-		LPath:    "/etc/daze/delegated-apnic-latest",
-		RPath:    "http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest",
-		CIDRList: IPNetList{},
+	return &CIDRFilter{
+		Client:     client,
+		CIDRList:   IPNetList{},
+		CachedFile: "/etc/daze/delegated-apnic-latest",
+		URL:        "http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest",
 	}
-	return r
 }
