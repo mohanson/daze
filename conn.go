@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -477,10 +478,12 @@ var NativeNetwork = func() IPNetList {
 type CIDRFilter struct {
 	Client   *Client
 	CIDRList IPNetList
+	LPath    string
+	RPath    string
 }
 
 // LoadCIDR from a reader.
-func (c *CIDRFilter) LoadCIDR(r io.Reader) error {
+func (c *CIDRFilter) LoadCIDRReader(r io.Reader) error {
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -502,24 +505,50 @@ func (c *CIDRFilter) LoadCIDR(r io.Reader) error {
 	return nil
 }
 
-// LoadCIDR onLine.
-func (c *CIDRFilter) LoadCIDROnLine() error {
-	r, err := http.Get("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")
+// LoadCIDR from FileName or Internet automatically.
+func (c *CIDRFilter) LoadCIDR() error {
+	var update bool
+	fileinfo, err := os.Stat(c.LPath)
 	if err != nil {
-		return err
+		if os.IsExist(err) {
+			return err
+		}
+		if err := os.MkdirAll(path.Dir(c.LPath), 0666); err != nil {
+			return err
+		}
+		update = true
+	} else {
+		if time.Since(fileinfo.ModTime()) > time.Hour*24*28 {
+			update = true
+		}
 	}
-	defer r.Body.Close()
-	return c.LoadCIDR(r.Body)
-}
+	if update {
+		err := func() error {
+			r, err := http.Get(c.RPath)
+			if err != nil {
+				return err
+			}
+			defer r.Body.Close()
 
-// LoadCIDR from file.
-func (c *CIDRFilter) LoadCIDRFile(name string) error {
-	f, err := os.Open(name)
+			file, err := os.OpenFile(c.LPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
+			if err != nil {
+				return err
+			}
+			defer file.Close()
+
+			_, err = io.Copy(file, r.Body)
+			return err
+		}()
+		if err != nil {
+			return err
+		}
+	}
+	file, err := os.Open(c.LPath)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	return c.LoadCIDR(f)
+	defer file.Close()
+	return c.LoadCIDRReader(file)
 }
 
 // Look reports whether the CIDRList includes host.
@@ -562,6 +591,8 @@ func (c *CIDRFilter) Dial(network, address string) (net.Conn, error) {
 func NewCIDRFilter(client *Client) *CIDRFilter {
 	r := &CIDRFilter{
 		Client:   client,
+		LPath:    "/etc/daze/delegated-apnic-latest",
+		RPath:    "http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest",
 		CIDRList: IPNetList{},
 	}
 	return r

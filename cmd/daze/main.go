@@ -42,18 +42,11 @@ func main() {
 		var (
 			flListen = flag.String("b", "127.0.0.1:51959", "listen address")
 			flServer = flag.String("s", "127.0.0.1:51958", "server address")
-			flRouter = flag.String("l", "", "local router file")
 		)
 		flag.Parse()
 		client := daze.NewClient(*flServer)
 		router := daze.NewCIDRFilter(client)
-		var err error
-		if *flRouter != "" {
-			err = router.LoadCIDRFile(*flRouter)
-		} else {
-			err = router.LoadCIDROnLine()
-		}
-		if err != nil {
+		if err := router.LoadCIDR(); err != nil {
 			log.Fatalln(err)
 		}
 		locale := daze.NewLocale(*flListen, router)
