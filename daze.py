@@ -245,19 +245,19 @@ class Locale:
 class Dialer:
     def __init__(self, client):
         self.client = client
-        self.cached_file = os.path.join(os.path.expanduser('~'), '.daze', 'delegated-apnic-latest')
-        self.url = 'http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest'
-        self.cidr_list = []
+        self.netbox = []
         self.res = dns.resolver.Resolver()
         self.res.nameservers = ['8.8.8.8', '8.8.4.4']
 
-        if not os.path.exists(self.cached_file) or \
-                (datetime.datetime.now().timestamp() - os.path.getmtime(self.cached_file)) > 3600 * 24 * 28:
-            print('update', self.cached_file)
-            with open(self.cached_file, 'wb') as f:
-                f.write(requests.get(self.url).content)
+        p = os.path.join(os.path.expanduser('~'), '.daze', 'delegated-apnic-latest')
+        if not os.path.exists(os.path.dirname(p)):
+            os.mkdir(os.path.dirname(p))
+        if not os.path.exists(p) or (datetime.datetime.now().timestamp() - os.path.getmtime(p)) > 3600 * 24 * 28:
+            print('update', p)
+            with open(p, 'wb') as f:
+                f.write(requests.get('http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest').content)
 
-        with open(self.cached_file, 'r') as f:
+        with open(p, 'r') as f:
             for line in f:
                 line = line.rstrip()
                 if not line.startswith('apnic|CN|ipv4'):
@@ -266,7 +266,7 @@ class Dialer:
                 sep4 = int(seps[4])
                 mask = 32 - int(math.log2(sep4))
                 cidr = ipaddress.IPv4Network(f'{seps[3]}/{mask}')
-                self.cidr_list.append(cidr)
+                self.netbox.append(cidr)
 
     def surmise(self, host):
         try:
@@ -278,8 +278,8 @@ class Dialer:
             ip = ipaddress.ip_address(answer[0])
         if ip.is_private:
             return 0
-        for cidr in self.cidr_list:
-            if ip in cidr:
+        for net in self.netbox:
+            if ip in net:
                 return 0
         return 1
 
