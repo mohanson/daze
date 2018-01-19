@@ -220,14 +220,14 @@ func (c *Client) Dial(network, address string) (io.ReadWriteCloser, error) {
 	}
 	conn = Gravity(conn, buf[:128])
 	rand.Read(buf[:386])
-	buf[0] = 255
-	buf[1] = 255
+	buf[0] = 0xFF
+	buf[1] = 0xFF
 	binary.BigEndian.PutUint64(buf[120:128], uint64(time.Now().Unix()))
 	switch network {
 	case "tcp", "tcp4", "tcp6":
-		buf[128] = 1
+		buf[128] = 0x01
 	case "udp", "udp4", "udp6":
-		buf[128] = 3
+		buf[128] = 0x03
 	}
 	buf[129] = uint8(len(address))
 	copy(buf[130:], []byte(address))
