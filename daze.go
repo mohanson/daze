@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/cipher"
+	"crypto/md5"
 	"crypto/rc4"
 	"encoding/binary"
 	"fmt"
@@ -107,6 +108,7 @@ func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
 
 type Server struct {
 	Listen string
+	Cipher [16]byte
 }
 
 func (s *Server) Serve(connl io.ReadWriteCloser) error {
@@ -121,11 +123,13 @@ func (s *Server) Serve(connl io.ReadWriteCloser) error {
 		connl.Close()
 	})
 	defer killer.Stop()
+
 	_, err = io.ReadFull(connl, buf[:128])
 	if err != nil {
 		return err
 	}
-	connl = Gravity(connl, buf[:128])
+	connl = Gravity(connl, append(buf[:128], s.Cipher[:]...))
+
 	_, err = io.ReadFull(connl, buf[:128])
 	if err != nil {
 		return err
@@ -164,7 +168,7 @@ func (s *Server) Run() error {
 		return err
 	}
 	defer ln.Close()
-	log.Println("Listen and server on", s.Listen)
+	log.Println("Listen and serve on", s.Listen)
 
 	for {
 		conn, err := ln.Accept()
@@ -180,9 +184,10 @@ func (s *Server) Run() error {
 	}
 }
 
-func NewServer(listen string) *Server {
+func NewServer(listen, cipher string) *Server {
 	return &Server{
 		Listen: listen,
+		Cipher: md5.Sum([]byte(cipher)),
 	}
 }
 
@@ -192,6 +197,7 @@ type Dialer interface {
 
 type Client struct {
 	Server string
+	Cipher [16]byte
 }
 
 func (c *Client) Dial(network, address string) (io.ReadWriteCloser, error) {
@@ -218,7 +224,8 @@ func (c *Client) Dial(network, address string) (io.ReadWriteCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn = Gravity(conn, buf[:128])
+	conn = Gravity(conn, append(buf[:128], c.Cipher[:]...))
+
 	rand.Read(buf[:386])
 	buf[0] = 0xFF
 	buf[1] = 0xFF
@@ -238,9 +245,10 @@ func (c *Client) Dial(network, address string) (io.ReadWriteCloser, error) {
 	return conn, nil
 }
 
-func NewClient(server string) *Client {
+func NewClient(server, cipher string) *Client {
 	return &Client{
 		Server: server,
+		Cipher: md5.Sum([]byte(cipher)),
 	}
 }
 

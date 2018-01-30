@@ -34,9 +34,11 @@ func main() {
 	case "server":
 		var (
 			flListen = flag.String("l", "0.0.0.0:51958", "listen address")
+			flCipher = flag.String("k", "daze", "cipher")
 		)
 		flag.Parse()
-		server := daze.NewServer(*flListen)
+		log.Println("Server cipher is", *flCipher)
+		server := daze.NewServer(*flListen, *flCipher)
 		if err := server.Run(); err != nil {
 			log.Fatalln(err)
 		}
@@ -44,9 +46,12 @@ func main() {
 		var (
 			flListen = flag.String("l", "127.0.0.1:51959", "listen address")
 			flServer = flag.String("s", "127.0.0.1:51958", "server address")
+			flCipher = flag.String("k", "daze", "cipher")
 		)
 		flag.Parse()
-		client := daze.NewClient(*flServer)
+		log.Println("Remote server is", *flServer)
+		log.Println("Client cipher is", *flCipher)
+		client := daze.NewClient(*flServer, *flCipher)
 		router, err := daze.NewFilter(client)
 		if err != nil {
 			log.Fatalln(err)
