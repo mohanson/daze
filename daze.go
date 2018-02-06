@@ -252,8 +252,6 @@ type Locale struct {
 }
 
 func (l *Locale) ServeProxy(pre []byte, connl io.ReadWriteCloser) error {
-	defer connl.Close()
-
 	reader := bufio.NewReader(io.MultiReader(bytes.NewReader(pre), connl))
 	r, err := http.ReadRequest(reader)
 	if err != nil {
@@ -292,8 +290,6 @@ func (l *Locale) ServeProxy(pre []byte, connl io.ReadWriteCloser) error {
 }
 
 func (l *Locale) ServeSocks(pre []byte, connl io.ReadWriteCloser) error {
-	defer connl.Close()
-
 	var (
 		buf        = make([]byte, 1024)
 		n          int
