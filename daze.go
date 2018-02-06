@@ -24,14 +24,8 @@ import (
 )
 
 func Link(a, b io.ReadWriteCloser) {
-	go func() {
-		io.Copy(b, a)
-		b.Close()
-		a.Close()
-	}()
+	go io.Copy(b, a)
 	io.Copy(a, b)
-	b.Close()
-	a.Close()
 }
 
 func IPContains(l []*net.IPNet, ip net.IP) bool {
@@ -90,7 +84,7 @@ func LookupIP(host string) ([]net.IP, error) {
 	return ips, nil
 }
 
-type GravityConn struct {
+type ReadWriteCloser struct {
 	io.Reader
 	io.Writer
 	io.Closer
@@ -99,7 +93,7 @@ type GravityConn struct {
 func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
 	cr, _ := rc4.NewCipher(k)
 	cw, _ := rc4.NewCipher(k)
-	return &GravityConn{
+	return &ReadWriteCloser{
 		Reader: cipher.StreamReader{S: cr, R: conn},
 		Writer: cipher.StreamWriter{S: cw, W: conn},
 		Closer: conn,
@@ -112,7 +106,6 @@ type Server struct {
 }
 
 func (s *Server) Serve(connl io.ReadWriteCloser) error {
-	defer connl.Close()
 	var (
 		buf   = make([]byte, 1024)
 		dst   string
@@ -176,11 +169,12 @@ func (s *Server) Run() error {
 			log.Println(err)
 			continue
 		}
-		go func() {
+		go func(conn net.Conn) {
+			defer conn.Close()
 			if err := s.Serve(conn); err != nil {
 				log.Println(err)
 			}
-		}()
+		}(conn)
 	}
 }
 
@@ -381,7 +375,6 @@ func (l *Locale) ServeSocks(pre []byte, connl io.ReadWriteCloser) error {
 }
 
 func (l *Locale) Serve(connl io.ReadWriteCloser) error {
-	defer connl.Close()
 	var (
 		buf = make([]byte, 1)
 		err error
@@ -412,11 +405,12 @@ func (l *Locale) Run() error {
 			log.Println(err)
 			continue
 		}
-		go func() {
+		go func(conn net.Conn) {
+			defer conn.Close()
 			if err := l.Serve(conn); err != nil {
 				log.Println(err)
 			}
-		}()
+		}(conn)
 	}
 }
 
