@@ -24,8 +24,14 @@ import (
 )
 
 func Link(a, b io.ReadWriteCloser) {
-	go io.Copy(b, a)
+	go func() {
+		io.Copy(b, a)
+		a.Close()
+		b.Close()
+	}()
 	io.Copy(a, b)
+	b.Close()
+	a.Close()
 }
 
 func IPContains(l []*net.IPNet, ip net.IP) bool {
