@@ -129,25 +129,25 @@ func (s *Server) Serve(connl io.ReadWriteCloser) error {
 	}
 	connl = Gravity(connl, append(buf[:128], s.Cipher[:]...))
 
-	_, err = io.ReadFull(connl, buf[:128])
+	_, err = io.ReadFull(connl, buf[:12])
 	if err != nil {
 		return err
 	}
 	if buf[0] != 0xFF || buf[1] != 0xFF {
 		return fmt.Errorf("daze: malformed request: %v", buf[:2])
 	}
-	d := int64(binary.BigEndian.Uint64(buf[120:128]))
+	d := int64(binary.BigEndian.Uint64(buf[2:10]))
 	if math.Abs(float64(time.Now().Unix()-d)) > 120 {
 		return fmt.Errorf("daze: expired: %v", time.Unix(d, 0))
 	}
-	_, err = io.ReadFull(connl, buf[:2+256])
+	_, err = io.ReadFull(connl, buf[12:12+buf[11]])
 	if err != nil {
 		return err
 	}
 	killer.Stop()
-	dst = string(buf[2 : 2+buf[1]])
+	dst = string(buf[12 : 12+buf[11]])
 	log.Println("Connect", dst)
-	if buf[0] == 0x03 {
+	if buf[10] == 0x03 {
 		connr, err = net.DialTimeout("udp", dst, time.Second*8)
 	} else {
 		connr, err = net.DialTimeout("tcp", dst, time.Second*8)
@@ -201,14 +201,15 @@ type Client struct {
 }
 
 func (c *Client) Dial(network, address string) (io.ReadWriteCloser, error) {
-	if len(address) > 256 {
-		return nil, fmt.Errorf("daze: destination address too long: %s", address)
-	}
 	var (
 		conn io.ReadWriteCloser
 		buf  = make([]byte, 1024)
 		err  error
+		n    = len(address)
 	)
+	if n > 256 {
+		return nil, fmt.Errorf("daze: destination address too long: %s", address)
+	}
 	conn, err = net.DialTimeout("tcp", c.Server, time.Second*8)
 	if err != nil {
 		return nil, err
@@ -226,19 +227,18 @@ func (c *Client) Dial(network, address string) (io.ReadWriteCloser, error) {
 	}
 	conn = Gravity(conn, append(buf[:128], c.Cipher[:]...))
 
-	rand.Read(buf[:386])
 	buf[0] = 0xFF
 	buf[1] = 0xFF
-	binary.BigEndian.PutUint64(buf[120:128], uint64(time.Now().Unix()))
+	binary.BigEndian.PutUint64(buf[2:10], uint64(time.Now().Unix()))
 	switch network {
 	case "tcp", "tcp4", "tcp6":
-		buf[128] = 0x01
+		buf[10] = 0x01
 	case "udp", "udp4", "udp6":
-		buf[128] = 0x03
+		buf[10] = 0x03
 	}
-	buf[129] = uint8(len(address))
-	copy(buf[130:], []byte(address))
-	_, err = conn.Write(buf[:386])
+	buf[11] = uint8(n)
+	copy(buf[12:], []byte(address))
+	_, err = conn.Write(buf[:12+n])
 	if err != nil {
 		return nil, err
 	}
