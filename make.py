@@ -3,6 +3,11 @@ import os.path
 import subprocess
 
 project_name = os.path.basename(os.path.dirname(os.path.abspath(__file__)))
+gopath = os.getenv('GOPATH')
+if gopath:
+    gopath = gopath.split(os.pathsep)[0]
+else:
+    gopath = os.path.expanduser('~/go')
 
 
 def call(command):
@@ -12,7 +17,6 @@ def call(command):
 
 def link():
     src = os.getcwd()
-    gopath = os.getenv('GOPATH').split(os.pathsep)[0]
     dst = os.path.normpath(os.path.join(gopath, 'src', 'github.com', 'mohanson', project_name))
     if os.path.exists(dst):
         return
