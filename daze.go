@@ -257,8 +257,8 @@ type Locale struct {
 	Dialer Dialer
 }
 
-func (l *Locale) ServeProxy(pre []byte, connl io.ReadWriteCloser) error {
-	reader := bufio.NewReader(io.MultiReader(bytes.NewReader(pre), connl))
+func (l *Locale) ServeProxy(connl io.ReadWriteCloser) error {
+	reader := bufio.NewReader(connl)
 	r, err := http.ReadRequest(reader)
 	if err != nil {
 		return err
@@ -295,7 +295,7 @@ func (l *Locale) ServeProxy(pre []byte, connl io.ReadWriteCloser) error {
 	return nil
 }
 
-func (l *Locale) ServeSocks(pre []byte, connl io.ReadWriteCloser) error {
+func (l *Locale) ServeSocks(connl io.ReadWriteCloser) error {
 	var (
 		buf        = make([]byte, 1024)
 		n          int
@@ -308,11 +308,11 @@ func (l *Locale) ServeSocks(pre []byte, connl io.ReadWriteCloser) error {
 		err        error
 	)
 
-	_, err = io.ReadFull(connl, buf[:1])
+	_, err = io.ReadFull(connl, buf[:2])
 	if err != nil {
 		return err
 	}
-	n = int(buf[0])
+	n = int(buf[1])
 	_, err = io.ReadFull(connl, buf[:n])
 	if err != nil {
 		return err
@@ -385,10 +385,15 @@ func (l *Locale) Serve(connl io.ReadWriteCloser) error {
 	if err != nil {
 		return err
 	}
+	connl = ReadWriteCloser{
+		Reader: io.MultiReader(bytes.NewReader(buf), connl),
+		Writer: connl,
+		Closer: connl,
+	}
 	if buf[0] == 0x05 {
-		err = l.ServeSocks(buf, connl)
+		err = l.ServeSocks(connl)
 	} else {
-		err = l.ServeProxy(buf, connl)
+		err = l.ServeProxy(connl)
 	}
 	return err
 }
