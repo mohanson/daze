@@ -1,6 +1,7 @@
 import os
 import os.path
 import subprocess
+import sys
 
 project_name = os.path.basename(os.path.dirname(os.path.abspath(__file__)))
 gopath = os.getenv('GOPATH')
@@ -12,7 +13,9 @@ else:
 
 def call(command):
     print(command)
-    subprocess.call(command, shell=True)
+    r = subprocess.call(command, shell=True)
+    if r != 0:
+        sys.exit(r)
 
 
 def link():
@@ -28,6 +31,7 @@ def link():
 
 
 def main():
+    call(f'go install github.com/mohanson/{project_name}')
     call(f'go install github.com/mohanson/{project_name}/cmd/{project_name}')
 
 
