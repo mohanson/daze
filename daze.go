@@ -34,62 +34,6 @@ func Link(a, b io.ReadWriteCloser) {
 	a.Close()
 }
 
-func IPContains(l []*net.IPNet, ip net.IP) bool {
-	for _, entry := range l {
-		if entry.Contains(ip) {
-			return true
-		}
-	}
-	return false
-}
-
-var NativeNet = func() []*net.IPNet {
-	priv := []string{
-		"0.0.0.0/8",
-		"10.0.0.0/8",
-		"127.0.0.0/8",
-		"169.254.0.0/16",
-		"172.16.0.0/12",
-		"192.0.0.0/29",
-		"192.0.0.170/31",
-		"192.0.2.0/24",
-		"192.168.0.0/16",
-		"198.18.0.0/15",
-		"198.51.100.0/24",
-		"203.0.113.0/24",
-		"240.0.0.0/4",
-		"255.255.255.255/32",
-	}
-	l := []*net.IPNet{}
-	for _, n := range priv {
-		_, e, _ := net.ParseCIDR(n)
-		l = append(l, e)
-	}
-	return l
-}()
-
-func DNSDialer(ctx context.Context, network, address string) (net.Conn, error) {
-	var d net.Dialer
-	return d.DialContext(ctx, "udp", "8.8.8.8:53")
-}
-
-var DefaultResolver = &net.Resolver{
-	PreferGo: true,
-	Dial:     DNSDialer,
-}
-
-func LookupIP(host string) ([]net.IP, error) {
-	addrs, err := DefaultResolver.LookupIPAddr(context.Background(), host)
-	if err != nil {
-		return nil, err
-	}
-	ips := make([]net.IP, len(addrs))
-	for i, ia := range addrs {
-		ips[i] = ia.IP
-	}
-	return ips, nil
-}
-
 type ReadWriteCloser struct {
 	io.Reader
 	io.Writer
@@ -270,6 +214,7 @@ func (l *Locale) ServeProxy(connl io.ReadWriteCloser) error {
 	} else {
 		port = r.URL.Port()
 	}
+	log.Println("Connect", r.URL.Hostname()+":"+port)
 
 	connr, err := l.Dialer.Dial("tcp", r.URL.Hostname()+":"+port)
 	if err != nil {
@@ -359,6 +304,7 @@ func (l *Locale) ServeSocks(connl io.ReadWriteCloser) error {
 	}
 	dstPort = binary.BigEndian.Uint16(buf[:2])
 	dst = dstHost + ":" + strconv.Itoa(int(dstPort))
+	log.Println("Connect", dst)
 
 	if dstNetwork == 0x03 {
 		connr, err = l.Dialer.Dial("udp", dst)
@@ -428,6 +374,62 @@ func NewLocale(listen string, dialer Dialer) *Locale {
 	}
 }
 
+func IPContains(l []*net.IPNet, ip net.IP) bool {
+	for _, entry := range l {
+		if entry.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+var NativeNet = func() []*net.IPNet {
+	priv := []string{
+		"0.0.0.0/8",
+		"10.0.0.0/8",
+		"127.0.0.0/8",
+		"169.254.0.0/16",
+		"172.16.0.0/12",
+		"192.0.0.0/29",
+		"192.0.0.170/31",
+		"192.0.2.0/24",
+		"192.168.0.0/16",
+		"198.18.0.0/15",
+		"198.51.100.0/24",
+		"203.0.113.0/24",
+		"240.0.0.0/4",
+		"255.255.255.255/32",
+	}
+	l := []*net.IPNet{}
+	for _, n := range priv {
+		_, e, _ := net.ParseCIDR(n)
+		l = append(l, e)
+	}
+	return l
+}()
+
+func DNSDialer(ctx context.Context, network, address string) (net.Conn, error) {
+	var d net.Dialer
+	return d.DialContext(ctx, "udp", "8.8.8.8:53")
+}
+
+var DefaultResolver = &net.Resolver{
+	PreferGo: true,
+	Dial:     DNSDialer,
+}
+
+func LookupIP(host string) ([]net.IP, error) {
+	addrs, err := DefaultResolver.LookupIPAddr(context.Background(), host)
+	if err != nil {
+		return nil, err
+	}
+	ips := make([]net.IP, len(addrs))
+	for i, ia := range addrs {
+		ips[i] = ia.IP
+	}
+	return ips, nil
+}
+
 type Filter struct {
 	Client *Client
 	NetBox []*net.IPNet
@@ -472,7 +474,6 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 		return nil, err
 	}
 	road := f.Road(host)
-	log.Println("Connect", road, address)
 	switch road {
 	case 0:
 		return net.DialTimeout(network, address, time.Second*8)

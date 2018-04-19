@@ -69,7 +69,7 @@ func main() {
 		}
 		cmd := exec.Command(os.Args[1], os.Args[2:]...)
 		env := os.Environ()
-		env = append(env, "all_proxy=socks5://"+*flClient)
+		env = append(env, "all_proxy="+*flClient)
 		cmd.Env = env
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
