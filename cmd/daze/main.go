@@ -7,7 +7,8 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/mohanson/daze"
+	"github.com/mohanson/daze/engine/v1"
+	"github.com/mohanson/daze/engine/v2"
 )
 
 const help = `usage: daze <command> [<args>]
@@ -35,30 +36,54 @@ func main() {
 		var (
 			flListen = flag.String("l", "0.0.0.0:51958", "listen address")
 			flCipher = flag.String("k", "daze", "cipher")
+			flMasker = flag.String("masker", "http://httpbin.org", "")
+			flEngine = flag.String("engine", "v1", "")
 		)
 		flag.Parse()
-		log.Println("Server cipher is", *flCipher)
-		server := daze.NewServer(*flListen, *flCipher)
-		if err := server.Run(); err != nil {
-			log.Fatalln(err)
+		switch *flEngine {
+		case "v1":
+			log.Println("Server cipher is", *flCipher)
+			server := v1.NewServer(*flListen, *flCipher)
+			if err := server.Run(); err != nil {
+				log.Fatalln(err)
+			}
+		case "v2":
+			log.Println("Server cipher is", *flCipher)
+			server := v2.NewServer(*flListen, *flCipher)
+			server.Masker = *flMasker
+			if err := server.Run(); err != nil {
+				log.Fatalln(err)
+			}
+		default:
+			log.Fatalln(*flEngine, "is not an engine")
 		}
 	case "client":
 		var (
 			flListen = flag.String("l", "127.0.0.1:51959", "listen address")
 			flServer = flag.String("s", "127.0.0.1:51958", "server address")
 			flCipher = flag.String("k", "daze", "cipher")
+			flEngine = flag.String("engine", "v1", "")
 		)
 		flag.Parse()
 		log.Println("Remote server is", *flServer)
 		log.Println("Client cipher is", *flCipher)
-		client := daze.NewClient(*flServer, *flCipher)
-		router, err := daze.NewFilter(client)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		locale := daze.NewLocale(*flListen, router)
-		if err := locale.Run(); err != nil {
-			log.Fatalln(err)
+		switch *flEngine {
+		case "v1":
+			client := v1.NewClient(*flServer, *flCipher)
+			router := v1.NewFilter(client)
+			locale := v1.NewLocale(*flListen, router)
+			if err := locale.Run(); err != nil {
+				log.Fatalln(err)
+			}
+		case "v2":
+			client := v2.NewClient(*flServer, *flCipher)
+			router := v1.NewFilter(client)
+			locale := v1.NewLocale(*flListen, router)
+			if err := locale.Run(); err != nil {
+				log.Fatalln(err)
+			}
+		default:
+			log.Fatalln(*flEngine, "is not an engine")
 		}
 	case "cmd":
 		var (
