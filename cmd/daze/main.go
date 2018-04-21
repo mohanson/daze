@@ -36,8 +36,8 @@ func main() {
 		var (
 			flListen = flag.String("l", "0.0.0.0:51958", "listen address")
 			flCipher = flag.String("k", "daze", "cipher")
-			flMasker = flag.String("masker", "http://httpbin.org", "")
-			flEngine = flag.String("engine", "v1", "")
+			flMasker = flag.String("m", "http://httpbin.org", "")
+			flEngine = flag.String("e", "v1", "")
 		)
 		flag.Parse()
 		switch *flEngine {
@@ -62,7 +62,7 @@ func main() {
 			flListen = flag.String("l", "127.0.0.1:51959", "listen address")
 			flServer = flag.String("s", "127.0.0.1:51958", "server address")
 			flCipher = flag.String("k", "daze", "cipher")
-			flEngine = flag.String("engine", "v1", "")
+			flEngine = flag.String("e", "v1", "")
 		)
 		flag.Parse()
 		log.Println("Remote server is", *flServer)
