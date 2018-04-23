@@ -7,8 +7,8 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/mohanson/daze/engine/v1"
-	"github.com/mohanson/daze/engine/v2"
+	"github.com/mohanson/daze/protocol/ashe"
+	"github.com/mohanson/daze/protocol/asheshadow"
 )
 
 const help = `usage: daze <command> [<args>]
@@ -37,19 +37,19 @@ func main() {
 			flListen = flag.String("l", "0.0.0.0:51958", "listen address")
 			flCipher = flag.String("k", "daze", "cipher")
 			flMasker = flag.String("m", "http://httpbin.org", "")
-			flEngine = flag.String("e", "v1", "")
+			flEngine = flag.String("e", "ashe", "")
 		)
 		flag.Parse()
 		switch *flEngine {
-		case "v1":
+		case "ashe":
 			log.Println("Server cipher is", *flCipher)
-			server := v1.NewServer(*flListen, *flCipher)
+			server := ashe.NewServer(*flListen, *flCipher)
 			if err := server.Run(); err != nil {
 				log.Fatalln(err)
 			}
-		case "v2":
+		case "asheshadow":
 			log.Println("Server cipher is", *flCipher)
-			server := v2.NewServer(*flListen, *flCipher)
+			server := asheshadow.NewServer(*flListen, *flCipher)
 			server.Masker = *flMasker
 			if err := server.Run(); err != nil {
 				log.Fatalln(err)
@@ -62,23 +62,23 @@ func main() {
 			flListen = flag.String("l", "127.0.0.1:51959", "listen address")
 			flServer = flag.String("s", "127.0.0.1:51958", "server address")
 			flCipher = flag.String("k", "daze", "cipher")
-			flEngine = flag.String("e", "v1", "")
+			flEngine = flag.String("e", "ashe", "")
 		)
 		flag.Parse()
 		log.Println("Remote server is", *flServer)
 		log.Println("Client cipher is", *flCipher)
 		switch *flEngine {
-		case "v1":
-			client := v1.NewClient(*flServer, *flCipher)
-			router := v1.NewFilter(client)
-			locale := v1.NewLocale(*flListen, router)
+		case "ashe":
+			client := ashe.NewClient(*flServer, *flCipher)
+			router := ashe.NewFilter(client)
+			locale := ashe.NewLocale(*flListen, router)
 			if err := locale.Run(); err != nil {
 				log.Fatalln(err)
 			}
-		case "v2":
-			client := v2.NewClient(*flServer, *flCipher)
-			router := v1.NewFilter(client)
-			locale := v1.NewLocale(*flListen, router)
+		case "asheshadow":
+			client := asheshadow.NewClient(*flServer, *flCipher)
+			router := ashe.NewFilter(client)
+			locale := ashe.NewLocale(*flListen, router)
 			if err := locale.Run(); err != nil {
 				log.Fatalln(err)
 			}

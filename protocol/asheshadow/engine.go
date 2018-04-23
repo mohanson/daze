@@ -1,4 +1,4 @@
-package v2
+package asheshadow
 
 import (
 	"crypto/md5"

@@ -32,8 +32,8 @@ def link():
 
 def main():
     call(f'go install github.com/mohanson/{project_name}')
-    call(f'go install github.com/mohanson/{project_name}/engine/v1')
-    call(f'go install github.com/mohanson/{project_name}/engine/v2')
+    call(f'go install github.com/mohanson/{project_name}/protocol/ashe')
+    call(f'go install github.com/mohanson/{project_name}/protocol/asheshadow')
     call(f'go install github.com/mohanson/{project_name}/cmd/{project_name}')
 
 
