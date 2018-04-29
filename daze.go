@@ -13,8 +13,8 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/user"
 	"path"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -127,19 +127,24 @@ var IPv6ReservedIPNet = func() *NetBox {
 	return netBox
 }
 
-var DarkMainlandIPNet = func() *NetBox {
-	u, _ := user.Current()
-	root := path.Join(u.HomeDir, ".daze")
-	_, err := os.Stat(root)
-	if err != nil {
-		err = os.Mkdir(path.Join(u.HomeDir, ".daze"), 0666)
-		if err != nil {
+var AppDir = func() string {
+	var appDir string
+	if runtime.GOOS == "windows" {
+		appDir = path.Join(os.Getenv("localappdata"), "daze")
+	} else {
+		appDir = path.Join("~", ".daze")
+	}
+	if _, err := os.Stat(appDir); err != nil {
+		if err = os.Mkdir(appDir, 0644); err != nil {
 			log.Fatalln(err)
 		}
 	}
+	return appDir
+}()
 
+var DarkMainlandIPNet = func() *NetBox {
 	var reader io.Reader
-	filePath := path.Join(root, "delegated-apnic-latest")
+	filePath := path.Join(AppDir, "delegated-apnic-latest")
 	fileInfo, err := os.Stat(filePath)
 	if err != nil || time.Since(fileInfo.ModTime()) > time.Hour*24*28 {
 		r, err := http.Get("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")
