@@ -79,6 +79,25 @@ func (n *NetBox) Has(ip net.IP) bool {
 	return false
 }
 
+var AppDir = func() string {
+	var appDir string
+	if runtime.GOOS == "windows" {
+		appDir = path.Join(os.Getenv("localappdata"), "daze")
+	} else {
+		u, err := user.Current()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		appDir = path.Join(u.HomeDir, ".daze")
+	}
+	if _, err := os.Stat(appDir); err != nil {
+		if err = os.Mkdir(appDir, 0644); err != nil {
+			log.Fatalln(err)
+		}
+	}
+	return appDir
+}()
+
 var IPv4ReservedIPNet = func() *NetBox {
 	netBox := &NetBox{}
 	for _, entry := range [][2]string{
@@ -127,25 +146,6 @@ var IPv6ReservedIPNet = func() *NetBox {
 	}
 	return netBox
 }
-
-var AppDir = func() string {
-	var appDir string
-	if runtime.GOOS == "windows" {
-		appDir = path.Join(os.Getenv("localappdata"), "daze")
-	} else {
-		u, err := user.Current()
-		if err != nil {
-			log.Fatalln(err)
-		}
-		appDir = path.Join(u.HomeDir, ".daze")
-	}
-	if _, err := os.Stat(appDir); err != nil {
-		if err = os.Mkdir(appDir, 0644); err != nil {
-			log.Fatalln(err)
-		}
-	}
-	return appDir
-}()
 
 var DarkMainlandIPNet = func() *NetBox {
 	var reader io.Reader
