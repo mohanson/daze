@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/user"
 	"path"
 	"runtime"
 	"strconv"
@@ -132,7 +133,11 @@ var AppDir = func() string {
 	if runtime.GOOS == "windows" {
 		appDir = path.Join(os.Getenv("localappdata"), "daze")
 	} else {
-		appDir = path.Join("~", ".daze")
+		u, err := user.Current()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		appDir = path.Join(u.HomeDir, ".daze")
 	}
 	if _, err := os.Stat(appDir); err != nil {
 		if err = os.Mkdir(appDir, 0644); err != nil {
