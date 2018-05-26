@@ -340,6 +340,7 @@ func NewLocale(listen string, dialer daze.Dialer) *Locale {
 
 type Filter struct {
 	Client daze.Dialer
+	Netbox *daze.NetBox
 }
 
 func (f *Filter) Road(host string) int {
@@ -347,7 +348,7 @@ func (f *Filter) Road(host string) int {
 	if err != nil {
 		return 2
 	}
-	if daze.IPv4ReservedIPNet.Has(ips[0]) || daze.DarkMainlandIPNet.Has(ips[0]) {
+	if f.Netbox.Has(ips[0]) {
 		return 0
 	}
 	return 1
@@ -373,5 +374,15 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 }
 
 func NewFilter(dialer daze.Dialer) *Filter {
-	return &Filter{Client: dialer}
+	netbox := &daze.NetBox{}
+	for _, e := range daze.IPv4ReservedIPNet().L {
+		netbox.Add(e)
+	}
+	for _, e := range daze.DarkMainlandIPNet().L {
+		netbox.Add(e)
+	}
+	return &Filter{
+		Client: dialer,
+		Netbox: netbox,
+	}
 }

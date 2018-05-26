@@ -12,8 +12,13 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"os"
+	"os/user"
+	"path"
+	"runtime"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func Link(a, b io.ReadWriteCloser) {
@@ -58,15 +63,15 @@ type Dialer interface {
 }
 
 type NetBox struct {
-	l []*net.IPNet
+	L []*net.IPNet
 }
 
 func (n *NetBox) Add(ipNet *net.IPNet) {
-	n.l = append(n.l, ipNet)
+	n.L = append(n.L, ipNet)
 }
 
 func (n *NetBox) Has(ip net.IP) bool {
-	for _, entry := range n.l {
+	for _, entry := range n.L {
 		if entry.Contains(ip) {
 			return true
 		}
@@ -74,7 +79,7 @@ func (n *NetBox) Has(ip net.IP) bool {
 	return false
 }
 
-var IPv4ReservedIPNet = func() *NetBox {
+func IPv4ReservedIPNet() *NetBox {
 	netBox := &NetBox{}
 	for _, entry := range [][2]string{
 		[2]string{"00000000", "FF000000"},
@@ -97,9 +102,9 @@ var IPv4ReservedIPNet = func() *NetBox {
 		netBox.Add(&net.IPNet{IP: i, Mask: m})
 	}
 	return netBox
-}()
+}
 
-var IPv6ReservedIPNet = func() *NetBox {
+func IPv6ReservedIPNet() *NetBox {
 	netBox := &NetBox{}
 	for _, entry := range [][2]string{
 		[2]string{"00000000000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
@@ -123,15 +128,39 @@ var IPv6ReservedIPNet = func() *NetBox {
 	return netBox
 }
 
-var DarkMainlandIPNet = func() *NetBox {
-	r, err := http.Get("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")
-	if err != nil {
+func DarkMainlandIPNet() *NetBox {
+	if err := os.MkdirAll(DataPath, 0666); err != nil {
 		log.Fatalln(err)
 	}
-	defer r.Body.Close()
+	var reader io.Reader
+	filePath := path.Join(DataPath, "delegated-apnic-latest")
+	fileInfo, err := os.Stat(filePath)
+	if err != nil || time.Since(fileInfo.ModTime()) > time.Hour*24*28 {
+		r, err := http.Get("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")
+		if err != nil {
+			log.Fatalln(err)
+		}
+		defer r.Body.Close()
+
+		file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		defer file.Close()
+
+		reader = io.TeeReader(r.Body, file)
+	} else {
+		file, err := os.Open(filePath)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		defer file.Close()
+
+		reader = file
+	}
 
 	netBox := &NetBox{}
-	s := bufio.NewScanner(r.Body)
+	s := bufio.NewScanner(reader)
 	for s.Scan() {
 		line := s.Text()
 		if !strings.HasPrefix(line, "apnic|CN|ipv4") {
@@ -151,6 +180,17 @@ var DarkMainlandIPNet = func() *NetBox {
 	}
 
 	return netBox
+}
+
+var DataPath = func() string {
+	var data string
+	if runtime.GOOS == "windows" {
+		data = path.Join(os.Getenv("localappdata"), "daze")
+	} else {
+		u, _ := user.Current()
+		data = path.Join(u.HomeDir, ".daze")
+	}
+	return data
 }()
 
 var Resolver = &net.Resolver{
