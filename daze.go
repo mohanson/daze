@@ -12,13 +12,8 @@ import (
 	"math"
 	"net"
 	"net/http"
-	"os"
-	"os/user"
-	"path"
-	"runtime"
 	"strconv"
 	"strings"
-	"time"
 )
 
 func Link(a, b io.ReadWriteCloser) {
@@ -79,25 +74,6 @@ func (n *NetBox) Has(ip net.IP) bool {
 	return false
 }
 
-var AppDir = func() string {
-	var appDir string
-	if runtime.GOOS == "windows" {
-		appDir = path.Join(os.Getenv("localappdata"), "daze")
-	} else {
-		u, err := user.Current()
-		if err != nil {
-			log.Fatalln(err)
-		}
-		appDir = path.Join(u.HomeDir, ".daze")
-	}
-	if _, err := os.Stat(appDir); err != nil {
-		if err = os.Mkdir(appDir, 0644); err != nil {
-			log.Fatalln(err)
-		}
-	}
-	return appDir
-}()
-
 var IPv4ReservedIPNet = func() *NetBox {
 	netBox := &NetBox{}
 	for _, entry := range [][2]string{
@@ -148,35 +124,14 @@ var IPv6ReservedIPNet = func() *NetBox {
 }
 
 var DarkMainlandIPNet = func() *NetBox {
-	var reader io.Reader
-	filePath := path.Join(AppDir, "delegated-apnic-latest")
-	fileInfo, err := os.Stat(filePath)
-	if err != nil || time.Since(fileInfo.ModTime()) > time.Hour*24*28 {
-		r, err := http.Get("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")
-		if err != nil {
-			log.Fatalln(err)
-		}
-		defer r.Body.Close()
-
-		file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		defer file.Close()
-
-		reader = io.TeeReader(r.Body, file)
-	} else {
-		file, err := os.Open(filePath)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		defer file.Close()
-
-		reader = file
+	r, err := http.Get("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")
+	if err != nil {
+		log.Fatalln(err)
 	}
+	defer r.Body.Close()
 
 	netBox := &NetBox{}
-	s := bufio.NewScanner(reader)
+	s := bufio.NewScanner(r.Body)
 	for s.Scan() {
 		line := s.Text()
 		if !strings.HasPrefix(line, "apnic|CN|ipv4") {
