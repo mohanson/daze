@@ -344,7 +344,7 @@ type Filter struct {
 }
 
 func (f *Filter) Road(host string) int {
-	ips, err := daze.LookupIP(host)
+	ips, err := net.LookupIP(host)
 	if err != nil {
 		return 2
 	}

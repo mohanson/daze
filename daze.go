@@ -193,22 +193,12 @@ var DataPath = func() string {
 	return data
 }()
 
-var Resolver = &net.Resolver{
-	PreferGo: true,
-	Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-		var d net.Dialer
-		return d.DialContext(ctx, "udp", "8.8.8.8:53")
-	},
-}
-
-func LookupIP(host string) ([]net.IP, error) {
-	addrs, err := Resolver.LookupIPAddr(context.Background(), host)
-	if err != nil {
-		return nil, err
+func ChangeDefaultResolver(addr string) {
+	net.DefaultResolver = &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			var d net.Dialer
+			return d.DialContext(ctx, "udp", addr)
+		},
 	}
-	ips := make([]net.IP, len(addrs))
-	for i, ia := range addrs {
-		ips[i] = ia.IP
-	}
-	return ips, nil
 }

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/protocol/ashe"
 	"github.com/mohanson/daze/protocol/asheshadow"
 )
@@ -38,8 +39,11 @@ func main() {
 			flCipher = flag.String("k", "daze", "cipher")
 			flMasker = flag.String("m", "http://httpbin.org", "")
 			flEngine = flag.String("e", "ashe", "")
+			flDnserv = flag.String("dns", "8.8.8.8:53", "")
 		)
 		flag.Parse()
+		log.Println("Domain server is", *flDnserv)
+		daze.ChangeDefaultResolver(*flDnserv)
 		switch *flEngine {
 		case "ashe":
 			log.Println("Server cipher is", *flCipher)
@@ -63,10 +67,13 @@ func main() {
 			flServer = flag.String("s", "127.0.0.1:51958", "server address")
 			flCipher = flag.String("k", "daze", "cipher")
 			flEngine = flag.String("e", "ashe", "")
+			flDnserv = flag.String("dns", "8.8.8.8:53", "")
 		)
 		flag.Parse()
 		log.Println("Remote server is", *flServer)
 		log.Println("Client cipher is", *flCipher)
+		log.Println("Domain server is", *flDnserv)
+		daze.ChangeDefaultResolver(*flDnserv)
 		switch *flEngine {
 		case "ashe":
 			client := ashe.NewClient(*flServer, *flCipher)
