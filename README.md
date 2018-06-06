@@ -17,3 +17,15 @@ daze client -s $SERVER:51958 -l 127.0.0.1:51959
 # now, you are free to visit Internet
 daze cmd curl https://google.com
 ```
+
+# About android
+
+Daze can work well on **Windows**, **Linux** and **macOS**. In additional, it can also work on **Android**, just it will be a bit complicated.
+
+1. Download [SDK Platform Tools](https://developer.android.com/studio/releases/platform-tools) and make sure you can use `adb` normally.
+2. Connect your phone to your computer with USB. Use `adb devices` to list devices.
+2. Cross compile daze for android: `GOOS=linux GOARCH=arm go build -o daze github.com/mohanson/daze/cmd/daze`
+4. Push binary and open shell: `adb push daze /data/local/tmp/daze`, `adb shell`
+5. Open daze client: `cd /data/local/tmp && chmod +x daze && daze client -s $SERVER:51958 -l 127.0.0.1:51959`
+6. Set the proxy for phone: WLAN -> Settings -> Proxy -> Fill in `127.0.0.1:51959`
+7. Now, you are free to visit Internet.
