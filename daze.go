@@ -12,13 +12,8 @@ import (
 	"math"
 	"net"
 	"net/http"
-	"os"
-	"os/user"
-	"path"
-	"runtime"
 	"strconv"
 	"strings"
-	"time"
 )
 
 func Link(a, b io.ReadWriteCloser) {
@@ -129,38 +124,14 @@ func IPv6ReservedIPNet() *NetBox {
 }
 
 func DarkMainlandIPNet() *NetBox {
-	if err := os.MkdirAll(DataPath, 0666); err != nil {
+	r, err := http.Get("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")
+	if err != nil {
 		log.Fatalln(err)
 	}
-	var reader io.Reader
-	filePath := path.Join(DataPath, "delegated-apnic-latest")
-	fileInfo, err := os.Stat(filePath)
-	if err != nil || time.Since(fileInfo.ModTime()) > time.Hour*24*28 {
-		r, err := http.Get("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")
-		if err != nil {
-			log.Fatalln(err)
-		}
-		defer r.Body.Close()
-
-		file, err := os.OpenFile(filePath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0666)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		defer file.Close()
-
-		reader = io.TeeReader(r.Body, file)
-	} else {
-		file, err := os.Open(filePath)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		defer file.Close()
-
-		reader = file
-	}
+	defer r.Body.Close()
 
 	netBox := &NetBox{}
-	s := bufio.NewScanner(reader)
+	s := bufio.NewScanner(r.Body)
 	for s.Scan() {
 		line := s.Text()
 		if !strings.HasPrefix(line, "apnic|CN|ipv4") {
@@ -178,22 +149,11 @@ func DarkMainlandIPNet() *NetBox {
 		}
 		netBox.Add(cidr)
 	}
-
 	return netBox
 }
 
-var DataPath = func() string {
-	var data string
-	if runtime.GOOS == "windows" {
-		data = path.Join(os.Getenv("localappdata"), "daze")
-	} else {
-		u, _ := user.Current()
-		data = path.Join(u.HomeDir, ".daze")
-	}
-	return data
-}()
-
-func ChangeDefaultResolver(addr string) {
+// SetResolver change the default resolver used by the package "net".
+func SetResolver(addr string) {
 	net.DefaultResolver = &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
