@@ -2,9 +2,11 @@ package daze
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/cipher"
 	"crypto/rc4"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -55,6 +57,11 @@ func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
 
 type Dialer interface {
 	Dial(network, address string) (io.ReadWriteCloser, error)
+}
+
+type Server interface {
+	Serve(connl io.ReadWriteCloser) error
+	Run() error
 }
 
 type NetBox struct {
@@ -159,5 +166,278 @@ func SetResolver(addr string) {
 			var d net.Dialer
 			return d.DialContext(ctx, "udp", addr)
 		},
+	}
+}
+
+type Filter struct {
+	Client Dialer
+	Netbox NetBox
+}
+
+func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, err
+	}
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return nil, err
+	}
+	if f.Netbox.Has(ips[0]) {
+		return net.Dial(network, address)
+	}
+	return f.Client.Dial(network, address)
+}
+
+func NewFilter(dialer Dialer) *Filter {
+	netbox := NetBox{}
+	for _, e := range IPv4ReservedIPNet().L {
+		netbox.Add(e)
+	}
+	for _, e := range DarkMainlandIPNet().L {
+		netbox.Add(e)
+	}
+	return &Filter{
+		Client: dialer,
+		Netbox: netbox,
+	}
+}
+
+type Locale struct {
+	Listen string
+	Dialer Dialer
+}
+
+func (l *Locale) ServeProxy(connl io.ReadWriteCloser) error {
+	reader := bufio.NewReader(connl)
+	r, err := http.ReadRequest(reader)
+	if err != nil {
+		return err
+	}
+
+	var port string
+	if r.URL.Port() == "" {
+		port = "80"
+	} else {
+		port = r.URL.Port()
+	}
+	log.Println("Connect", r.URL.Hostname()+":"+port)
+
+	connr, err := l.Dialer.Dial("tcp", r.URL.Hostname()+":"+port)
+	if err != nil {
+		return err
+	}
+
+	if r.Method == "CONNECT" {
+		if _, err := connl.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n")); err != nil {
+			return err
+		}
+	} else if r.Method == "GET" && r.Header.Get("Upgrade") == "websocket" {
+		if err := r.Write(connr); err != nil {
+			return err
+		}
+	} else {
+		r.Header.Set("Connection", "close")
+		if err := r.Write(connr); err != nil {
+			return err
+		}
+	}
+
+	Link(connl, connr)
+	return nil
+}
+
+func (l *Locale) ServeSocks4(connl io.ReadWriteCloser) error {
+	var (
+		buf          = make([]byte, 1024)
+		reader       = bufio.NewReader(connl)
+		dstHostBytes []byte
+		dstHost      string
+		dstPort      uint16
+		dst          string
+		connr        io.ReadWriteCloser
+		err          error
+	)
+
+	connl = ReadWriteCloser{
+		Reader: reader,
+		Writer: connl,
+		Closer: connl,
+	}
+
+	_, err = io.ReadFull(connl, buf[:2])
+	if err != nil {
+		return err
+	}
+	_, err = io.ReadFull(connl, buf[:2])
+	if err != nil {
+		return err
+	}
+	dstPort = binary.BigEndian.Uint16(buf[:2])
+	_, err = io.ReadFull(connl, buf[:4])
+	if err != nil {
+		return err
+	}
+	_, err = reader.ReadBytes(0x00)
+	if err != nil {
+		return err
+	}
+	if bytes.Equal(buf[:3], []byte{0x00, 0x00, 0x00}) && buf[3] != 0x00 {
+		dstHostBytes, err = reader.ReadBytes(0x00)
+		if err != nil {
+			return err
+		}
+		dstHost = string(dstHostBytes[:len(dstHostBytes)-1])
+	} else {
+		dstHost = net.IP(buf[:4]).String()
+	}
+	dst = dstHost + ":" + strconv.Itoa(int(dstPort))
+	log.Println("Connect", dst)
+
+	connr, err = l.Dialer.Dial("tcp", dst)
+	if err != nil {
+		connl.Write([]byte{0x00, 0x5B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		return err
+	}
+	connl.Write([]byte{0x00, 0x5A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+	defer connr.Close()
+
+	Link(connl, connr)
+	return nil
+}
+
+func (l *Locale) ServeSocks5(connl io.ReadWriteCloser) error {
+	var (
+		buf        = make([]byte, 1024)
+		n          int
+		dstNetwork uint8
+		dstCase    uint8
+		dstHost    string
+		dstPort    uint16
+		dst        string
+		connr      io.ReadWriteCloser
+		err        error
+	)
+
+	_, err = io.ReadFull(connl, buf[:2])
+	if err != nil {
+		return err
+	}
+	n = int(buf[1])
+	_, err = io.ReadFull(connl, buf[:n])
+	if err != nil {
+		return err
+	}
+	_, err = connl.Write([]byte{0x05, 0x00})
+	if err != nil {
+		return err
+	}
+
+	_, err = io.ReadFull(connl, buf[:4])
+	if err != nil {
+		return err
+	}
+	dstNetwork = buf[1]
+	dstCase = buf[3]
+	switch dstCase {
+	case 0x01:
+		_, err = io.ReadFull(connl, buf[:4])
+		if err != nil {
+			return err
+		}
+		dstHost = net.IP(buf[:4]).String()
+	case 0x03:
+		_, err = io.ReadFull(connl, buf[:1])
+		if err != nil {
+			return err
+		}
+		n = int(buf[0])
+		_, err = io.ReadFull(connl, buf[:n])
+		if err != nil {
+			return err
+		}
+		dstHost = string(buf[:n])
+	case 0x04:
+		_, err = io.ReadFull(connl, buf[:16])
+		if err != nil {
+			return err
+		}
+		dstHost = net.IP(buf[:16]).String()
+	}
+	_, err = io.ReadFull(connl, buf[:2])
+	if err != nil {
+		return err
+	}
+	dstPort = binary.BigEndian.Uint16(buf[:2])
+	dst = dstHost + ":" + strconv.Itoa(int(dstPort))
+	log.Println("Connect", dst)
+
+	if dstNetwork == 0x03 {
+		connr, err = l.Dialer.Dial("udp", dst)
+	} else {
+		connr, err = l.Dialer.Dial("tcp", dst)
+	}
+	if err != nil {
+		connl.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		return err
+	}
+	connl.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+	defer connr.Close()
+
+	Link(connl, connr)
+	return nil
+}
+
+func (l *Locale) Serve(connl io.ReadWriteCloser) error {
+	var (
+		buf = make([]byte, 1)
+		err error
+	)
+	_, err = io.ReadFull(connl, buf)
+	if err != nil {
+		return err
+	}
+	connl = ReadWriteCloser{
+		Reader: io.MultiReader(bytes.NewReader(buf), connl),
+		Writer: connl,
+		Closer: connl,
+	}
+	if buf[0] == 0x05 {
+		err = l.ServeSocks5(connl)
+	} else if buf[0] == 0x04 {
+		err = l.ServeSocks4(connl)
+	} else {
+		err = l.ServeProxy(connl)
+	}
+	return err
+}
+
+func (l *Locale) Run() error {
+	ln, err := net.Listen("tcp", l.Listen)
+	if err != nil {
+		return err
+	}
+	defer ln.Close()
+	log.Println("Listen and serve on", l.Listen)
+
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		go func(conn net.Conn) {
+			defer conn.Close()
+			if err := l.Serve(conn); err != nil {
+				log.Println(err)
+			}
+		}(conn)
+	}
+}
+
+func NewLocale(listen string, dialer Dialer) *Locale {
+	return &Locale{
+		Listen: listen,
+		Dialer: dialer,
 	}
 }

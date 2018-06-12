@@ -76,15 +76,15 @@ func main() {
 		switch *flEngine {
 		case "ashe":
 			client := ashe.NewClient(*flServer, *flCipher)
-			router := ashe.NewFilter(client)
-			locale := ashe.NewLocale(*flListen, router)
+			router := daze.NewFilter(client)
+			locale := daze.NewLocale(*flListen, router)
 			if err := locale.Run(); err != nil {
 				log.Fatalln(err)
 			}
 		case "asheshadow":
 			client := asheshadow.NewClient(*flServer, *flCipher)
-			router := ashe.NewFilter(client)
-			locale := ashe.NewLocale(*flListen, router)
+			router := daze.NewFilter(client)
+			locale := daze.NewLocale(*flListen, router)
 			if err := locale.Run(); err != nil {
 				log.Fatalln(err)
 			}
