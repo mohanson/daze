@@ -42,17 +42,16 @@ func main() {
 			flDnserv = flag.String("dns", "8.8.8.8:53", "")
 		)
 		flag.Parse()
+		log.Println("Server cipher is", *flCipher)
 		log.Println("Domain server is", *flDnserv)
 		daze.SetResolver(*flDnserv)
 		switch *flEngine {
 		case "ashe":
-			log.Println("Server cipher is", *flCipher)
 			server := ashe.NewServer(*flListen, *flCipher)
 			if err := server.Run(); err != nil {
 				log.Fatalln(err)
 			}
 		case "asheshadow":
-			log.Println("Server cipher is", *flCipher)
 			server := asheshadow.NewServer(*flListen, *flCipher)
 			server.Masker = *flMasker
 			if err := server.Run(); err != nil {
