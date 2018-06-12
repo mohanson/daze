@@ -152,7 +152,6 @@ func DarkMainlandIPNet() *NetBox {
 	return netBox
 }
 
-// SetResolver change the default resolver used by the package "net".
 func SetResolver(addr string) {
 	net.DefaultResolver = &net.Resolver{
 		PreferGo: true,
