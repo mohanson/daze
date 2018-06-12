@@ -55,6 +55,16 @@ func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
 	}
 }
 
+func Resolve(addr string) {
+	net.DefaultResolver = &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			var d net.Dialer
+			return d.DialContext(ctx, "udp", addr)
+		},
+	}
+}
+
 type Dialer interface {
 	Dial(network, address string) (io.ReadWriteCloser, error)
 }
@@ -159,16 +169,6 @@ func DarkMainlandIPNet() *NetBox {
 	return netBox
 }
 
-func SetResolver(addr string) {
-	net.DefaultResolver = &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			var d net.Dialer
-			return d.DialContext(ctx, "udp", addr)
-		},
-	}
-}
-
 type Filter struct {
 	Client Dialer
 	Netbox NetBox
@@ -180,10 +180,7 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 		return nil, err
 	}
 	ips, err := net.LookupIP(host)
-	if err != nil {
-		return nil, err
-	}
-	if f.Netbox.Has(ips[0]) {
+	if err == nil && f.Netbox.Has(ips[0]) {
 		return net.Dial(network, address)
 	}
 	return f.Client.Dial(network, address)
@@ -194,13 +191,16 @@ func NewFilter(dialer Dialer) *Filter {
 	for _, e := range IPv4ReservedIPNet().L {
 		netbox.Add(e)
 	}
-	for _, e := range DarkMainlandIPNet().L {
-		netbox.Add(e)
-	}
-	return &Filter{
+	f := &Filter{
 		Client: dialer,
 		Netbox: netbox,
 	}
+	go func() {
+		for _, e := range DarkMainlandIPNet().L {
+			f.Netbox.Add(e)
+		}
+	}()
+	return f
 }
 
 type Locale struct {
@@ -209,41 +209,57 @@ type Locale struct {
 }
 
 func (l *Locale) ServeProxy(connl io.ReadWriteCloser) error {
-	reader := bufio.NewReader(connl)
-	r, err := http.ReadRequest(reader)
-	if err != nil {
-		return err
-	}
+	connlReader := bufio.NewReader(connl)
 
-	var port string
-	if r.URL.Port() == "" {
-		port = "80"
-	} else {
-		port = r.URL.Port()
-	}
-	log.Println("Connect", r.URL.Hostname()+":"+port)
+	for {
+		if err := func() error {
+			r, err := http.ReadRequest(connlReader)
+			if err != nil {
+				return err
+			}
 
-	connr, err := l.Dialer.Dial("tcp", r.URL.Hostname()+":"+port)
-	if err != nil {
-		return err
-	}
+			var port string
+			if r.URL.Port() == "" {
+				port = "80"
+			} else {
+				port = r.URL.Port()
+			}
+			log.Println("Connect", r.URL.Hostname()+":"+port)
 
-	if r.Method == "CONNECT" {
-		if _, err := connl.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n")); err != nil {
-			return err
+			connr, err := l.Dialer.Dial("tcp", r.URL.Hostname()+":"+port)
+			if err != nil {
+				return err
+			}
+			defer connr.Close()
+			connrReader := bufio.NewReader(connr)
+
+			if r.Method == "CONNECT" {
+				_, err := connl.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+				if err != nil {
+					return err
+				}
+				Link(connl, connr)
+				return nil
+			}
+			if r.Method == "GET" && r.Header.Get("Upgrade") == "websocket" {
+				if err := r.Write(connr); err != nil {
+					return err
+				}
+				Link(connl, connr)
+				return nil
+			}
+			if err := r.Write(connr); err != nil {
+				return err
+			}
+			resp, err := http.ReadResponse(connrReader, r)
+			if err != nil {
+				return err
+			}
+			return resp.Write(connl)
+		}(); err != nil {
+			break
 		}
-	} else if r.Method == "GET" && r.Header.Get("Upgrade") == "websocket" {
-		if err := r.Write(connr); err != nil {
-			return err
-		}
-	} else {
-		r.Header.Set("Connection", "close")
-		if err := r.Write(connr); err != nil {
-			return err
-		}
 	}
-
-	Link(connl, connr)
 	return nil
 }
 
@@ -265,19 +281,10 @@ func (l *Locale) ServeSocks4(connl io.ReadWriteCloser) error {
 		Closer: connl,
 	}
 
-	_, err = io.ReadFull(connl, buf[:2])
-	if err != nil {
-		return err
-	}
-	_, err = io.ReadFull(connl, buf[:2])
-	if err != nil {
-		return err
-	}
+	io.ReadFull(connl, buf[:2])
+	io.ReadFull(connl, buf[:2])
 	dstPort = binary.BigEndian.Uint16(buf[:2])
-	_, err = io.ReadFull(connl, buf[:4])
-	if err != nil {
-		return err
-	}
+	io.ReadFull(connl, buf[:4])
 	_, err = reader.ReadBytes(0x00)
 	if err != nil {
 		return err
@@ -299,8 +306,8 @@ func (l *Locale) ServeSocks4(connl io.ReadWriteCloser) error {
 		connl.Write([]byte{0x00, 0x5B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 		return err
 	}
-	connl.Write([]byte{0x00, 0x5A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 	defer connr.Close()
+	connl.Write([]byte{0x00, 0x5A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 
 	Link(connl, connr)
 	return nil
@@ -319,49 +326,24 @@ func (l *Locale) ServeSocks5(connl io.ReadWriteCloser) error {
 		err        error
 	)
 
-	_, err = io.ReadFull(connl, buf[:2])
-	if err != nil {
-		return err
-	}
+	io.ReadFull(connl, buf[:2])
 	n = int(buf[1])
-	_, err = io.ReadFull(connl, buf[:n])
-	if err != nil {
-		return err
-	}
-	_, err = connl.Write([]byte{0x05, 0x00})
-	if err != nil {
-		return err
-	}
-
-	_, err = io.ReadFull(connl, buf[:4])
-	if err != nil {
-		return err
-	}
+	io.ReadFull(connl, buf[:n])
+	connl.Write([]byte{0x05, 0x00})
+	io.ReadFull(connl, buf[:4])
 	dstNetwork = buf[1]
 	dstCase = buf[3]
 	switch dstCase {
 	case 0x01:
-		_, err = io.ReadFull(connl, buf[:4])
-		if err != nil {
-			return err
-		}
+		io.ReadFull(connl, buf[:4])
 		dstHost = net.IP(buf[:4]).String()
 	case 0x03:
-		_, err = io.ReadFull(connl, buf[:1])
-		if err != nil {
-			return err
-		}
+		io.ReadFull(connl, buf[:1])
 		n = int(buf[0])
-		_, err = io.ReadFull(connl, buf[:n])
-		if err != nil {
-			return err
-		}
+		io.ReadFull(connl, buf[:n])
 		dstHost = string(buf[:n])
 	case 0x04:
-		_, err = io.ReadFull(connl, buf[:16])
-		if err != nil {
-			return err
-		}
+		io.ReadFull(connl, buf[:16])
 		dstHost = net.IP(buf[:16]).String()
 	}
 	_, err = io.ReadFull(connl, buf[:2])
@@ -381,8 +363,8 @@ func (l *Locale) ServeSocks5(connl io.ReadWriteCloser) error {
 		connl.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 		return err
 	}
-	connl.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 	defer connr.Close()
+	connl.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 
 	Link(connl, connr)
 	return nil
@@ -403,13 +385,12 @@ func (l *Locale) Serve(connl io.ReadWriteCloser) error {
 		Closer: connl,
 	}
 	if buf[0] == 0x05 {
-		err = l.ServeSocks5(connl)
-	} else if buf[0] == 0x04 {
-		err = l.ServeSocks4(connl)
-	} else {
-		err = l.ServeProxy(connl)
+		return l.ServeSocks5(connl)
 	}
-	return err
+	if buf[0] == 0x04 {
+		return l.ServeSocks4(connl)
+	}
+	return l.ServeProxy(connl)
 }
 
 func (l *Locale) Run() error {

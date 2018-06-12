@@ -44,7 +44,7 @@ func main() {
 		flag.Parse()
 		log.Println("Server cipher is", *flCipher)
 		log.Println("Domain server is", *flDnserv)
-		daze.SetResolver(*flDnserv)
+		daze.Resolve(*flDnserv)
 		switch *flEngine {
 		case "ashe":
 			server := ashe.NewServer(*flListen, *flCipher)
@@ -72,7 +72,7 @@ func main() {
 		log.Println("Remote server is", *flServer)
 		log.Println("Client cipher is", *flCipher)
 		log.Println("Domain server is", *flDnserv)
-		daze.SetResolver(*flDnserv)
+		daze.Resolve(*flDnserv)
 		switch *flEngine {
 		case "ashe":
 			client := ashe.NewClient(*flServer, *flCipher)
