@@ -18,7 +18,11 @@ daze client -s $SERVER:51958 -l 127.0.0.1:51959
 daze cmd curl https://google.com
 ```
 
-# About android
+# For browser, Firefox, Chrome or Edge e.g.
+
+Daze forces any TCP connection to follow through proxy like SOCKS4, SOCKS5 or HTTP(S) proxy. It can be simply used in browser, take Firefox as an example: Open `Connection Settings` -> `Manual proxy configuration` -> `SOCKS Host=127.0.0.1` and `Port=51959`.
+
+# For android
 
 Daze can work well on **Windows**, **Linux** and **macOS**. In additional, it can also work on **Android**, just it will be a bit complicated.
 
