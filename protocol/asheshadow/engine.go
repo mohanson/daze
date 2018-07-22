@@ -58,7 +58,7 @@ func (s *Server) ServeDaze(connl io.ReadWriteCloser) error {
 	}
 	killer.Stop()
 	dst = string(buf[12 : 12+buf[11]])
-	log.Println("Connect", dst)
+	log.Println("Connect[asheshadow]", dst)
 	if buf[10] == 0x03 {
 		connr, err = net.DialTimeout("udp", dst, time.Second*8)
 	} else {

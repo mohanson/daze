@@ -224,7 +224,6 @@ func (l *Locale) ServeProxy(connl io.ReadWriteCloser) error {
 			} else {
 				port = r.URL.Port()
 			}
-			log.Println("Connect", r.URL.Hostname()+":"+port)
 
 			connr, err := l.Dialer.Dial("tcp", r.URL.Hostname()+":"+port)
 			if err != nil {
@@ -234,6 +233,7 @@ func (l *Locale) ServeProxy(connl io.ReadWriteCloser) error {
 			connrReader := bufio.NewReader(connr)
 
 			if r.Method == "CONNECT" {
+				log.Println("Connect[tunnel]", r.URL.Hostname()+":"+port)
 				_, err := connl.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
 				if err != nil {
 					return err
@@ -241,6 +241,8 @@ func (l *Locale) ServeProxy(connl io.ReadWriteCloser) error {
 				Link(connl, connr)
 				return nil
 			}
+
+			log.Println("Connect[hproxy]", r.URL.Hostname()+":"+port)
 			if r.Method == "GET" && r.Header.Get("Upgrade") == "websocket" {
 				if err := r.Write(connr); err != nil {
 					return err
@@ -299,7 +301,7 @@ func (l *Locale) ServeSocks4(connl io.ReadWriteCloser) error {
 		dstHost = net.IP(buf[:4]).String()
 	}
 	dst = dstHost + ":" + strconv.Itoa(int(dstPort))
-	log.Println("Connect", dst)
+	log.Println("Connect[socks4]", dst)
 
 	connr, err = l.Dialer.Dial("tcp", dst)
 	if err != nil {
@@ -352,7 +354,7 @@ func (l *Locale) ServeSocks5(connl io.ReadWriteCloser) error {
 	}
 	dstPort = binary.BigEndian.Uint16(buf[:2])
 	dst = dstHost + ":" + strconv.Itoa(int(dstPort))
-	log.Println("Connect", dst)
+	log.Println("Connect[socks5]", dst)
 
 	if dstNetwork == 0x03 {
 		connr, err = l.Dialer.Dial("udp", dst)

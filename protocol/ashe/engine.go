@@ -54,7 +54,7 @@ func (s *Server) Serve(connl io.ReadWriteCloser) error {
 	}
 	killer.Stop()
 	dst = string(buf[12 : 12+buf[11]])
-	log.Println("Connect", dst)
+	log.Println("Connect[ashe]", dst)
 	if buf[10] == 0x03 {
 		connr, err = net.DialTimeout("udp", dst, time.Second*8)
 	} else {
