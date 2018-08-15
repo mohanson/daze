@@ -38,7 +38,7 @@ Daze can work well on **Windows**, **Linux** and **macOS**. In additional, it ca
 
 # For python
 
-`daze cmd` can proxy most common applications likes `curl`, `wget`(They all used `libcurl`). But for some reason, we also want our python codes connected to the Internet properly. All you need is just install `pysocks` and run codes with `daze cmd`.
+`daze cmd` can proxy most common applications likes `curl` or `wget`(which all used `libcurl`). You can easily apply daze in your own python code also. All you need is just install `pysocks` and run codes with `daze cmd`.
 
 ```sh
 $ pip install pysocks requests
