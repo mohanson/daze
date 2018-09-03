@@ -179,11 +179,18 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	ips, err := net.LookupIP(host)
-	if err == nil && f.Netbox.Has(ips[0]) {
+	ipls, err := net.LookupIP(host)
+	if err != nil {
 		return net.Dial(network, address)
 	}
-	return f.Client.Dial(network, address)
+	if f.Netbox.Has(ipls[0]) {
+		return net.Dial(network, address)
+	}
+	conn, err := f.Client.Dial(network, address)
+	if err != nil {
+		return net.Dial(network, address)
+	}
+	return conn, nil
 }
 
 func NewFilter(dialer Dialer) *Filter {
