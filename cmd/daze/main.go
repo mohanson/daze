@@ -66,7 +66,7 @@ func main() {
 			flServer = flag.String("s", "127.0.0.1:51958", "server address")
 			flCipher = flag.String("k", "daze", "cipher")
 			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
-			flFilter = flag.String("f", "auto", "filter {auto, none, ipcn}")
+			flFilter = flag.String("f", "ipcn", "filter {auto, none, ipcn}")
 			flDnserv = flag.String("dns", "8.8.8.8:53", "")
 		)
 		flag.Parse()

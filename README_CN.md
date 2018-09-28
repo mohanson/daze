@@ -16,15 +16,15 @@ $ go get -u -v github.com/mohanson/daze/cmd/daze
 $ daze server -l 0.0.0.0:51958
 
 # 客户端
-# 使用如下命令连接至你的服务端
+# 使用如下命令连接至你的服务端(将 $SERVER 替换为你的服务器地址)
 $ daze client -s $SERVER:51958 -l 127.0.0.1:51959 -dns 114.114.114.114:53
 # 现在, 你即可自由地访问互联网
 $ daze cmd curl https://google.com
 ```
 
-# 在浏览器中使用, Firefox, Chrome 或 Edge 等
+# 在浏览器中使用, Firefox, Chrome 或 Edge
 
-Daze 通过代理技术, 如 SOCKS4, SOCKS5 和 HTTP(S) 代理转发任何本机的 TCP/UDP 流量. 在浏览器中使用 Daze 非常简单, 以 Firefox 为例: `选项` -> `网络代理` -> `手动配置代理` -> 填写 `SOCKS 主机=127.0.0.1` 和 `Port=51959`, 同时勾选 `SOCKS v5`. 注意的是, 在大部分情况下, 请同时勾选 `使用 SOCKS v5 时代理 DNS 查询`.
+Daze 通过代理技术, 如 SOCKS4, SOCKS5 和 HTTP(S) 代理转发任何本机的 TCP/UDP 流量. 在浏览器中使用 Daze 非常简单, 以 Firefox 为例: **选项** -> **网络代理** -> **手动配置代理** -> 勾选 **SOCKS v5** 并填写 **SOCKS 主机=127.0.0.1** 和 **Port=51959**. 注意的是, 在大部分情况下, 请同时勾选底部的 **使用 SOCKS v5 时代理 DNS 查询**.
 
 # 在 android 中使用
 
@@ -38,25 +38,13 @@ Daze 可以在 **Windows**, **Linux** 和 **macOS** 下正常工作. 另外, 它
 6. 设置代理: 连接任意 Wifi -> 设置 -> 代理 -> 填写 `127.0.0.1:51959`
 7. 现在, 你即可自由地访问互联网
 
-# 在 python 中使用
+# 了解更多
 
-`daze cmd` 可以代理大部分应用比如 `curl` 或 `wget`(它们均使用了 `libcurl`). 你同样可以方便的代理自己的 python 代码. 你所需要做的一切就是安装 `pysocks` 并且使用 `daze cmd` 运行代码.
+你可以在 `daze server -h` 和 `daze client -h` 了解到所有信息. 命令行工具提供了如下可配置功能
 
-```sh
-$ pip install pysocks requests
-```
+- 数据加密
+- 混淆
+- DNS 设置
+- 流量过滤(仅代理必要的流量)
 
-将下面的代码写入一个新的文件, 如 "google.py":
-
-```py
-import requests
-r = requests.get('https://google.com')
-print(r.status_code)
-```
-
-使用 `daze cmd python google.py` 而非 `python google.py`
-
-```sh
-$ daze cmd python google.py
-# 200
-```
+玩的开心.
