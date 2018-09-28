@@ -2,6 +2,8 @@
 
 Daze is a tool to help you link to the **Internet**.
 
+\[English\] \[[中文](./README_CN.md)\]
+
 # Usage
 
 Daze is dead simple to use:
@@ -10,11 +12,11 @@ Daze is dead simple to use:
 $ go get -u -v github.com/mohanson/daze/cmd/daze
 
 # server port
-# you need a linux machine that can access the Internet, and enter the following command:
+# you need a machine that can access the Internet, and enter the following command:
 $ daze server -l 0.0.0.0:51958
 
 # client port
-# use the following command to link your server:
+# use the following command to link your server(replace $SERVER with your server ip):
 $ daze client -s $SERVER:51958 -l 127.0.0.1:51959 -dns 114.114.114.114:53
 # now, you are free to visit Internet
 $ daze cmd curl https://google.com
@@ -22,7 +24,7 @@ $ daze cmd curl https://google.com
 
 # For browser, Firefox, Chrome or Edge e.g.
 
-Daze forces any TCP connection to follow through proxy like SOCKS4, SOCKS5 or HTTP(S) proxy. It can be simply used in browser, take Firefox as an example: Open `Connection Settings` -> `Manual proxy configuration` -> `SOCKS Host=127.0.0.1` and `Port=51959`.
+Daze forces any TCP/UDP connection to follow through proxy like SOCKS4, SOCKS5 or HTTP(S) proxy. It can be simply used in browser, take Firefox as an example: Open `Connection Settings` -> `Manual proxy configuration` -> `SOCKSv5 Host=127.0.0.1` and `Port=51959`.
 
 # For android
 
@@ -36,25 +38,13 @@ Daze can work well on **Windows**, **Linux** and **macOS**. In additional, it ca
 6. Set the proxy for phone: WLAN -> Settings -> Proxy -> Fill in `127.0.0.1:51959`
 7. Now, you are free to visit Internet.
 
-# For python
+# More
 
-`daze cmd` can proxy most common applications likes `curl` or `wget`(which all used `libcurl`). You can easily apply daze in your own python code also. All you need is just install `pysocks` and run codes with `daze cmd`.
+You can find all the information here by using `daze server -h` and `daze client -h`. The cli provides
 
-```sh
-$ pip install pysocks requests
-```
+- Encrypted data connection
+- Confuse
+- Specify DNS
+- Traffic filter (only proxy the necessary)
 
-Write the following codes to a file named "google.py":
-
-```py
-import requests
-r = requests.get('https://google.com')
-print(r.status_code)
-```
-
-Use `daze cmd python google.py` instead of `python google.py`
-
-```sh
-$ daze cmd python google.py
-# 200
-```
+Have fun.

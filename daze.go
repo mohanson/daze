@@ -16,8 +16,12 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/mohanson/acdb"
 )
 
+// Link copies from src to dst and dst to src until either EOF is reached.
 func Link(a, b io.ReadWriteCloser) {
 	go func() {
 		io.Copy(b, a)
@@ -91,6 +95,8 @@ func (n *NetBox) Has(ip net.IP) bool {
 	return false
 }
 
+// IPv4ReservedIPNet returns reserved IPv4 addresses.
+// See https://en.wikipedia.org/wiki/Reserved_IP_addresses
 func IPv4ReservedIPNet() *NetBox {
 	netBox := &NetBox{}
 	for _, entry := range [][2]string{
@@ -116,12 +122,13 @@ func IPv4ReservedIPNet() *NetBox {
 	return netBox
 }
 
+// IPv6ReservedIPNet returns reserved IPv6 addresses.
+// See https://en.wikipedia.org/wiki/Reserved_IP_addresses
 func IPv6ReservedIPNet() *NetBox {
 	netBox := &NetBox{}
 	for _, entry := range [][2]string{
 		[2]string{"00000000000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
 		[2]string{"00000000000000000000000000000001", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
-		[2]string{"00000000000000000000FFFF00000000", "FFFFFFFFFFFFFFFFFFFFFFFF00000000"},
 		[2]string{"01000000000000000000000000000000", "FFFFFFFFFFFFFFFF0000000000000000"},
 		[2]string{"0064FF9B000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFF00000000"},
 		[2]string{"20010000000000000000000000000000", "FFFFFFFF000000000000000000000000"},
@@ -140,7 +147,8 @@ func IPv6ReservedIPNet() *NetBox {
 	return netBox
 }
 
-func DarkMainlandIPNet() *NetBox {
+// CNIPNet returns full ipv4 CIDR in CN.
+func CNIPNet() *NetBox {
 	r, err := http.Get("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")
 	if err != nil {
 		log.Fatalln(err)
@@ -169,12 +177,34 @@ func DarkMainlandIPNet() *NetBox {
 	return netBox
 }
 
-type Filter struct {
+// NewFilterIP returns a FilterIP.
+func NewFilterIP(dialer Dialer) *FilterIP {
+	f := &FilterIP{
+		Client: dialer,
+		Netbox: NetBox{},
+	}
+	f.Join(IPv4ReservedIPNet())
+	f.Join(IPv6ReservedIPNet())
+	return f
+}
+
+// Filter determines whether the traffic should uses the proxy based on the
+// destination's IP address.
+type FilterIP struct {
 	Client Dialer
 	Netbox NetBox
 }
 
-func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
+// Join adds the IPNet of n.
+func (f *FilterIP) Join(n *NetBox) {
+	for _, e := range n.L {
+		f.Netbox.Add(e)
+	}
+}
+
+// Dial connects to the address on the named network. If necessary, Filter
+// will use f.Client.Dial, else net.Dial instead.
+func (f *FilterIP) Dial(network, address string) (io.ReadWriteCloser, error) {
 	host, _, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
@@ -193,21 +223,46 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 	return conn, nil
 }
 
-func NewFilter(dialer Dialer) *Filter {
-	netbox := NetBox{}
-	for _, e := range IPv4ReservedIPNet().L {
-		netbox.Add(e)
-	}
-	f := &Filter{
+// NewFilterAuto returns a FilterAuto. The poor Nier doesn't have enough brain
+// capacity, it can only remember 1024 addresses(Because LRU is used to avoid
+// memory transition expansion).
+func NewFilterAuto(dialer Dialer) *FilterAuto {
+	return &FilterAuto{
 		Client: dialer,
-		Netbox: netbox,
+		Box:    acdb.LRU(1024),
 	}
-	go func() {
-		for _, e := range DarkMainlandIPNet().L {
-			f.Netbox.Add(e)
-		}
-	}()
-	return f
+}
+
+// Filter determines whether the traffic should uses the proxy based on the
+// destination's IP address or domain. Different from FilterIP, FilterAuto
+// is a fuck smart monkey, it first tries to connect to the address using a
+// local connection, if it fails, will using the proxy instead. This
+// experience will be remembered by this monkey, so next time it sees the same
+// address again, Nier(I just gave it the name) will make a decision
+// immediately.
+type FilterAuto struct {
+	Client Dialer
+	Box    acdb.Client
+}
+
+// Dial connects to the address on the named network. If necessary, Filter
+// will use f.Client.Dial, else net.Dial instead.
+func (f *FilterAuto) Dial(network, address string) (io.ReadWriteCloser, error) {
+	var p bool
+	f.Box.Get(address, &p)
+	if p {
+		return f.Client.Dial(network, address)
+	}
+	connl, connlErr := net.DialTimeout(network, address, time.Second*2)
+	if connlErr == nil {
+		return connl, nil
+	}
+	connr, connrErr := f.Client.Dial(network, address)
+	if connrErr == nil {
+		f.Box.Set(address, true)
+		return connr, nil
+	}
+	return nil, connrErr
 }
 
 type Locale struct {
