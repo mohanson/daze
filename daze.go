@@ -21,6 +21,7 @@ import (
 	"github.com/mohanson/acdb"
 )
 
+// Link copies from src to dst and dst to src until either EOF is reached.
 func Link(a, b io.ReadWriteCloser) {
 	go func() {
 		io.Copy(b, a)
@@ -94,6 +95,8 @@ func (n *NetBox) Has(ip net.IP) bool {
 	return false
 }
 
+// IPv4ReservedIPNet returns reserved IPv4 addresses.
+// See https://en.wikipedia.org/wiki/Reserved_IP_addresses
 func IPv4ReservedIPNet() *NetBox {
 	netBox := &NetBox{}
 	for _, entry := range [][2]string{
@@ -119,6 +122,8 @@ func IPv4ReservedIPNet() *NetBox {
 	return netBox
 }
 
+// IPv6ReservedIPNet returns reserved IPv6 addresses.
+// See https://en.wikipedia.org/wiki/Reserved_IP_addresses
 func IPv6ReservedIPNet() *NetBox {
 	netBox := &NetBox{}
 	for _, entry := range [][2]string{
@@ -142,6 +147,7 @@ func IPv6ReservedIPNet() *NetBox {
 	return netBox
 }
 
+// CNIPNet returns full ipv4 CIDR in CN.
 func CNIPNet() *NetBox {
 	r, err := http.Get("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")
 	if err != nil {
