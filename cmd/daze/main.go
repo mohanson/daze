@@ -66,7 +66,7 @@ func main() {
 			flServer = flag.String("s", "127.0.0.1:51958", "server address")
 			flCipher = flag.String("k", "daze", "cipher")
 			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
-			flFilter = flag.String("f", "auto", "filter {auto, ip}")
+			flFilter = flag.String("f", "auto", "filter {auto, none, ipcn}")
 			flDnserv = flag.String("dns", "8.8.8.8:53", "")
 		)
 		flag.Parse()
@@ -90,8 +90,15 @@ func main() {
 		switch *flFilter {
 		case "auto":
 			router = daze.NewFilterAuto(client)
-		case "ip":
-			router = daze.NewFilterIP(client)
+		case "none":
+			filter := daze.NewFilterIP(client)
+			router = filter
+		case "ipcn":
+			filter := daze.NewFilterIP(client)
+			go func() {
+				filter.Join(daze.CNIPNet())
+			}()
+			router = filter
 		default:
 			log.Fatalln("daze: unknown filter", *flFilter)
 		}

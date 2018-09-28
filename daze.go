@@ -142,7 +142,7 @@ func IPv6ReservedIPNet() *NetBox {
 	return netBox
 }
 
-func DarkMainlandIPNet() *NetBox {
+func CNIPNet() *NetBox {
 	r, err := http.Get("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")
 	if err != nil {
 		log.Fatalln(err)
@@ -177,11 +177,8 @@ func NewFilterIP(dialer Dialer) *FilterIP {
 		Client: dialer,
 		Netbox: NetBox{},
 	}
-	go func() {
-		f.Join(IPv4ReservedIPNet())
-		f.Join(IPv6ReservedIPNet())
-		f.Join(DarkMainlandIPNet())
-	}()
+	f.Join(IPv4ReservedIPNet())
+	f.Join(IPv6ReservedIPNet())
 	return f
 }
 

@@ -2,6 +2,8 @@
 
 Daze is a tool to help you link to the **Internet**.
 
+\[English\] \[[中文](./README_CN.md)\]
+
 # Usage
 
 Daze is dead simple to use:
@@ -22,7 +24,7 @@ $ daze cmd curl https://google.com
 
 # For browser, Firefox, Chrome or Edge e.g.
 
-Daze forces any TCP connection to follow through proxy like SOCKS4, SOCKS5 or HTTP(S) proxy. It can be simply used in browser, take Firefox as an example: Open `Connection Settings` -> `Manual proxy configuration` -> `SOCKS Host=127.0.0.1` and `Port=51959`.
+Daze forces any TCP/UDP connection to follow through proxy like SOCKS4, SOCKS5 or HTTP(S) proxy. It can be simply used in browser, take Firefox as an example: Open `Connection Settings` -> `Manual proxy configuration` -> `SOCKSv5 Host=127.0.0.1` and `Port=51959`.
 
 # For android
 
