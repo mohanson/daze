@@ -40,7 +40,7 @@ Daze 可以在 **Windows**, **Linux** 和 **macOS** 下正常工作. 另外, 它
 
 # 了解更多
 
-你可以在 `daze server -h` 和 `daze client -h` 了解到所有信息. 命令行工具提供了如下可配置功能
+你可以在 `daze server -h` 和 `daze client -h` 了解到所有信息. Cli 提供了如下可配置项目
 
 - 数据加密
 - 混淆
