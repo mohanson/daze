@@ -38,7 +38,7 @@ func main() {
 			flListen = flag.String("l", "0.0.0.0:51958", "listen address")
 			flCipher = flag.String("k", "daze", "cipher")
 			flMasker = flag.String("m", "http://httpbin.org", "")
-			flEngine = flag.String("e", "ashe", "")
+			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
 			flDnserv = flag.String("dns", "8.8.8.8:53", "")
 		)
 		flag.Parse()
@@ -65,7 +65,8 @@ func main() {
 			flListen = flag.String("l", "127.0.0.1:51959", "listen address")
 			flServer = flag.String("s", "127.0.0.1:51958", "server address")
 			flCipher = flag.String("k", "daze", "cipher")
-			flEngine = flag.String("e", "ashe", "")
+			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
+			flFilter = flag.String("f", "auto", "filter {auto, ip}")
 			flDnserv = flag.String("dns", "8.8.8.8:53", "")
 		)
 		flag.Parse()
@@ -73,23 +74,30 @@ func main() {
 		log.Println("Client cipher is", *flCipher)
 		log.Println("Domain server is", *flDnserv)
 		daze.Resolve(*flDnserv)
+
+		var (
+			client daze.Dialer
+			router daze.Dialer
+		)
 		switch *flEngine {
 		case "ashe":
-			client := ashe.NewClient(*flServer, *flCipher)
-			router := daze.NewFilter(client)
-			locale := daze.NewLocale(*flListen, router)
-			if err := locale.Run(); err != nil {
-				log.Fatalln(err)
-			}
+			client = ashe.NewClient(*flServer, *flCipher)
 		case "asheshadow":
-			client := asheshadow.NewClient(*flServer, *flCipher)
-			router := daze.NewFilter(client)
-			locale := daze.NewLocale(*flListen, router)
-			if err := locale.Run(); err != nil {
-				log.Fatalln(err)
-			}
+			client = asheshadow.NewClient(*flServer, *flCipher)
 		default:
-			log.Fatalln(*flEngine, "is not an engine")
+			log.Fatalln("daze: unknown engine", *flEngine)
+		}
+		switch *flFilter {
+		case "auto":
+			router = daze.NewFilterAuto(client)
+		case "ip":
+			router = daze.NewFilterIP(client)
+		default:
+			log.Fatalln("daze: unknown filter", *flFilter)
+		}
+		locale := daze.NewLocale(*flListen, router)
+		if err := locale.Run(); err != nil {
+			log.Fatalln(err)
 		}
 	case "cmd":
 		var (
