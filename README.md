@@ -44,7 +44,7 @@ You can find all the information here by using `daze server -h` and `daze client
 
 - Encrypted data connection
 - Confuse
-- DNS settings
+- Specify DNS
 - Traffic filter (only proxy the necessary)
 
 Have fun.
