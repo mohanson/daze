@@ -33,22 +33,27 @@ func Link(a, b io.ReadWriteCloser) {
 	a.Close()
 }
 
+// ReadWriteCloser is the interface that groups the basic Read, Write and
+// Close methods.
 type ReadWriteCloser struct {
 	io.Reader
 	io.Writer
 	io.Closer
 }
 
+// GravityReader wraps an io.Reader with RC4 crypto.
 func GravityReader(r io.Reader, k []byte) io.Reader {
 	cr, _ := rc4.NewCipher(k)
 	return cipher.StreamReader{S: cr, R: r}
 }
 
+// GravityWriter wraps an io.Writer with RC4 crypto.
 func GravityWriter(w io.Writer, k []byte) io.Writer {
 	cw, _ := rc4.NewCipher(k)
 	return cipher.StreamWriter{S: cw, W: w}
 }
 
+// Double gravity, double happiness.
 func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
 	cr, _ := rc4.NewCipher(k)
 	cw, _ := rc4.NewCipher(k)
@@ -59,6 +64,12 @@ func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
 	}
 }
 
+// Resolve modifies the net.DefaultResolver(which is the resolver used by the
+// package-level Lookup functions and by Dialers without a specified Resolver).
+//
+// Examples:
+//   Resolve("8.8.8.8:53")
+//	 Resolve("114.114.114.114:53")
 func Resolve(addr string) {
 	net.DefaultResolver = &net.Resolver{
 		PreferGo: true,
@@ -69,23 +80,37 @@ func Resolve(addr string) {
 	}
 }
 
+// Dialer contains options for connecting to an address.
 type Dialer interface {
 	Dial(network, address string) (io.ReadWriteCloser, error)
 }
 
+// Server is the main process of daze. In most cases, it is usually deployed
+// as a daemon on a linux machine.
+//
+// Different protocols implement different Servers. In the current version,
+// daze implements few protocols. the source code is located:
+//   ./protocol/ashe
+//   ./protocol/asheshadow
+//
+// You can easily implement your own protocals to fight against the watching
+// of the big brother.
 type Server interface {
 	Serve(connl io.ReadWriteCloser) error
 	Run() error
 }
 
+// NetBox is the collection of *net.IPNet. It just provides some easy ways.
 type NetBox struct {
 	L []*net.IPNet
 }
 
+// Add a new *net.IPNet into NetBox.
 func (n *NetBox) Add(ipNet *net.IPNet) {
 	n.L = append(n.L, ipNet)
 }
 
+// Whether ip is in the collection.
 func (n *NetBox) Has(ip net.IP) bool {
 	for _, entry := range n.L {
 		if entry.Contains(ip) {
@@ -96,7 +121,9 @@ func (n *NetBox) Has(ip net.IP) bool {
 }
 
 // IPv4ReservedIPNet returns reserved IPv4 addresses.
-// See https://en.wikipedia.org/wiki/Reserved_IP_addresses
+//
+// Introductions:
+//   See https://en.wikipedia.org/wiki/Reserved_IP_addresses
 func IPv4ReservedIPNet() *NetBox {
 	netBox := &NetBox{}
 	for _, entry := range [][2]string{
@@ -123,7 +150,9 @@ func IPv4ReservedIPNet() *NetBox {
 }
 
 // IPv6ReservedIPNet returns reserved IPv6 addresses.
-// See https://en.wikipedia.org/wiki/Reserved_IP_addresses
+//
+// Introductions:
+//   See https://en.wikipedia.org/wiki/Reserved_IP_addresses
 func IPv6ReservedIPNet() *NetBox {
 	netBox := &NetBox{}
 	for _, entry := range [][2]string{
@@ -265,11 +294,26 @@ func (f *FilterAuto) Dial(network, address string) (io.ReadWriteCloser, error) {
 	return nil, connrErr
 }
 
+// Locale is the main process of daze. In most cases, it is usually deployed
+// as a daemon on a local machine.
 type Locale struct {
 	Listen string
 	Dialer Dialer
 }
 
+// Serve traffic in HTTP Proxy/Tunnel format.
+//
+// Introductions:
+//   See https://en.wikipedia.org/wiki/Proxy_server
+//   See https://en.wikipedia.org/wiki/HTTP_tunnel
+//
+// Warning: The performance of HTTP Proxy is very poor, unless you have a good
+// reason, please use ServeSocks4 or ServeSocks5 instead. Why the poor
+// performance is that I did not implement http long connection( a well-known
+// name is KeepAlive) because It will trigger some bugs on Firefox. Firefox
+// will send traffic from different sites to the same long connection.
+// I have been debugging for a long time.
+// Fuck.
 func (l *Locale) ServeProxy(connl io.ReadWriteCloser) error {
 	connlReader := bufio.NewReader(connl)
 
@@ -327,6 +371,10 @@ func (l *Locale) ServeProxy(connl io.ReadWriteCloser) error {
 	return nil
 }
 
+// Serve traffic in SOCKS4/SOCKS4a format.
+//
+// Introductions:
+//   See https://en.wikipedia.org/wiki/SOCKS.
 func (l *Locale) ServeSocks4(connl io.ReadWriteCloser) error {
 	var (
 		buf          = make([]byte, 1024)
@@ -377,6 +425,11 @@ func (l *Locale) ServeSocks4(connl io.ReadWriteCloser) error {
 	return nil
 }
 
+// Serve traffic in SOCKS5 format.
+//
+// Introductions:
+//   See https://en.wikipedia.org/wiki/SOCKS.
+//   See https://tools.ietf.org/html/rfc1928
 func (l *Locale) ServeSocks5(connl io.ReadWriteCloser) error {
 	var (
 		buf        = make([]byte, 1024)
@@ -434,6 +487,8 @@ func (l *Locale) ServeSocks5(connl io.ReadWriteCloser) error {
 	return nil
 }
 
+// We should be very clear about what it does. It judges the traffic type and
+// processes it with a different handler(ServeProxy/ServeSocks4/ServeSocks5).
 func (l *Locale) Serve(connl io.ReadWriteCloser) error {
 	var (
 		buf = make([]byte, 1)
@@ -457,6 +512,7 @@ func (l *Locale) Serve(connl io.ReadWriteCloser) error {
 	return l.ServeProxy(connl)
 }
 
+// Run.
 func (l *Locale) Run() error {
 	ln, err := net.Listen("tcp", l.Listen)
 	if err != nil {
@@ -480,6 +536,7 @@ func (l *Locale) Run() error {
 	}
 }
 
+// NewLocale returns a Locale.
 func NewLocale(listen string, dialer Dialer) *Locale {
 	return &Locale{
 		Listen: listen,

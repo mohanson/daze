@@ -45,6 +45,6 @@ You can find all the information here by using `daze server -h` and `daze client
 - Encrypted data connection
 - Confuse
 - Specify DNS
-- Traffic filter (only proxy the necessary)
+- Select traffic filtering mode: Auto, None or Only China IPs(default)
 
 Have fun.
