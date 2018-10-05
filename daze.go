@@ -122,7 +122,7 @@ func (n *NetBox) Has(ip net.IP) bool {
 
 // IPv4ReservedIPNet returns reserved IPv4 addresses.
 //
-// Introductions:
+// Introduction:
 //   See https://en.wikipedia.org/wiki/Reserved_IP_addresses
 func IPv4ReservedIPNet() *NetBox {
 	netBox := &NetBox{}
@@ -151,7 +151,7 @@ func IPv4ReservedIPNet() *NetBox {
 
 // IPv6ReservedIPNet returns reserved IPv6 addresses.
 //
-// Introductions:
+// Introduction:
 //   See https://en.wikipedia.org/wiki/Reserved_IP_addresses
 func IPv6ReservedIPNet() *NetBox {
 	netBox := &NetBox{}
@@ -303,7 +303,7 @@ type Locale struct {
 
 // Serve traffic in HTTP Proxy/Tunnel format.
 //
-// Introductions:
+// Introduction:
 //   See https://en.wikipedia.org/wiki/Proxy_server
 //   See https://en.wikipedia.org/wiki/HTTP_tunnel
 //
@@ -373,7 +373,7 @@ func (l *Locale) ServeProxy(connl io.ReadWriteCloser) error {
 
 // Serve traffic in SOCKS4/SOCKS4a format.
 //
-// Introductions:
+// Introduction:
 //   See https://en.wikipedia.org/wiki/SOCKS.
 func (l *Locale) ServeSocks4(connl io.ReadWriteCloser) error {
 	var (
@@ -427,7 +427,7 @@ func (l *Locale) ServeSocks4(connl io.ReadWriteCloser) error {
 
 // Serve traffic in SOCKS5 format.
 //
-// Introductions:
+// Introduction:
 //   See https://en.wikipedia.org/wiki/SOCKS.
 //   See https://tools.ietf.org/html/rfc1928
 func (l *Locale) ServeSocks5(connl io.ReadWriteCloser) error {
