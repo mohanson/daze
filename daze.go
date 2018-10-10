@@ -277,18 +277,26 @@ type FilterAuto struct {
 // Dial connects to the address on the named network. If necessary, Filter
 // will use f.Client.Dial, else net.Dial instead.
 func (f *FilterAuto) Dial(network, address string) (io.ReadWriteCloser, error) {
-	var p bool
-	f.Box.Get(address, &p)
-	if p {
-		return f.Client.Dial(network, address)
+	var p int
+	if err := f.Box.Get(address, &p); err == nil {
+		switch p {
+		case 0x00:
+			return f.Client.Dial(network, address)
+		case 0x01:
+			return net.Dial(network, address)
+		}
+		log.Fatalln("")
 	}
-	connl, connlErr := net.DialTimeout(network, address, time.Second*2)
-	if connlErr == nil {
-		return connl, nil
+	for i := 0; i < 3; i++ {
+		connl, connlErr := net.DialTimeout(network, address, time.Second*2)
+		if connlErr == nil {
+			f.Box.Set(address, 0x01)
+			return connl, nil
+		}
 	}
 	connr, connrErr := f.Client.Dial(network, address)
 	if connrErr == nil {
-		f.Box.Set(address, true)
+		f.Box.Set(address, 0x00)
 		return connr, nil
 	}
 	return nil, connrErr
