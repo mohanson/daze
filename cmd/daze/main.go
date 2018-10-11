@@ -89,7 +89,7 @@ func main() {
 		}
 		switch *flFilter {
 		case "auto":
-			router = daze.NewFilterAuto(client)
+			router = daze.NewFilter(client)
 		case "none":
 			filter := daze.NewFilterIP(client)
 			router = filter
