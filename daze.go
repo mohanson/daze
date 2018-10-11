@@ -252,11 +252,16 @@ func (f *FilterIP) Dial(network, address string) (io.ReadWriteCloser, error) {
 	return conn, nil
 }
 
-// NewFilterAuto returns a FilterAuto. The poor Nier doesn't have enough brain
+const (
+	RoadRemote = 0x00
+	RoadLocale = 0x01
+)
+
+// NewFilter returns a Filter. The poor Nier doesn't have enough brain
 // capacity, it can only remember 1024 addresses(Because LRU is used to avoid
 // memory transition expansion).
-func NewFilterAuto(dialer Dialer) *FilterAuto {
-	return &FilterAuto{
+func NewFilter(dialer Dialer) *Filter {
+	return &Filter{
 		Client: dialer,
 		Box:    acdb.LRU(1024),
 	}
@@ -269,37 +274,44 @@ func NewFilterAuto(dialer Dialer) *FilterAuto {
 // experience will be remembered by this monkey, so next time it sees the same
 // address again, Nier(I just gave it the name) will make a decision
 // immediately.
-type FilterAuto struct {
+type Filter struct {
 	Client Dialer
 	Box    acdb.Client
 }
 
 // Dial connects to the address on the named network. If necessary, Filter
 // will use f.Client.Dial, else net.Dial instead.
-func (f *FilterAuto) Dial(network, address string) (io.ReadWriteCloser, error) {
-	var p int
-	if err := f.Box.Get(address, &p); err == nil {
-		switch p {
-		case 0x00:
+func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
+	var (
+		choose int
+		connl  io.ReadWriteCloser
+		connr  io.ReadWriteCloser
+		err    error
+	)
+	err = f.Box.Get(address, &choose)
+	if err == nil {
+		switch choose {
+		case RoadRemote:
 			return f.Client.Dial(network, address)
-		case 0x01:
+		case RoadLocale:
 			return net.Dial(network, address)
 		}
 		log.Fatalln("")
 	}
-	for i := 0; i < 3; i++ {
-		connl, connlErr := net.DialTimeout(network, address, time.Second*2)
-		if connlErr == nil {
-			f.Box.Set(address, 0x01)
-			return connl, nil
-		}
+	if err != acdb.ErrNotExist {
+		return nil, err
 	}
-	connr, connrErr := f.Client.Dial(network, address)
-	if connrErr == nil {
-		f.Box.Set(address, 0x00)
+	connl, err = net.DialTimeout(network, address, time.Second*2)
+	if err == nil {
+		f.Box.Set(address, RoadLocale)
+		return connl, nil
+	}
+	connr, err = f.Client.Dial(network, address)
+	if err == nil {
+		f.Box.Set(address, RoadRemote)
 		return connr, nil
 	}
-	return nil, connrErr
+	return nil, err
 }
 
 // Locale is the main process of daze. In most cases, it is usually deployed
