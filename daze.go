@@ -303,12 +303,12 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 	}
 	connl, err = net.DialTimeout(network, address, time.Second*2)
 	if err == nil {
-		f.Box.Set(address, RoadLocale)
+		f.Box.SetNone(address, RoadLocale)
 		return connl, nil
 	}
 	connr, err = f.Client.Dial(network, address)
 	if err == nil {
-		f.Box.Set(address, RoadRemote)
+		f.Box.SetNone(address, RoadRemote)
 		return connr, nil
 	}
 	return nil, err

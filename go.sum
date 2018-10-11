@@ -4,3 +4,5 @@ github.com/mohanson/acdb v0.0.0-20181011021607-62bb3f7dbf5c h1:9zLVPxzBYyT+8Ro4p
 github.com/mohanson/acdb v0.0.0-20181011021607-62bb3f7dbf5c/go.mod h1:SFSq3No783fJ1DC/zyAkX5/B2PQue+hv8betzCiV16w=
 github.com/mohanson/acdb v0.0.0-20181011062123-a5c242e632cf h1:0hCdBbGf8h/MxSvsPzYhLC2u6AhOLU7EyXypqek6zPc=
 github.com/mohanson/acdb v0.0.0-20181011062123-a5c242e632cf/go.mod h1:SFSq3No783fJ1DC/zyAkX5/B2PQue+hv8betzCiV16w=
+github.com/mohanson/acdb v0.0.0-20181011082614-c8dd62f0727f h1:G4eGQJ1L+zf+00P9zOOQdKJxOHEWh0vcW4LUzz1WXxM=
+github.com/mohanson/acdb v0.0.0-20181011082614-c8dd62f0727f/go.mod h1:SFSq3No783fJ1DC/zyAkX5/B2PQue+hv8betzCiV16w=
