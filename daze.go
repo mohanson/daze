@@ -311,7 +311,7 @@ type Locale struct {
 // reason, please use ServeSocks4 or ServeSocks5 instead. Why the poor
 // performance is that I did not implement http persistent connection( a well-known
 // name is KeepAlive) because It will trigger some bugs on Firefox. Firefox
-// will send traffic from different sites to the same long connection.
+// will send traffic from different sites to the same persistent connection.
 // I have been debugging for a long time.
 // Fuck.
 func (l *Locale) ServeProxy(connl io.ReadWriteCloser) error {
