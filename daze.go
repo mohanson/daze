@@ -268,7 +268,7 @@ func NewFilter(dialer Dialer) *Filter {
 }
 
 // Filter determines whether the traffic should uses the proxy based on the
-// destination's IP address or domain. Different from FilterIP, FilterAuto
+// destination's IP address or domain. Different from FilterIP, Filter
 // is a fuck smart monkey, it first tries to connect to the address using a
 // local connection, if it fails, will using the proxy instead. This
 // experience will be remembered by this monkey, so next time it sees the same
@@ -301,7 +301,7 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 	if err != acdb.ErrNotExist {
 		return nil, err
 	}
-	connl, err = net.DialTimeout(network, address, time.Second*2)
+	connl, err = net.DialTimeout(network, address, time.Second*4)
 	if err == nil {
 		f.Box.SetNone(address, RoadLocale)
 		return connl, nil
@@ -329,10 +329,10 @@ type Locale struct {
 //
 // Warning: The performance of HTTP Proxy is very poor, unless you have a good
 // reason, please use ServeSocks4 or ServeSocks5 instead. Why the poor
-// performance is that I did not implement http persistent connection( a well-known
-// name is KeepAlive) because It will trigger some bugs on Firefox. Firefox
-// will send traffic from different sites to the same persistent connection.
-// I have been debugging for a long time.
+// performance is that I did not implement http persistent connection(a
+// well-known name is KeepAlive) because It will trigger some bugs on Firefox.
+// Firefox will send traffic from different sites to the one persistent
+// connection. I have been debugging for a long time.
 // Fuck.
 func (l *Locale) ServeProxy(connl io.ReadWriteCloser) error {
 	connlReader := bufio.NewReader(connl)
