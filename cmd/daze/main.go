@@ -77,7 +77,7 @@ func main() {
 
 		var (
 			client daze.Dialer
-			router daze.Dialer
+			filter *daze.Filter
 		)
 		switch *flEngine {
 		case "ashe":
@@ -87,22 +87,27 @@ func main() {
 		default:
 			log.Fatalln("daze: unknown engine", *flEngine)
 		}
+		filter = daze.NewFilter(client)
 		switch *flFilter {
 		case "auto":
-			router = daze.NewFilter(client)
+			filter.Mold = daze.MoldNier
 		case "none":
-			filter := daze.NewFilterIP(client)
-			router = filter
-		case "ipcn":
-			filter := daze.NewFilterIP(client)
+			filter.Mold = daze.MoldIP
 			go func() {
-				filter.Join(daze.CNIPNet())
+				filter.NetBox.Mrg(daze.IPv4ReservedIPNet())
+				filter.NetBox.Mrg(daze.IPv6ReservedIPNet())
 			}()
-			router = filter
+		case "ipcn":
+			filter.Mold = daze.MoldIP
+			go func() {
+				filter.NetBox.Mrg(daze.IPv4ReservedIPNet())
+				filter.NetBox.Mrg(daze.IPv6ReservedIPNet())
+				filter.NetBox.Mrg(daze.CNIPNet())
+			}()
 		default:
 			log.Fatalln("daze: unknown filter", *flFilter)
 		}
-		locale := daze.NewLocale(*flListen, router)
+		locale := daze.NewLocale(*flListen, filter)
 		if err := locale.Run(); err != nil {
 			log.Fatalln(err)
 		}

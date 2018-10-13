@@ -8,6 +8,7 @@ import (
 	"crypto/rc4"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -110,6 +111,13 @@ func (n *NetBox) Add(ipNet *net.IPNet) {
 	n.L = append(n.L, ipNet)
 }
 
+// Mrg is short for "Merge".
+func (n *NetBox) Mrg(box *NetBox) {
+	for _, e := range box.L {
+		n.Add(e)
+	}
+}
+
 // Whether ip is in the collection.
 func (n *NetBox) Has(ip net.IP) bool {
 	for _, entry := range n.L {
@@ -206,55 +214,11 @@ func CNIPNet() *NetBox {
 	return netBox
 }
 
-// NewFilterIP returns a FilterIP.
-func NewFilterIP(dialer Dialer) *FilterIP {
-	f := &FilterIP{
-		Client: dialer,
-		Netbox: NetBox{},
-	}
-	f.Join(IPv4ReservedIPNet())
-	f.Join(IPv6ReservedIPNet())
-	return f
-}
-
-// Filter determines whether the traffic should uses the proxy based on the
-// destination's IP address.
-type FilterIP struct {
-	Client Dialer
-	Netbox NetBox
-}
-
-// Join adds the IPNet of n.
-func (f *FilterIP) Join(n *NetBox) {
-	for _, e := range n.L {
-		f.Netbox.Add(e)
-	}
-}
-
-// Dial connects to the address on the named network. If necessary, Filter
-// will use f.Client.Dial, else net.Dial instead.
-func (f *FilterIP) Dial(network, address string) (io.ReadWriteCloser, error) {
-	host, _, err := net.SplitHostPort(address)
-	if err != nil {
-		return nil, err
-	}
-	ipls, err := net.LookupIP(host)
-	if err != nil {
-		return net.Dial(network, address)
-	}
-	if f.Netbox.Has(ipls[0]) {
-		return net.Dial(network, address)
-	}
-	conn, err := f.Client.Dial(network, address)
-	if err != nil {
-		return net.Dial(network, address)
-	}
-	return conn, nil
-}
-
 const (
 	RoadRemote = 0x00
 	RoadLocale = 0x01
+	MoldNier   = 0x00
+	MoldIP     = 0x01
 )
 
 // NewFilter returns a Filter. The poor Nier doesn't have enough brain
@@ -263,20 +227,29 @@ const (
 func NewFilter(dialer Dialer) *Filter {
 	return &Filter{
 		Client: dialer,
+		NetBox: NetBox{},
 		Box:    acdb.LRU(1024),
+		Mold:   MoldIP,
 	}
 }
 
 // Filter determines whether the traffic should uses the proxy based on the
-// destination's IP address or domain. Different from FilterIP, Filter
-// is a fuck smart monkey, it first tries to connect to the address using a
-// local connection, if it fails, will using the proxy instead. This
-// experience will be remembered by this monkey, so next time it sees the same
-// address again, Nier(I just gave it the name) will make a decision
-// immediately.
+// destination's IP address or domain.
+// There are two criteria to define a Filter:
+//   - MoldNier
+//   - MoldIP
+//
+// MoldNier is a fuck smart monkey, it first tries to connect to the address
+// by local connection, if it fails, then use the proxy. This experience will
+// be remembered by this monkey, so next time Nier will make a decision
+// immediately when it sees the same address again.
+//
+// MoldIP force switching based on IP address.
 type Filter struct {
 	Client Dialer
+	NetBox NetBox
 	Box    acdb.Client
+	Mold   int
 }
 
 // Dial connects to the address on the named network. If necessary, Filter
@@ -301,17 +274,40 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 	if err != acdb.ErrNotExist {
 		return nil, err
 	}
-	connl, err = net.DialTimeout(network, address, time.Second*4)
-	if err == nil {
-		f.Box.SetNone(address, RoadLocale)
-		return connl, nil
+	switch f.Mold {
+	case MoldNier:
+		connl, err = net.DialTimeout(network, address, time.Second*4)
+		if err == nil {
+			f.Box.SetNone(address, RoadLocale)
+			return connl, nil
+		}
+		connr, err = f.Client.Dial(network, address)
+		if err == nil {
+			f.Box.SetNone(address, RoadRemote)
+			return connr, nil
+		}
+		return nil, err
+	case MoldIP:
+		host, _, err := net.SplitHostPort(address)
+		if err != nil {
+			return nil, err
+		}
+		ipls, err := net.LookupIP(host)
+		if err != nil {
+			return net.Dial(network, address)
+		}
+		if f.NetBox.Has(ipls[0]) {
+			f.Box.Set(address, RoadLocale)
+			return net.Dial(network, address)
+		}
+		conn, err := f.Client.Dial(network, address)
+		if err != nil {
+			return net.Dial(network, address)
+		}
+		f.Box.Set(address, RoadRemote)
+		return conn, nil
 	}
-	connr, err = f.Client.Dial(network, address)
-	if err == nil {
-		f.Box.SetNone(address, RoadRemote)
-		return connr, nil
-	}
-	return nil, err
+	return nil, errors.New("daze: unknown mold")
 }
 
 // Locale is the main process of daze. In most cases, it is usually deployed
@@ -331,7 +327,7 @@ type Locale struct {
 // reason, please use ServeSocks4 or ServeSocks5 instead. Why the poor
 // performance is that I did not implement http persistent connection(a
 // well-known name is KeepAlive) because It will trigger some bugs on Firefox.
-// Firefox will send traffic from different sites to the one persistent
+// Firefox sends traffic from different sites to the one persistent
 // connection. I have been debugging for a long time.
 // Fuck.
 func (l *Locale) ServeProxy(connl io.ReadWriteCloser) error {
