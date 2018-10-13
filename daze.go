@@ -297,14 +297,14 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 			return net.Dial(network, address)
 		}
 		if f.NetBox.Has(ipls[0]) {
-			f.Box.Set(address, RoadLocale)
+			f.Box.SetNone(address, RoadLocale)
 			return net.Dial(network, address)
 		}
 		conn, err := f.Client.Dial(network, address)
 		if err != nil {
 			return net.Dial(network, address)
 		}
-		f.Box.Set(address, RoadRemote)
+		f.Box.SetNone(address, RoadRemote)
 		return conn, nil
 	}
 	return nil, errors.New("daze: unknown mold")
