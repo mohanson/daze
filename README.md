@@ -6,11 +6,15 @@ Daze is a tool to help you link to the **Internet**.
 
 # Usage
 
-Daze is dead simple to use:
+Compile or [Download](https://github.com/mohanson/daze/releases) daze:
 
 ```sh
 $ go get -u -v github.com/mohanson/daze/cmd/daze
+```
 
+Daze is dead simple to use:
+
+```sh
 # server port
 # you need a machine that can access the Internet, and enter the following command:
 $ daze server -l 0.0.0.0:51958

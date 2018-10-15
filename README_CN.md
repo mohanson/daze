@@ -6,11 +6,15 @@ Daze 是一款帮助你连接至**互联网**的工具.
 
 # 使用
 
-使用 daze 该死的简单:
+编译或[下载](https://github.com/mohanson/daze/releases) daze:
 
 ```sh
 $ go get -u -v github.com/mohanson/daze/cmd/daze
+```
 
+使用 daze 该死的简单:
+
+```sh
 # 服务端
 # 你需要一台能正确连接互联网的机器, 并输入以下命令
 $ daze server -l 0.0.0.0:51958
