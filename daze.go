@@ -70,7 +70,7 @@ func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
 //
 // Examples:
 //   Resolve("8.8.8.8:53")
-//	 Resolve("114.114.114.114:53")
+//   Resolve("114.114.114.114:53")
 func Resolve(addr string) {
 	net.DefaultResolver = &net.Resolver{
 		PreferGo: true,
