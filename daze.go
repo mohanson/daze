@@ -294,18 +294,14 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 		}
 		ipls, err := net.LookupIP(host)
 		if err != nil {
-			return net.Dial(network, address)
+			return nil, err
 		}
 		if f.NetBox.Has(ipls[0]) {
 			f.Namedb.SetNone(address, RoadLocale)
 			return net.Dial(network, address)
 		}
-		conn, err := f.Client.Dial(network, address)
-		if err != nil {
-			return net.Dial(network, address)
-		}
 		f.Namedb.SetNone(address, RoadRemote)
-		return conn, nil
+		return f.Client.Dial(network, address)
 	}
 	return nil, errors.New("daze: unknown mold")
 }
