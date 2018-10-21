@@ -39,12 +39,14 @@ func main() {
 			flCipher = flag.String("k", "daze", "cipher")
 			flMasker = flag.String("m", "http://httpbin.org", "")
 			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
-			flDnserv = flag.String("dns", "8.8.8.8:53", "")
+			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
 		log.Println("Server cipher is", *flCipher)
 		log.Println("Domain server is", *flDnserv)
-		daze.Resolve(*flDnserv)
+		if *flDnserv != "" {
+			daze.Resolve(*flDnserv)
+		}
 		switch *flEngine {
 		case "ashe":
 			server := ashe.NewServer(*flListen, *flCipher)
@@ -67,13 +69,15 @@ func main() {
 			flCipher = flag.String("k", "daze", "cipher")
 			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
 			flFilter = flag.String("f", "ipcn", "filter {auto, none, ipcn}")
-			flDnserv = flag.String("dns", "8.8.8.8:53", "")
+			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
 		log.Println("Remote server is", *flServer)
 		log.Println("Client cipher is", *flCipher)
 		log.Println("Domain server is", *flDnserv)
-		daze.Resolve(*flDnserv)
+		if *flDnserv != "" {
+			daze.Resolve(*flDnserv)
+		}
 
 		var (
 			client daze.Dialer
