@@ -491,7 +491,7 @@ func (l *Locale) ServeSocks5(connl io.ReadWriteCloser) error {
 		io.ReadFull(reader, fDstAddr)
 		dstHost = net.IP(fDstAddr).String()
 	}
-	if _, err := io.ReadFull(connl, fDstPort); err != nil {
+	if _, err = io.ReadFull(connl, fDstPort); err != nil {
 		return err
 	}
 	dstPort = binary.BigEndian.Uint16(fDstPort)
