@@ -133,7 +133,6 @@ func NewServer(listen, cipher string) *Server {
 	return &Server{
 		Listen: listen,
 		Cipher: md5.Sum([]byte(cipher)),
-		Masker: "https://google.com",
 	}
 }
 

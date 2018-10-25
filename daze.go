@@ -387,116 +387,130 @@ func (l *Locale) ServeProxy(connl io.ReadWriteCloser) error {
 // Serve traffic in SOCKS4/SOCKS4a format.
 //
 // Introduction:
-//   See https://en.wikipedia.org/wiki/SOCKS.
+//   See https://en.wikipedia.org/wiki/SOCKS
+//   See http://ftp.icm.edu.pl/packages/socks/socks4/SOCKS4.protocol
 func (l *Locale) ServeSocks4(connl io.ReadWriteCloser) error {
 	var (
-		buf          = make([]byte, 1024)
-		reader       = bufio.NewReader(connl)
-		dstHostBytes []byte
-		dstHost      string
-		dstPort      uint16
-		dst          string
-		connr        io.ReadWriteCloser
-		err          error
+		reader    = bufio.NewReader(connl)
+		fCode     uint8
+		fDstPort  = make([]byte, 2)
+		fDstIP    = make([]byte, 4)
+		fHostName []byte
+		dstHost   string
+		dstPort   uint16
+		dst       string
+		connr     io.ReadWriteCloser
+		err       error
 	)
-
 	connl = ReadWriteCloser{
 		Reader: reader,
 		Writer: connl,
 		Closer: connl,
 	}
-
-	io.ReadFull(connl, buf[:2])
-	io.ReadFull(connl, buf[:2])
-	dstPort = binary.BigEndian.Uint16(buf[:2])
-	io.ReadFull(connl, buf[:4])
+	reader.Discard(1)
+	fCode, _ = reader.ReadByte()
+	io.ReadFull(reader, fDstPort)
+	dstPort = binary.BigEndian.Uint16(fDstPort)
+	io.ReadFull(reader, fDstIP)
 	_, err = reader.ReadBytes(0x00)
 	if err != nil {
 		return err
 	}
-	if bytes.Equal(buf[:3], []byte{0x00, 0x00, 0x00}) && buf[3] != 0x00 {
-		dstHostBytes, err = reader.ReadBytes(0x00)
+	if bytes.Equal(fDstIP[:3], []byte{0x00, 0x00, 0x00}) && fDstIP[3] != 0x00 {
+		fHostName, err = reader.ReadBytes(0x00)
 		if err != nil {
 			return err
 		}
-		dstHost = string(dstHostBytes[:len(dstHostBytes)-1])
+		fHostName = fHostName[:len(fHostName)-1]
+		dstHost = string(fHostName)
 	} else {
-		dstHost = net.IP(buf[:4]).String()
+		dstHost = net.IP(fDstIP).String()
 	}
 	dst = dstHost + ":" + strconv.Itoa(int(dstPort))
 	log.Println("Connect[socks4]", dst)
-
-	connr, err = l.Dialer.Dial("tcp", dst)
-	if err != nil {
-		connl.Write([]byte{0x00, 0x5B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-		return err
+	switch fCode {
+	case 0x01:
+		connr, err = l.Dialer.Dial("tcp", dst)
+		if err != nil {
+			connl.Write([]byte{0x00, 0x5B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+			return err
+		}
+		defer connr.Close()
+		connl.Write([]byte{0x00, 0x5A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		Link(connl, connr)
+		return nil
+	case 0x02:
 	}
-	defer connr.Close()
-	connl.Write([]byte{0x00, 0x5A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-
-	Link(connl, connr)
 	return nil
 }
 
 // Serve traffic in SOCKS5 format.
 //
 // Introduction:
-//   See https://en.wikipedia.org/wiki/SOCKS.
+//   See https://en.wikipedia.org/wiki/SOCKS
 //   See https://tools.ietf.org/html/rfc1928
 func (l *Locale) ServeSocks5(connl io.ReadWriteCloser) error {
 	var (
-		buf        = make([]byte, 1024)
-		n          int
-		dstNetwork uint8
-		dstCase    uint8
-		dstHost    string
-		dstPort    uint16
-		dst        string
-		connr      io.ReadWriteCloser
-		err        error
+		reader   = bufio.NewReader(connl)
+		fN       uint8
+		fCmd     uint8
+		fAT      uint8
+		fDstAddr []byte
+		fDstPort = make([]byte, 2)
+		dstHost  string
+		dstPort  uint16
+		dst      string
+		connr    io.ReadWriteCloser
+		err      error
 	)
-
-	io.ReadFull(connl, buf[:2])
-	n = int(buf[1])
-	io.ReadFull(connl, buf[:n])
-	connl.Write([]byte{0x05, 0x00})
-	io.ReadFull(connl, buf[:4])
-	dstNetwork = buf[1]
-	dstCase = buf[3]
-	switch dstCase {
-	case 0x01:
-		io.ReadFull(connl, buf[:4])
-		dstHost = net.IP(buf[:4]).String()
-	case 0x03:
-		io.ReadFull(connl, buf[:1])
-		n = int(buf[0])
-		io.ReadFull(connl, buf[:n])
-		dstHost = string(buf[:n])
-	case 0x04:
-		io.ReadFull(connl, buf[:16])
-		dstHost = net.IP(buf[:16]).String()
+	connl = ReadWriteCloser{
+		Reader: reader,
+		Writer: connl,
+		Closer: connl,
 	}
-	_, err = io.ReadFull(connl, buf[:2])
-	if err != nil {
+	reader.Discard(1)
+	fN, _ = reader.ReadByte()
+	reader.Discard(int(fN))
+	connl.Write([]byte{0x05, 0x00})
+	reader.Discard(1)
+	fCmd, _ = reader.ReadByte()
+	reader.Discard(1)
+	fAT, _ = reader.ReadByte()
+	switch fAT {
+	case 0x01:
+		fDstAddr = make([]byte, 4)
+		io.ReadFull(reader, fDstAddr)
+		dstHost = net.IP(fDstAddr).String()
+	case 0x03:
+		fN, _ = reader.ReadByte()
+		fDstAddr = make([]byte, int(fN))
+		io.ReadFull(reader, fDstAddr)
+		dstHost = string(fDstAddr)
+	case 0x04:
+		fDstAddr = make([]byte, 16)
+		io.ReadFull(reader, fDstAddr)
+		dstHost = net.IP(fDstAddr).String()
+	}
+	if _, err = io.ReadFull(connl, fDstPort); err != nil {
 		return err
 	}
-	dstPort = binary.BigEndian.Uint16(buf[:2])
+	dstPort = binary.BigEndian.Uint16(fDstPort)
 	dst = dstHost + ":" + strconv.Itoa(int(dstPort))
 	log.Println("Connect[socks5]", dst)
-
-	if dstNetwork == 0x03 {
-		connr, err = l.Dialer.Dial("udp", dst)
-	} else {
+	switch fCmd {
+	case 0x01:
 		connr, err = l.Dialer.Dial("tcp", dst)
+		if err != nil {
+			connl.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+			return err
+		}
+		defer connr.Close()
+		connl.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		Link(connl, connr)
+		return nil
+	case 0x02:
+	case 0x03:
 	}
-	if err != nil {
-		connl.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-		return err
-	}
-	defer connr.Close()
-	connl.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-
-	Link(connl, connr)
 	return nil
 }
 
@@ -540,12 +554,12 @@ func (l *Locale) Run() error {
 			log.Println(err)
 			continue
 		}
-		go func(conn net.Conn) {
+		go func() {
 			defer conn.Close()
 			if err := l.Serve(conn); err != nil {
 				log.Println(err)
 			}
-		}(conn)
+		}()
 	}
 }
 
