@@ -256,12 +256,17 @@ type Filter struct {
 // will use f.Client.Dial, else net.Dial instead.
 func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 	var (
+		host   string
 		choose int
 		connl  io.ReadWriteCloser
 		connr  io.ReadWriteCloser
 		err    error
 	)
-	err = f.Namedb.Get(address, &choose)
+	host, _, err = net.SplitHostPort(address)
+	if err != nil {
+		return nil, err
+	}
+	err = f.Namedb.Get(host, &choose)
 	if err == nil {
 		switch choose {
 		case RoadRemote:
@@ -278,34 +283,26 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 	case MoldNier:
 		connl, err = net.DialTimeout(network, address, time.Second*4)
 		if err == nil {
-			f.Namedb.SetNone(address, RoadLocale)
+			f.Namedb.SetNone(host, RoadLocale)
 			return connl, nil
 		}
 		connr, err = f.Client.Dial(network, address)
 		if err == nil {
-			f.Namedb.SetNone(address, RoadRemote)
+			f.Namedb.SetNone(host, RoadRemote)
 			return connr, nil
 		}
 		return nil, err
 	case MoldIP:
-		host, _, err := net.SplitHostPort(address)
+		ipls, err := net.LookupIP(host)
 		if err != nil {
 			return nil, err
 		}
-		ipls, err := net.LookupIP(host)
-		if err != nil {
-			return net.Dial(network, address)
-		}
 		if f.NetBox.Has(ipls[0]) {
-			f.Namedb.SetNone(address, RoadLocale)
+			f.Namedb.SetNone(host, RoadLocale)
 			return net.Dial(network, address)
 		}
-		conn, err := f.Client.Dial(network, address)
-		if err != nil {
-			return net.Dial(network, address)
-		}
-		f.Namedb.SetNone(address, RoadRemote)
-		return conn, nil
+		f.Namedb.SetNone(host, RoadRemote)
+		return f.Client.Dial(network, address)
 	}
 	return nil, errors.New("daze: unknown mold")
 }
