@@ -388,6 +388,7 @@ func (l *Locale) ServeProxy(connl io.ReadWriteCloser) error {
 //
 // Introduction:
 //   See https://en.wikipedia.org/wiki/SOCKS.
+//   See http://ftp.icm.edu.pl/packages/socks/socks4/SOCKS4.protocol.
 func (l *Locale) ServeSocks4(connl io.ReadWriteCloser) error {
 	var (
 		buf          = make([]byte, 1024)
@@ -448,7 +449,7 @@ func (l *Locale) ServeSocks4(connl io.ReadWriteCloser) error {
 //
 // Introduction:
 //   See https://en.wikipedia.org/wiki/SOCKS.
-//   See https://tools.ietf.org/html/rfc1928
+//   See https://tools.ietf.org/html/rfc1928.
 func (l *Locale) ServeSocks5(connl io.ReadWriteCloser) error {
 	var (
 		buf        = make([]byte, 1024)
