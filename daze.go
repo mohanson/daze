@@ -392,6 +392,7 @@ func (l *Locale) ServeSocks4(connl io.ReadWriteCloser) error {
 	var (
 		buf          = make([]byte, 1024)
 		reader       = bufio.NewReader(connl)
+		dstNetwork   uint8
 		dstHostBytes []byte
 		dstHost      string
 		dstPort      uint16
@@ -407,6 +408,7 @@ func (l *Locale) ServeSocks4(connl io.ReadWriteCloser) error {
 	}
 
 	io.ReadFull(connl, buf[:2])
+	dstNetwork = buf[1]
 	io.ReadFull(connl, buf[:2])
 	dstPort = binary.BigEndian.Uint16(buf[:2])
 	io.ReadFull(connl, buf[:4])
@@ -426,15 +428,19 @@ func (l *Locale) ServeSocks4(connl io.ReadWriteCloser) error {
 	dst = dstHost + ":" + strconv.Itoa(int(dstPort))
 	log.Println("Connect[socks4]", dst)
 
-	connr, err = l.Dialer.Dial("tcp", dst)
-	if err != nil {
-		connl.Write([]byte{0x00, 0x5B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-		return err
+	switch dstNetwork {
+	case 0x01:
+		connr, err = l.Dialer.Dial("tcp", dst)
+		if err != nil {
+			connl.Write([]byte{0x00, 0x5B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+			return err
+		}
+		defer connr.Close()
+		connl.Write([]byte{0x00, 0x5A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		Link(connl, connr)
+		return nil
+	case 0x02:
 	}
-	defer connr.Close()
-	connl.Write([]byte{0x00, 0x5A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-
-	Link(connl, connr)
 	return nil
 }
 
@@ -484,19 +490,20 @@ func (l *Locale) ServeSocks5(connl io.ReadWriteCloser) error {
 	dst = dstHost + ":" + strconv.Itoa(int(dstPort))
 	log.Println("Connect[socks5]", dst)
 
-	if dstNetwork == 0x03 {
-		connr, err = l.Dialer.Dial("udp", dst)
-	} else {
+	switch dstNetwork {
+	case 0x01:
 		connr, err = l.Dialer.Dial("tcp", dst)
+		if err != nil {
+			connl.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+			return err
+		}
+		defer connr.Close()
+		connl.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		Link(connl, connr)
+		return nil
+	case 0x02:
+	case 0x03:
 	}
-	if err != nil {
-		connl.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-		return err
-	}
-	defer connr.Close()
-	connl.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-
-	Link(connl, connr)
 	return nil
 }
 
