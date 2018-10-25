@@ -391,45 +391,44 @@ func (l *Locale) ServeProxy(connl io.ReadWriteCloser) error {
 //   See http://ftp.icm.edu.pl/packages/socks/socks4/SOCKS4.protocol.
 func (l *Locale) ServeSocks4(connl io.ReadWriteCloser) error {
 	var (
-		buf          = make([]byte, 1024)
-		reader       = bufio.NewReader(connl)
-		dstNetwork   uint8
-		dstHostBytes []byte
-		dstHost      string
-		dstPort      uint16
-		dst          string
-		connr        io.ReadWriteCloser
-		err          error
+		reader    = bufio.NewReader(connl)
+		fCode     uint8
+		fDstPort  = make([]byte, 2)
+		fDstIP    = make([]byte, 4)
+		fHostName []byte
+		dstHost   string
+		dstPort   uint16
+		dst       string
+		connr     io.ReadWriteCloser
+		err       error
 	)
-
 	connl = ReadWriteCloser{
 		Reader: reader,
 		Writer: connl,
 		Closer: connl,
 	}
-
-	io.ReadFull(connl, buf[:2])
-	dstNetwork = buf[1]
-	io.ReadFull(connl, buf[:2])
-	dstPort = binary.BigEndian.Uint16(buf[:2])
-	io.ReadFull(connl, buf[:4])
+	reader.Discard(1)
+	fCode, _ = reader.ReadByte()
+	io.ReadFull(reader, fDstPort)
+	dstPort = binary.BigEndian.Uint16(fDstPort)
+	io.ReadFull(reader, fDstIP)
 	_, err = reader.ReadBytes(0x00)
 	if err != nil {
 		return err
 	}
-	if bytes.Equal(buf[:3], []byte{0x00, 0x00, 0x00}) && buf[3] != 0x00 {
-		dstHostBytes, err = reader.ReadBytes(0x00)
+	if bytes.Equal(fDstIP[:3], []byte{0x00, 0x00, 0x00}) && fDstIP[3] != 0x00 {
+		fHostName, err = reader.ReadBytes(0x00)
 		if err != nil {
 			return err
 		}
-		dstHost = string(dstHostBytes[:len(dstHostBytes)-1])
+		fHostName = fHostName[:len(fHostName)-1]
+		dstHost = string(fHostName)
 	} else {
-		dstHost = net.IP(buf[:4]).String()
+		dstHost = net.IP(fDstIP).String()
 	}
 	dst = dstHost + ":" + strconv.Itoa(int(dstPort))
 	log.Println("Connect[socks4]", dst)
-
-	switch dstNetwork {
+	switch fCode {
 	case 0x01:
 		connr, err = l.Dialer.Dial("tcp", dst)
 		if err != nil {
