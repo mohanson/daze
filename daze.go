@@ -547,12 +547,12 @@ func (l *Locale) Run() error {
 			log.Println(err)
 			continue
 		}
-		go func(conn net.Conn) {
+		go func() {
 			defer conn.Close()
 			if err := l.Serve(conn); err != nil {
 				log.Println(err)
 			}
-		}(conn)
+		}()
 	}
 }
 
