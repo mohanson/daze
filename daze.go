@@ -269,13 +269,13 @@ func (f *Filter) SetRemote(host string) error {
 //
 // RULE file aims to be a minimal configuration file format that's easy to
 // read due to obvious semantics.
-// There are two parts per line on RULE file: host and road. host are on the
-// left of the space sign and road are on the right. road is an int and
+// There are two parts per line on RULE file: road and host. road are on the
+// left of the space sign and host are on the right. road is an int and
 // describes whether the host should go proxy.
 //
 // This is a RULE document:
-// google.com 1
-// baidu.com 0
+// 1 google.com
+// 0 baidu.com
 func (f *Filter) Load(name string) error {
 	r, err := os.Open(name)
 	if err != nil {
@@ -286,11 +286,11 @@ func (f *Filter) Load(name string) error {
 	for scanner.Scan() {
 		line := scanner.Text()
 		seps := strings.Split(line, " ")
-		switch seps[1] {
+		switch seps[0] {
 		case "0":
-			f.SetLocale(seps[0])
-		case "1":
 			f.SetLocale(seps[1])
+		case "1":
+			f.SetRemote(seps[1])
 		}
 	}
 	return scanner.Err()
