@@ -16,6 +16,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -227,11 +228,11 @@ const (
 // memory transition expansion).
 func NewFilter(dialer Dialer) *Filter {
 	return &Filter{
-		Client:      dialer,
-		NetBox:      NetBox{},
-		NamedbFixed: acdb.Mem(),
-		NamedbCache: acdb.LRU(1024),
-		Mold:        MoldIP,
+		Client: dialer,
+		Namedb: acdb.LRU(1024),
+		Rule:   map[string]int{},
+		NetBox: NetBox{},
+		Mold:   MoldIP,
 	}
 }
 
@@ -248,11 +249,11 @@ func NewFilter(dialer Dialer) *Filter {
 //
 // MoldIP force switching based on IP address.
 type Filter struct {
-	Client      Dialer
-	NetBox      NetBox
-	NamedbFixed acdb.Client
-	NamedbCache acdb.Client
-	Mold        int
+	Client Dialer
+	Namedb acdb.Client
+	Rule   map[string]int
+	NetBox NetBox
+	Mold   int
 }
 
 // Load a RULE file.
@@ -289,9 +290,9 @@ func (f *Filter) Load(name string) error {
 		seps := strings.Split(line, " ")
 		switch seps[0] {
 		case "0":
-			f.NamedbFixed.Set(seps[1], RoadLocale)
+			f.Rule[seps[1]] = 0
 		case "1":
-			f.NamedbFixed.Set(seps[1], RoadRemote)
+			f.Rule[seps[1]] = 1
 		}
 	}
 	return scanner.Err()
@@ -302,6 +303,7 @@ func (f *Filter) Load(name string) error {
 func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 	var (
 		host   string
+		rule   string
 		choose int
 		connl  io.ReadWriteCloser
 		connr  io.ReadWriteCloser
@@ -311,32 +313,41 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	if f.NamedbFixed.Get(host, &choose) != nil {
-		err = f.NamedbCache.Get(host, &choose)
-	} else {
-		err = nil
-	}
+	err = f.Namedb.Get(host, &choose)
 	if err == nil {
 		switch choose {
-		case RoadRemote:
-			return f.Client.Dial(network, address)
 		case RoadLocale:
 			return net.Dial(network, address)
+		case RoadRemote:
+			return f.Client.Dial(network, address)
 		}
 	}
 	if err != acdb.ErrNotExist {
 		return nil, err
 	}
+	for rule, choose = range f.Rule {
+		b, err := filepath.Match(rule, host)
+		if err != nil || !b {
+			continue
+		}
+		f.Namedb.SetNone(host, choose)
+		switch choose {
+		case RoadLocale:
+			return net.Dial(network, address)
+		case RoadRemote:
+			return f.Client.Dial(network, address)
+		}
+	}
 	switch f.Mold {
 	case MoldNier:
 		connl, err = net.DialTimeout(network, address, time.Second*4)
 		if err == nil {
-			f.NamedbCache.SetNone(host, RoadLocale)
+			f.Namedb.SetNone(host, RoadLocale)
 			return connl, nil
 		}
 		connr, err = f.Client.Dial(network, address)
 		if err == nil {
-			f.NamedbCache.SetNone(host, RoadRemote)
+			f.Namedb.SetNone(host, RoadRemote)
 			return connr, nil
 		}
 		return nil, err
@@ -346,10 +357,10 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 			return nil, err
 		}
 		if f.NetBox.Has(ips[0]) {
-			f.NamedbCache.SetNone(host, RoadLocale)
+			f.Namedb.SetNone(host, RoadLocale)
 			return net.Dial(network, address)
 		}
-		f.NamedbCache.SetNone(host, RoadRemote)
+		f.Namedb.SetNone(host, RoadRemote)
 		return f.Client.Dial(network, address)
 	}
 	return nil, errors.New("daze: unknown mold")
