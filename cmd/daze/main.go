@@ -68,6 +68,7 @@ func main() {
 			flServer = flag.String("s", "127.0.0.1:51958", "server address")
 			flCipher = flag.String("k", "daze", "cipher, for encryption")
 			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
+			flFilterFixed = flag.String("f.fixed", "", "path of rule file")
 			flFilter = flag.String("f", "ipcn", "filter {auto, none, ipcn}")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
@@ -92,6 +93,9 @@ func main() {
 			log.Fatalln("daze: unknown engine", *flEngine)
 		}
 		filter = daze.NewFilter(client)
+		if *flFilterFixed != "" {
+			filter.Load(*flFilterFixed)
+		}
 		switch *flFilter {
 		case "auto":
 			filter.Mold = daze.MoldNier

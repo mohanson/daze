@@ -15,6 +15,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -262,6 +263,37 @@ func (f *Filter) SetLocale(host string) error {
 // SetRemote tag an address use remote access PERMANENTLY.
 func (f *Filter) SetRemote(host string) error {
 	return f.NamedbFixed.Set(host, RoadRemote)
+}
+
+// Load a RULE file.
+//
+// RULE file aims to be a minimal configuration file format that's easy to
+// read due to obvious semantics.
+// There are two parts per line on RULE file: host and road. host are on the
+// left of the space sign and road are on the right. road is an int and
+// describes whether the host should go proxy.
+//
+// This is a RULE document:
+// google.com 1
+// baidu.com 0
+func (f *Filter) Load(name string) error {
+	r, err := os.Open(name)
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+	scanner := bufio.NewScanner(r)
+	for scanner.Scan() {
+		line := scanner.Text()
+		seps := strings.Split(line, " ")
+		switch seps[1] {
+		case "0":
+			f.SetLocale(seps[0])
+		case "1":
+			f.SetLocale(seps[1])
+		}
+	}
+	return scanner.Err()
 }
 
 // Dial connects to the address on the named network. If necessary, Filter
