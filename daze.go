@@ -215,8 +215,8 @@ func CNIPNet() *NetBox {
 }
 
 const (
-	RoadRemote = 0x00
-	RoadLocale = 0x01
+	RoadLocale = 0x00
+	RoadRemote = 0x01
 	MoldNier   = 0x00
 	MoldIP     = 0x01
 )
@@ -226,10 +226,11 @@ const (
 // memory transition expansion).
 func NewFilter(dialer Dialer) *Filter {
 	return &Filter{
-		Client: dialer,
-		NetBox: NetBox{},
-		Namedb: acdb.Lru(1024),
-		Mold:   MoldIP,
+		Client:      dialer,
+		NetBox:      NetBox{},
+		NamedbFixed: acdb.Mem(),
+		NamedbCache: acdb.LRU(1024),
+		Mold:        MoldIP,
 	}
 }
 
@@ -246,10 +247,21 @@ func NewFilter(dialer Dialer) *Filter {
 //
 // MoldIP force switching based on IP address.
 type Filter struct {
-	Client Dialer
-	NetBox NetBox
-	Namedb acdb.Client
-	Mold   int
+	Client      Dialer
+	NetBox      NetBox
+	NamedbFixed acdb.Client
+	NamedbCache acdb.Client
+	Mold        int
+}
+
+// SetLocale tag an address use locale access PERMANENTLY.
+func (f *Filter) SetLocale(host string) error {
+	return f.NamedbFixed.Set(host, RoadLocale)
+}
+
+// SetRemote tag an address use remote access PERMANENTLY.
+func (f *Filter) SetRemote(host string) error {
+	return f.NamedbFixed.Set(host, RoadRemote)
 }
 
 // Dial connects to the address on the named network. If necessary, Filter
@@ -266,7 +278,12 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = f.Namedb.Get(host, &choose)
+	err = func() error {
+		if err := f.NamedbFixed.Get(host, &choose); err == nil {
+			return nil
+		}
+		return f.NamedbCache.Get(host, &choose)
+	}()
 	if err == nil {
 		switch choose {
 		case RoadRemote:
@@ -283,25 +300,25 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 	case MoldNier:
 		connl, err = net.DialTimeout(network, address, time.Second*4)
 		if err == nil {
-			f.Namedb.SetNone(host, RoadLocale)
+			f.NamedbCache.SetNone(host, RoadLocale)
 			return connl, nil
 		}
 		connr, err = f.Client.Dial(network, address)
 		if err == nil {
-			f.Namedb.SetNone(host, RoadRemote)
+			f.NamedbCache.SetNone(host, RoadRemote)
 			return connr, nil
 		}
 		return nil, err
 	case MoldIP:
-		ipls, err := net.LookupIP(host)
+		ips, err := net.LookupIP(host)
 		if err != nil {
 			return nil, err
 		}
-		if f.NetBox.Has(ipls[0]) {
-			f.Namedb.SetNone(host, RoadLocale)
+		if f.NetBox.Has(ips[0]) {
+			f.NamedbCache.SetNone(host, RoadLocale)
 			return net.Dial(network, address)
 		}
-		f.Namedb.SetNone(host, RoadRemote)
+		f.NamedbCache.SetNone(host, RoadRemote)
 		return f.Client.Dial(network, address)
 	}
 	return nil, errors.New("daze: unknown mold")
