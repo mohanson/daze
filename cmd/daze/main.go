@@ -36,8 +36,8 @@ func main() {
 	case "server":
 		var (
 			flListen = flag.String("l", "0.0.0.0:51958", "listen address")
-			flCipher = flag.String("k", "daze", "cipher")
-			flMasker = flag.String("m", "http://httpbin.org", "")
+			flCipher = flag.String("k", "daze", "cipher, for encryption")
+			flMasker = flag.String("m", "http://httpbin.org", "masker, for confusion")
 			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
@@ -66,7 +66,7 @@ func main() {
 		var (
 			flListen = flag.String("l", "127.0.0.1:51959", "listen address")
 			flServer = flag.String("s", "127.0.0.1:51958", "server address")
-			flCipher = flag.String("k", "daze", "cipher")
+			flCipher = flag.String("k", "daze", "cipher, for encryption")
 			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
 			flFilter = flag.String("f", "ipcn", "filter {auto, none, ipcn}")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
