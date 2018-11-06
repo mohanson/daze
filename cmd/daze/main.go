@@ -64,13 +64,13 @@ func main() {
 		}
 	case "client":
 		var (
-			flListen = flag.String("l", "127.0.0.1:51959", "listen address")
-			flServer = flag.String("s", "127.0.0.1:51958", "server address")
-			flCipher = flag.String("k", "daze", "cipher, for encryption")
-			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
+			flListen      = flag.String("l", "127.0.0.1:51959", "listen address")
+			flServer      = flag.String("s", "127.0.0.1:51958", "server address")
+			flCipher      = flag.String("k", "daze", "cipher, for encryption")
+			flEngine      = flag.String("e", "ashe", "engine {ashe, asheshadow}")
 			flFilterFixed = flag.String("f.fixed", "", "path of rule file")
-			flFilter = flag.String("f", "ipcn", "filter {auto, none, ipcn}")
-			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
+			flFilter      = flag.String("f", "ipcn", "filter {auto, none, ipcn}")
+			flDnserv      = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
 		log.Println("Remote server is", *flServer)
@@ -79,7 +79,6 @@ func main() {
 			daze.Resolve(*flDnserv)
 			log.Println("Domain server is", *flDnserv)
 		}
-
 		var (
 			client daze.Dialer
 			filter *daze.Filter
@@ -94,7 +93,12 @@ func main() {
 		}
 		filter = daze.NewFilter(client)
 		if *flFilterFixed != "" {
-			filter.Load(*flFilterFixed)
+			log.Println("Load rule", *flFilterFixed)
+			go func() {
+				if err := filter.Load(*flFilterFixed); err != nil {
+					log.Fatalln(err)
+				}
+			}()
 		}
 		switch *flFilter {
 		case "auto":

@@ -267,12 +267,23 @@ type Filter struct {
 // 1 google.com
 // 0 baidu.com
 func (f *Filter) Load(name string) error {
-	r, err := os.Open(name)
-	if err != nil {
-		return err
+	var reader io.Reader
+	if strings.HasPrefix(name, "http") {
+		r, err := http.Get(name)
+		if err != nil {
+			return err
+		}
+		defer r.Body.Close()
+		reader = r.Body
+	} else {
+		r, err := os.Open(name)
+		if err != nil {
+			return err
+		}
+		defer r.Close()
+		reader = r
 	}
-	defer r.Close()
-	scanner := bufio.NewScanner(r)
+	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := scanner.Text()
 		seps := strings.Split(line, " ")
@@ -300,12 +311,11 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = func() error {
-		if err := f.NamedbFixed.Get(host, &choose); err == nil {
-			return nil
-		}
-		return f.NamedbCache.Get(host, &choose)
-	}()
+	if f.NamedbFixed.Get(host, &choose) != nil {
+		err = f.NamedbCache.Get(host, &choose)
+	} else {
+		err = nil
+	}
 	if err == nil {
 		switch choose {
 		case RoadRemote:
@@ -313,7 +323,6 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 		case RoadLocale:
 			return net.Dial(network, address)
 		}
-		log.Fatalln("")
 	}
 	if err != acdb.ErrNotExist {
 		return nil, err
