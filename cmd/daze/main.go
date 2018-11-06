@@ -106,14 +106,10 @@ func main() {
 		case "none":
 			filter.JoinRoader(daze.NewRoaderBull(daze.RoadRemote))
 		case "ipcn":
+			log.Println("Load IPcn")
 			roaderIPcn := daze.NewRoaderIP(daze.RoadLocale, daze.RoadRemote)
-			go func() {
-				log.Println("Load IPcn")
-				roaderIPcn.NetBox.Mrg(daze.CNIPNet())
-			}()
+			roaderIPcn.NetBox.Mrg(daze.CNIPNet())
 			filter.JoinRoader(roaderIPcn)
-		default:
-			log.Fatalln("daze: unknown filter", *flFilter)
 		}
 		locale := daze.NewLocale(*flListen, filter)
 		if err := locale.Run(); err != nil {
