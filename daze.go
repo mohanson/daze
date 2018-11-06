@@ -8,7 +8,6 @@ import (
 	"crypto/rc4"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -219,55 +218,56 @@ func CNIPNet() *NetBox {
 const (
 	RoadLocale = 0x00
 	RoadRemote = 0x01
-	MoldNier   = 0x00
-	MoldIP     = 0x01
+	RoadUnknow = 0x02
 )
 
-// NewFilter returns a Filter. The poor Nier doesn't have enough brain
-// capacity, it can only remember 1024 addresses(Because LRU is used to avoid
-// memory transition expansion).
-func NewFilter(dialer Dialer) *Filter {
-	return &Filter{
-		Client: dialer,
-		Namedb: acdb.LRU(1024),
-		Rule:   map[string]int{},
-		NetBox: NetBox{},
-		Mold:   MoldIP,
+// Roader is the interface that groups the basic Road method.
+type Roader interface {
+	Road(host string) int
+}
+
+// NewRoaderRule returns a new RoaderRule.
+func NewRoaderRule() *RoaderRule {
+	return &RoaderRule{
+		Rule: map[string]int{},
 	}
 }
 
-// Filter determines whether the traffic should uses the proxy based on the
-// destination's IP address or domain.
-// There are two criteria to define a Filter:
-//   - MoldNier
-//   - MoldIP
-//
-// MoldNier is a fuck smart monkey, it first tries to connect to the address
-// by local connection, if it fails, then use the proxy. This experience will
-// be remembered by this monkey, so next time Nier will make a decision
-// immediately when it sees the same address again.
-//
-// MoldIP force switching based on IP address.
-type Filter struct {
-	Client Dialer
-	Namedb acdb.Client
-	Rule   map[string]int
-	NetBox NetBox
-	Mold   int
-}
-
-// Load a RULE file.
+// RoaderRule routing based on the RULE file.
 //
 // RULE file aims to be a minimal configuration file format that's easy to
 // read due to obvious semantics.
-// There are two parts per line on RULE file: road and host. road are on the
-// left of the space sign and host are on the right. road is an int and
-// describes whether the host should go proxy.
+// There are two parts per line on RULE file: road and glob. road are on the
+// left of the space sign and glob are on the right. road is an int and
+// describes whether the host should go proxy, glob supported glob-style
+// patterns:
+//   h?llo matches hello, hallo and hxllo
+//   h*llo matches hllo and heeeello
+//   h[ae]llo matches hello and hallo, but not hillo
+//   h[^e]llo matches hallo, hbllo, ... but not hello
+//   h[a-b]llo matches hallo and hbllo
 //
 // This is a RULE document:
-// 1 google.com
-// 0 baidu.com
-func (f *Filter) Load(name string) error {
+//   1 google.com *.google.com
+//   0 taobao.com
+type RoaderRule struct {
+	Rule map[string]int
+}
+
+// Road.
+func (r *RoaderRule) Road(host string) int {
+	for p, i := range r.Rule {
+		b, err := filepath.Match(p, host)
+		if err != nil || !b {
+			continue
+		}
+		return i
+	}
+	return RoadUnknow
+}
+
+// Load a RULE file.
+func (r *RoaderRule) Load(name string) error {
 	var reader io.Reader
 	if strings.HasPrefix(name, "http") {
 		r, err := http.Get(name)
@@ -288,34 +288,102 @@ func (f *Filter) Load(name string) error {
 	for scanner.Scan() {
 		line := scanner.Text()
 		seps := strings.Split(line, " ")
-		switch seps[0] {
-		case "0":
-			f.Rule[seps[1]] = 0
-		case "1":
-			f.Rule[seps[1]] = 1
+		road, err := strconv.Atoi(seps[0])
+		if err != nil {
+			return err
+		}
+		for _, e := range seps[1:] {
+			r.Rule[e] = road
 		}
 	}
 	return scanner.Err()
+}
+
+// NewRoaderIP returns a new RoaderIP.
+func NewRoaderIP(in, no int) *RoaderIP {
+	return &RoaderIP{
+		NetBox: NetBox{},
+		In:     in,
+		No:     no,
+	}
+}
+
+// RoaderRule routing based on the IP.
+type RoaderIP struct {
+	NetBox NetBox
+	In     int
+	No     int
+}
+
+// Road.
+func (r *RoaderIP) Road(host string) int {
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return RoadUnknow
+	}
+	if r.NetBox.Has(ips[0]) {
+		return r.In
+	}
+	return r.No
+}
+
+// NewRoaderBull returns a new RoaderBull.
+func NewRoaderBull(road int) *RoaderBull {
+	return &RoaderBull{
+		Path: road,
+	}
+}
+
+// RoaderBull routing based on ... wow, it is stubborn like a bull, it always
+// heads in one direction and do nothing.
+type RoaderBull struct {
+	Path int
+}
+
+// Road.
+func (r *RoaderBull) Road(host string) int {
+	return r.Path
+}
+
+// NewFilter returns a Filter. The poor Nier doesn't have enough brain
+// capacity, it can only remember 2048 addresses(Because LRU is used to avoid
+// memory transition expansion).
+func NewFilter(dialer Dialer) *Filter {
+	return &Filter{
+		Client: dialer,
+		Namedb: acdb.LRU(2048),
+		Roader: []Roader{},
+	}
+}
+
+// Filter determines whether the traffic should uses the proxy based on the
+// destination's IP address or domain.
+type Filter struct {
+	Client Dialer
+	Namedb acdb.Client
+	Roader []Roader
+}
+
+// JoinRoader.
+func (f *Filter) JoinRoader(roader Roader) {
+	f.Roader = append(f.Roader, roader)
 }
 
 // Dial connects to the address on the named network. If necessary, Filter
 // will use f.Client.Dial, else net.Dial instead.
 func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 	var (
-		host   string
-		rule   string
-		choose int
-		connl  io.ReadWriteCloser
-		connr  io.ReadWriteCloser
-		err    error
+		host string
+		road int
+		err  error
 	)
 	host, _, err = net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
 	}
-	err = f.Namedb.Get(host, &choose)
+	err = f.Namedb.Get(host, &road)
 	if err == nil {
-		switch choose {
+		switch road {
 		case RoadLocale:
 			return net.Dial(network, address)
 		case RoadRemote:
@@ -325,45 +393,30 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 	if err != acdb.ErrNotExist {
 		return nil, err
 	}
-	for rule, choose = range f.Rule {
-		b, err := filepath.Match(rule, host)
-		if err != nil || !b {
-			continue
-		}
-		f.Namedb.SetNone(host, choose)
-		switch choose {
+	for _, roader := range f.Roader {
+		road = roader.Road(host)
+		switch road {
 		case RoadLocale:
+			f.Namedb.SetNone(host, RoadLocale)
 			return net.Dial(network, address)
 		case RoadRemote:
-			return f.Client.Dial(network, address)
-		}
-	}
-	switch f.Mold {
-	case MoldNier:
-		connl, err = net.DialTimeout(network, address, time.Second*4)
-		if err == nil {
-			f.Namedb.SetNone(host, RoadLocale)
-			return connl, nil
-		}
-		connr, err = f.Client.Dial(network, address)
-		if err == nil {
 			f.Namedb.SetNone(host, RoadRemote)
-			return connr, nil
+			return f.Client.Dial(network, address)
+		case RoadUnknow:
+			continue
 		}
-		return nil, err
-	case MoldIP:
-		ips, err := net.LookupIP(host)
-		if err != nil {
-			return nil, err
-		}
-		if f.NetBox.Has(ips[0]) {
-			f.Namedb.SetNone(host, RoadLocale)
-			return net.Dial(network, address)
-		}
-		f.Namedb.SetNone(host, RoadRemote)
-		return f.Client.Dial(network, address)
 	}
-	return nil, errors.New("daze: unknown mold")
+	connl, err := net.DialTimeout(network, address, time.Second*4)
+	if err == nil {
+		f.Namedb.SetNone(host, RoadLocale)
+		return connl, nil
+	}
+	connr, err := f.Client.Dial(network, address)
+	if err == nil {
+		f.Namedb.SetNone(host, RoadRemote)
+		return connr, nil
+	}
+	return nil, err
 }
 
 // Locale is the main process of daze. In most cases, it is usually deployed
