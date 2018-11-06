@@ -255,16 +255,6 @@ type Filter struct {
 	Mold        int
 }
 
-// SetLocale tag an address use locale access PERMANENTLY.
-func (f *Filter) SetLocale(host string) error {
-	return f.NamedbFixed.Set(host, RoadLocale)
-}
-
-// SetRemote tag an address use remote access PERMANENTLY.
-func (f *Filter) SetRemote(host string) error {
-	return f.NamedbFixed.Set(host, RoadRemote)
-}
-
 // Load a RULE file.
 //
 // RULE file aims to be a minimal configuration file format that's easy to
@@ -288,9 +278,9 @@ func (f *Filter) Load(name string) error {
 		seps := strings.Split(line, " ")
 		switch seps[0] {
 		case "0":
-			f.SetLocale(seps[1])
+			f.NamedbFixed.Set(seps[1], RoadLocale)
 		case "1":
-			f.SetRemote(seps[1])
+			f.NamedbFixed.Set(seps[1], RoadRemote)
 		}
 	}
 	return scanner.Err()
