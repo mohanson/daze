@@ -106,7 +106,7 @@ func main() {
 		case "none":
 			filter.JoinRoader(daze.NewRoaderBull(daze.RoadRemote))
 		case "ipcn":
-			log.Println("Load IPcn")
+			log.Println("Load ipcn")
 			roaderIPcn := daze.NewRoaderIP(daze.RoadLocale, daze.RoadRemote)
 			roaderIPcn.NetBox.Mrg(daze.CNIPNet())
 			filter.JoinRoader(roaderIPcn)
