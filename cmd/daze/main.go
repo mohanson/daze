@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/protocol/ashe"
@@ -68,7 +69,7 @@ func main() {
 			flServer      = flag.String("s", "127.0.0.1:51958", "server address")
 			flCipher      = flag.String("k", "daze", "cipher, for encryption")
 			flEngine      = flag.String("e", "ashe", "engine {ashe, asheshadow}")
-			flFilterFixed = flag.String("f.fixed", "", "path of rule file")
+			flRulels = flag.String("r", filepath.Join(daze.Data(), "rule.ls"), "rule path")
 			flFilter      = flag.String("f", "ipcn", "filter {auto, none, ipcn}")
 			flDnserv      = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
@@ -89,10 +90,10 @@ func main() {
 			log.Fatalln("daze: unknown engine", *flEngine)
 		}
 		filter := daze.NewFilter(client)
-		if *flFilterFixed != "" {
-			log.Println("Load rule", *flFilterFixed)
+		if _, err := os.Stat(*flRulels); err == nil {
+			log.Println("Load rule", *flRulels)
 			roaderRule := daze.NewRoaderRule()
-			if err := roaderRule.Load(*flFilterFixed); err != nil {
+			if err := roaderRule.Load(*flRulels); err != nil {
 				log.Fatalln(err)
 			}
 			filter.JoinRoader(roaderRule)
