@@ -298,23 +298,12 @@ func (r *RoaderRule) Road(host string) int {
 
 // Load a RULE file.
 func (r *RoaderRule) Load(name string) error {
-	var reader io.Reader
-	if strings.HasPrefix(name, "http") {
-		r, err := http.Get(name)
-		if err != nil {
-			return err
-		}
-		defer r.Body.Close()
-		reader = r.Body
-	} else {
-		r, err := os.Open(name)
-		if err != nil {
-			return err
-		}
-		defer r.Close()
-		reader = r
+	f, err := os.Open(name)
+	if err != nil {
+		return err
 	}
-	scanner := bufio.NewScanner(reader)
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Text()
 		seps := strings.Split(line, " ")
