@@ -20,6 +20,8 @@ Daze is dead simple to use:
 $ daze server -l 0.0.0.0:51958
 
 # client port
+# due to synchronize IP tables from the Asia Pacific Internet Information Center,
+# the first start will takes longer.
 # use the following command to link your server(replace $SERVER with your server ip):
 $ daze client -s $SERVER:51958 -l 127.0.0.1:51959 -dns 114.114.114.114:53
 # now, you are free to visit Internet

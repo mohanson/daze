@@ -20,6 +20,7 @@ $ go get -u -v github.com/mohanson/daze/cmd/daze
 $ daze server -l 0.0.0.0:51958
 
 # 客户端
+# 由于需从亚太互联网络信息中心同步 IP 表, 首次启动耗时较长
 # 使用如下命令连接至你的服务端(将 $SERVER 替换为你的服务器地址)
 $ daze client -s $SERVER:51958 -l 127.0.0.1:51959 -dns 114.114.114.114:53
 # 现在, 你即可自由地访问互联网
