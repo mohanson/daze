@@ -10,12 +10,15 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"math"
 	"net"
 	"net/http"
 	"os"
+	"os/user"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -187,14 +190,41 @@ func IPv6ReservedIPNet() *NetBox {
 
 // CNIPNet returns full ipv4 CIDR in CN.
 func CNIPNet() *NetBox {
-	r, err := http.Get("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")
+	data := Data()
+	apnf := filepath.Join(data, "delegated-apnic-latest")
+	info, err := os.Stat(apnf)
+	if err != nil && os.IsNotExist(err) {
+		goto HERE
+	}
+	if time.Since(info.ModTime()) > time.Hour*24*64 {
+		goto HERE
+	}
+	goto NEXT
+HERE:
+	func() {
+		res, err := http.Get("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")
+		if err != nil {
+			log.Fatalln(err)
+		}
+		raw, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		res.Body.Close()
+		fw, err := os.OpenFile(apnf, os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			log.Fatalln(err)
+		}
+		fw.Write(raw)
+		fw.Close()
+	}()
+NEXT:
+	fr, err := os.Open(apnf)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	defer r.Body.Close()
-
 	netBox := &NetBox{}
-	s := bufio.NewScanner(r.Body)
+	s := bufio.NewScanner(fr)
 	for s.Scan() {
 		line := s.Text()
 		if !strings.HasPrefix(line, "apnic|CN|ipv4") {
@@ -681,4 +711,24 @@ func NewLocale(listen string, dialer Dialer) *Locale {
 		Listen: listen,
 		Dialer: dialer,
 	}
+}
+
+// Data file storage path. If you want to completely remove the daze, remember
+// to empty the data directory.
+func Data() string {
+	var data string
+	if runtime.GOOS == "windows" {
+		data = filepath.Join(os.Getenv("localappdata"), "daze")
+	} else {
+		u, _ := user.Current()
+		data = filepath.Join(u.HomeDir, ".daze")
+	}
+	_, err := os.Stat(data)
+	if err == nil || os.IsExist(err) {
+		return data
+	}
+	if err := os.Mkdir(data, 0755); err != nil {
+		log.Fatalln(err)
+	}
+	return data
 }
