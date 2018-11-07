@@ -369,7 +369,7 @@ func (r *RoaderBull) Road(host string) int {
 func NewFilter(dialer Dialer) *Filter {
 	return &Filter{
 		Client: dialer,
-		Namedb: acdb.LRU(2048),
+		Namedb: acdb.Lru(2048),
 		Roader: []Roader{},
 	}
 }
