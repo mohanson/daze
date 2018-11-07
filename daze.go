@@ -192,39 +192,35 @@ func IPv6ReservedIPNet() *NetBox {
 func CNIPNet() *NetBox {
 	data := Data()
 	apnf := filepath.Join(data, "delegated-apnic-latest")
-	info, err := os.Stat(apnf)
-	if err != nil && os.IsNotExist(err) {
-		goto HERE
-	}
-	if time.Since(info.ModTime()) > time.Hour*24*64 {
-		goto HERE
-	}
-	goto NEXT
-HERE:
-	func() {
+	down := func() error {
 		res, err := http.Get("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")
 		if err != nil {
-			log.Fatalln(err)
+			return err
 		}
+		defer res.Body.Close()
 		raw, err := ioutil.ReadAll(res.Body)
 		if err != nil {
-			log.Fatalln(err)
+			return err
 		}
-		res.Body.Close()
 		fw, err := os.OpenFile(apnf, os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			log.Fatalln(err)
+			return err
 		}
+		defer fw.Close()
 		fw.Write(raw)
-		fw.Close()
-	}()
-NEXT:
-	fr, err := os.Open(apnf)
+		return nil
+	}
+	info, err := os.Stat(apnf)
+	if err != nil && os.IsNotExist(err) {
+		down()
+	}
+	f, err := os.Open(apnf)
 	if err != nil {
 		log.Fatalln(err)
 	}
+	defer f.Close()
 	netBox := &NetBox{}
-	s := bufio.NewScanner(fr)
+	s := bufio.NewScanner(f)
 	for s.Scan() {
 		line := s.Text()
 		if !strings.HasPrefix(line, "apnic|CN|ipv4") {
@@ -241,6 +237,9 @@ NEXT:
 			log.Fatalln(err)
 		}
 		netBox.Add(cidr)
+	}
+	if time.Since(info.ModTime()) > time.Hour*24*64 {
+		go down()
 	}
 	return netBox
 }
