@@ -65,13 +65,13 @@ func main() {
 		}
 	case "client":
 		var (
-			flListen      = flag.String("l", "127.0.0.1:51959", "listen address")
-			flServer      = flag.String("s", "127.0.0.1:51958", "server address")
-			flCipher      = flag.String("k", "daze", "cipher, for encryption")
-			flEngine      = flag.String("e", "ashe", "engine {ashe, asheshadow}")
+			flListen = flag.String("l", "127.0.0.1:51959", "listen address")
+			flServer = flag.String("s", "127.0.0.1:51958", "server address")
+			flCipher = flag.String("k", "daze", "cipher, for encryption")
+			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
 			flRulels = flag.String("r", filepath.Join(daze.Data(), "rule.ls"), "rule path")
-			flFilter      = flag.String("f", "ipcn", "filter {auto, none, ipcn}")
-			flDnserv      = flag.String("dns", "", "such as 8.8.8.8:53")
+			flFilter = flag.String("f", "ipcn", "filter {auto, none, ipcn}")
+			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
 		log.Println("Remote server is", *flServer)
@@ -109,7 +109,9 @@ func main() {
 		case "ipcn":
 			log.Println("Load ipcn")
 			roaderIPcn := daze.NewRoaderIP(daze.RoadLocale, daze.RoadRemote)
-			roaderIPcn.NetBox.Mrg(daze.CNIPNet())
+			go func() {
+				roaderIPcn.NetBox.Mrg(daze.CNIPNet())
+			}()
 			filter.JoinRoader(roaderIPcn)
 		}
 		locale := daze.NewLocale(*flListen, filter)

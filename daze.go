@@ -192,28 +192,36 @@ func IPv6ReservedIPNet() *NetBox {
 func CNIPNet() *NetBox {
 	data := Data()
 	apnf := filepath.Join(data, "delegated-apnic-latest")
-	down := func() error {
+	info, err := os.Stat(apnf)
+	if err != nil {
+		if os.IsNotExist(err) {
+			goto HERE
+		}
+		log.Fatalln(err)
+	}
+	if time.Since(info.ModTime()) > time.Hour*24*64 {
+		goto HERE
+	}
+	goto NEXT
+HERE:
+	func() {
 		res, err := http.Get("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")
 		if err != nil {
-			return err
+			log.Fatalln(err)
 		}
 		defer res.Body.Close()
 		raw, err := ioutil.ReadAll(res.Body)
 		if err != nil {
-			return err
+			log.Fatalln(err)
 		}
-		fw, err := os.OpenFile(apnf, os.O_CREATE|os.O_WRONLY, 0644)
+		f, err := os.OpenFile(apnf, os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			return err
+			log.Fatalln(err)
 		}
-		defer fw.Close()
-		fw.Write(raw)
-		return nil
-	}
-	info, err := os.Stat(apnf)
-	if err != nil && os.IsNotExist(err) {
-		down()
-	}
+		defer f.Close()
+		f.Write(raw)
+	}()
+NEXT:
 	f, err := os.Open(apnf)
 	if err != nil {
 		log.Fatalln(err)
@@ -237,9 +245,6 @@ func CNIPNet() *NetBox {
 			log.Fatalln(err)
 		}
 		netBox.Add(cidr)
-	}
-	if time.Since(info.ModTime()) > time.Hour*24*64 {
-		go down()
 	}
 	return netBox
 }
