@@ -228,7 +228,7 @@ func NewFilter(dialer Dialer) *Filter {
 	return &Filter{
 		Client: dialer,
 		NetBox: NetBox{},
-		Namedb: acdb.LRU(1024),
+		Namedb: acdb.Lru(1024),
 		Mold:   MoldIP,
 	}
 }
