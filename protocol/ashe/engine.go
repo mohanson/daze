@@ -14,11 +14,36 @@ import (
 	"github.com/mohanson/daze"
 )
 
+// This document specifies an Internet protocol for the Internet community.
+// For traverse a firewall transparently and securely, ASHE used
+// rc4 encryption with one-time password. In order to fight replay attacks,
+// ASHE get inspiration from cookie, added a timestamp inside the frame.
+//
+// The client connects to the server, and sends a version identifier/method
+// selection message:
+//
+// +-----+-----------+------+-----+---------+---------+
+// | OTA | Handshake | Time | RSV | DST.Len | DST     |
+// +-----+-----------+------+-----+---------+---------|
+// | 128 | 2         | 8    |  1  | 1       | 0 - 255 |
+// +-----+-----------+------+-----+---------+---------|
+//
+// - OTA: random 128 bytes for rc4 key
+// - Handshake: must be 0xFF, 0xFF
+// - Time: Timestamp of request
+// - RSV: Reserved
+// - DST.Len: len of DST. If DST is https://google.com, DST.Len is 0x12
+// - DST: desired destination address
+
+// Server implemented the ashe protocol. The ASHE server will typically
+// evaluate the request based on source and destination addresses, and return
+// one or more reply messages, as appropriate for the request type.
 type Server struct {
 	Listen string
 	Cipher [16]byte
 }
 
+// Serve.
 func (s *Server) Serve(connl io.ReadWriteCloser) error {
 	var (
 		buf   = make([]byte, 1024)
@@ -69,6 +94,7 @@ func (s *Server) Serve(connl io.ReadWriteCloser) error {
 	return nil
 }
 
+// Run.
 func (s *Server) Run() error {
 	ln, err := net.Listen("tcp", s.Listen)
 	if err != nil {
@@ -92,6 +118,8 @@ func (s *Server) Run() error {
 	}
 }
 
+// NewServer returns a new Server. A secret data needs to be passed in Cipher,
+// as a sign to interface with the Client.
 func NewServer(listen, cipher string) *Server {
 	return &Server{
 		Listen: listen,
@@ -99,11 +127,16 @@ func NewServer(listen, cipher string) *Server {
 	}
 }
 
+// Client implemented the ashe protocol.
 type Client struct {
 	Server string
 	Cipher [16]byte
 }
 
+// Dial. It is similar to the server, the only difference is that it constructs
+// the data and the server parses the data. This code I refer to the golang
+// socks5 official library. That is a good code which is opened with
+// expectation, and closed with delight and profit.
 func (c *Client) Dial(network, address string) (io.ReadWriteCloser, error) {
 	var (
 		conn io.ReadWriteCloser
@@ -118,17 +151,8 @@ func (c *Client) Dial(network, address string) (io.ReadWriteCloser, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		if err != nil {
-			conn.Close()
-		}
-	}()
-
 	rand.Read(buf[:128])
-	_, err = conn.Write(buf[:128])
-	if err != nil {
-		return nil, err
-	}
+	conn.Write(buf[:128])
 	conn = daze.Gravity(conn, append(buf[:128], c.Cipher[:]...))
 
 	buf[0] = 0xFF
@@ -142,13 +166,12 @@ func (c *Client) Dial(network, address string) (io.ReadWriteCloser, error) {
 	}
 	buf[11] = uint8(n)
 	copy(buf[12:], []byte(address))
-	_, err = conn.Write(buf[:12+n])
-	if err != nil {
-		return nil, err
-	}
+	conn.Write(buf[:12+n])
 	return conn, nil
 }
 
+// NewClient returns a new Client. A secret data needs to be passed in Cipher,
+// as a sign to interface with the Server.
 func NewClient(server, cipher string) *Client {
 	return &Client{
 		Server: server,

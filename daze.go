@@ -311,6 +311,9 @@ func (r *RoaderRule) Load(name string) error {
 	for scanner.Scan() {
 		line := scanner.Text()
 		seps := strings.Split(line, " ")
+		if len(seps) < 2 {
+			continue
+		}
 		road, err := strconv.Atoi(seps[0])
 		if err != nil {
 			return err
