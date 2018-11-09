@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/protocol/ashe"
@@ -36,8 +37,8 @@ func main() {
 	case "server":
 		var (
 			flListen = flag.String("l", "0.0.0.0:51958", "listen address")
-			flCipher = flag.String("k", "daze", "cipher")
-			flMasker = flag.String("m", "http://httpbin.org", "")
+			flCipher = flag.String("k", "daze", "cipher, for encryption")
+			flMasker = flag.String("m", "http://httpbin.org", "masker, for confusion")
 			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
@@ -66,8 +67,9 @@ func main() {
 		var (
 			flListen = flag.String("l", "127.0.0.1:51959", "listen address")
 			flServer = flag.String("s", "127.0.0.1:51958", "server address")
-			flCipher = flag.String("k", "daze", "cipher")
+			flCipher = flag.String("k", "daze", "cipher, for encryption")
 			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
+			flRulels = flag.String("r", filepath.Join(daze.Data(), "rule.ls"), "rule path")
 			flFilter = flag.String("f", "ipcn", "filter {auto, none, ipcn}")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
@@ -78,11 +80,7 @@ func main() {
 			daze.Resolve(*flDnserv)
 			log.Println("Domain server is", *flDnserv)
 		}
-
-		var (
-			client daze.Dialer
-			filter *daze.Filter
-		)
+		var client daze.Dialer
 		switch *flEngine {
 		case "ashe":
 			client = ashe.NewClient(*flServer, *flCipher)
@@ -91,25 +89,31 @@ func main() {
 		default:
 			log.Fatalln("daze: unknown engine", *flEngine)
 		}
-		filter = daze.NewFilter(client)
+		filter := daze.NewFilter(client)
+		if _, err := os.Stat(*flRulels); err == nil {
+			log.Println("Roader Load rule", *flRulels)
+			roaderRule := daze.NewRoaderRule()
+			if err := roaderRule.Load(*flRulels); err != nil {
+				log.Fatalln(err)
+			}
+			filter.JoinRoader(roaderRule)
+		}
+		log.Println("Roader Load reserved IPv4/6 CIDRs")
+		roaderIPre := daze.NewRoaderIP(daze.RoadLocale, daze.RoadUnknow)
+		roaderIPre.NetBox.Mrg(daze.IPv4ReservedIPNet())
+		roaderIPre.NetBox.Mrg(daze.IPv6ReservedIPNet())
+		filter.JoinRoader(roaderIPre)
 		switch *flFilter {
 		case "auto":
-			filter.Mold = daze.MoldNier
 		case "none":
-			filter.Mold = daze.MoldIP
-			go func() {
-				filter.NetBox.Mrg(daze.IPv4ReservedIPNet())
-				filter.NetBox.Mrg(daze.IPv6ReservedIPNet())
-			}()
+			filter.JoinRoader(daze.NewRoaderBull(daze.RoadRemote))
 		case "ipcn":
-			filter.Mold = daze.MoldIP
+			log.Println("Roader Load CN(China PR) CIDRs")
+			roaderIPcn := daze.NewRoaderIP(daze.RoadLocale, daze.RoadRemote)
 			go func() {
-				filter.NetBox.Mrg(daze.IPv4ReservedIPNet())
-				filter.NetBox.Mrg(daze.IPv6ReservedIPNet())
-				filter.NetBox.Mrg(daze.CNIPNet())
+				roaderIPcn.NetBox.Mrg(daze.CNIPNet())
 			}()
-		default:
-			log.Fatalln("daze: unknown filter", *flFilter)
+			filter.JoinRoader(roaderIPcn)
 		}
 		locale := daze.NewLocale(*flListen, filter)
 		if err := locale.Run(); err != nil {
