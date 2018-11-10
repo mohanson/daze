@@ -188,7 +188,7 @@ func IPv6ReservedIPNet() *NetBox {
 	return netBox
 }
 
-// CNIPNet returns full ipv4 CIDR in CN.
+// CNIPNet returns full ipv4/6 CIDR in CN.
 func CNIPNet() *NetBox {
 	data := Data()
 	apnf := filepath.Join(data, "delegated-apnic-latest")
@@ -231,20 +231,31 @@ NEXT:
 	s := bufio.NewScanner(f)
 	for s.Scan() {
 		line := s.Text()
-		if !strings.HasPrefix(line, "apnic|CN|ipv4") {
+		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		seps := strings.Split(line, "|")
-		sep4, err := strconv.Atoi(seps[4])
-		if err != nil {
-			log.Fatalln(err)
+		switch {
+		case strings.HasPrefix(line, "apnic|CN|ipv4"):
+			seps := strings.Split(line, "|")
+			sep4, err := strconv.Atoi(seps[4])
+			if err != nil {
+				log.Fatalln(err)
+			}
+			mask := 32 - int(math.Log2(float64(sep4)))
+			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%d", seps[3], mask))
+			if err != nil {
+				log.Fatalln(err)
+			}
+			netBox.Add(cidr)
+		case strings.HasPrefix(line, "apnic|CN|ipv6"):
+			seps := strings.Split(line, "|")
+			sep4 := seps[4]
+			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%s", seps[3], sep4))
+			if err != nil {
+				log.Fatalln(err)
+			}
+			netBox.Add(cidr)
 		}
-		mask := 32 - int(math.Log2(float64(sep4)))
-		_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%d", seps[3], mask))
-		if err != nil {
-			log.Fatalln(err)
-		}
-		netBox.Add(cidr)
 	}
 	return netBox
 }
