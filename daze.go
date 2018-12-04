@@ -294,13 +294,13 @@ func NewRoaderRule() *RoaderRule {
 //   h[a-b]llo matches hallo and hbllo
 //
 // This is a RULE document:
-//   1 google.com *.google.com
-//   0 zhihu.com *.zhihu.com
-//   2 baidu.com *.baidu.com
+//   0 a.com *.a.com
+//   1 b.com *.b.com
+//   2 c.com *.c.com
 //
 // 0 means using local network
 // 1 means using proxy
-// 2 means the website is a shit
+// 2 means block it
 type RoaderRule struct {
 	Rule map[string]int
 }

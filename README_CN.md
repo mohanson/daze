@@ -47,9 +47,9 @@ Daze 可以在 **Windows**, **Linux** 和 **macOS** 下正常工作. 另外, 它
 daze 使用一份名叫 RULE 的文件来管理用户自定义的过滤规则(可选的). RULE 在流量过滤器中拥有最高优先级, 因此你应该小心的使用它. 这是一份合法的 RULE 文件, 并且位于 "/tmp/rule.ls". 使用 `daze client -r /tmp/rule.ls` 来应用它.
 
 ```
-1 google.com *.google.com
-0 zhihu.com *.zhihu.com
-2 baidu.com *.baidu.com
+0 a.com *.a.com
+1 b.com *.b.com
+2 c.com *.c.com
 ```
 
 - 0 表示使用本地网络进行访问
