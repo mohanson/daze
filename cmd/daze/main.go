@@ -90,12 +90,12 @@ func main() {
 			log.Fatalln("daze: unknown engine", *flEngine)
 		}
 		filter := daze.NewFilter(client)
-		log.Println("Roader joins rulels", *flRulels)
+		log.Println("Roader join rule", *flRulels)
 		roaderRule := daze.NewRoaderRule()
 		if err := roaderRule.Load(*flRulels); err == nil {
 			filter.JoinRoader(roaderRule)
 		}
-		log.Println("Roader joins reserved IPv4/6 CIDRs")
+		log.Println("Roader join reserved IPv4/6 CIDRs")
 		roaderIPre := daze.NewRoaderIP(daze.RoadLocale, daze.RoadUnknow)
 		roaderIPre.NetBox.Mrg(daze.IPv4ReservedIPNet())
 		roaderIPre.NetBox.Mrg(daze.IPv6ReservedIPNet())
@@ -105,7 +105,7 @@ func main() {
 		case "none":
 			filter.JoinRoader(daze.NewRoaderBull(daze.RoadRemote))
 		case "ipcn":
-			log.Println("Roader joins CN(China PR) CIDRs")
+			log.Println("Roader join CN(China PR) CIDRs")
 			roaderIPcn := daze.NewRoaderIP(daze.RoadLocale, daze.RoadRemote)
 			go func() {
 				roaderIPcn.NetBox.Mrg(daze.CNIPNet())
