@@ -90,12 +90,9 @@ func main() {
 			log.Fatalln("daze: unknown engine", *flEngine)
 		}
 		filter := daze.NewFilter(client)
-		if _, err := os.Stat(*flRulels); err == nil {
-			log.Println("Roader join rule", *flRulels)
-			roaderRule := daze.NewRoaderRule()
-			if err := roaderRule.Load(*flRulels); err != nil {
-				log.Fatalln(err)
-			}
+		log.Println("Roader join rule", *flRulels)
+		roaderRule := daze.NewRoaderRule()
+		if err := roaderRule.Load(*flRulels); err == nil {
 			filter.JoinRoader(roaderRule)
 		}
 		log.Println("Roader join reserved IPv4/6 CIDRs")

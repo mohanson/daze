@@ -263,7 +263,8 @@ NEXT:
 const (
 	RoadLocale = 0x00
 	RoadRemote = 0x01
-	RoadUnknow = 0x02
+	RoadFucked = 0x02
+	RoadUnknow = 0x09
 )
 
 // Roader is the interface that groups the basic Road method.
@@ -293,8 +294,13 @@ func NewRoaderRule() *RoaderRule {
 //   h[a-b]llo matches hallo and hbllo
 //
 // This is a RULE document:
-//   1 google.com *.google.com
-//   0 taobao.com
+//   0 a.com *.a.com
+//   1 b.com *.b.com
+//   2 c.com *.c.com
+//
+// 0 means using local network
+// 1 means using proxy
+// 2 means block it
 type RoaderRule struct {
 	Rule map[string]int
 }
@@ -313,7 +319,7 @@ func (r *RoaderRule) Road(host string) int {
 
 // Load a RULE file.
 func (r *RoaderRule) Load(name string) error {
-	f, err := os.Open(name)
+	f, err := Read(name)
 	if err != nil {
 		return err
 	}
@@ -439,6 +445,8 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 		case RoadRemote:
 			f.Namedb.SetNone(host, RoadRemote)
 			return f.Client.Dial(network, address)
+		case RoadFucked:
+			return nil, fmt.Errorf("daze: %s has been blocked", host)
 		case RoadUnknow:
 			continue
 		}
@@ -738,4 +746,20 @@ func Data() string {
 		log.Fatalln(err)
 	}
 	return data
+}
+
+// Read a file from URL or disk.
+func Read(furl string) (io.ReadCloser, error) {
+	if strings.HasPrefix(furl, "http") {
+		r, err := http.Get(furl)
+		if err != nil {
+			return nil, err
+		}
+		return r.Body, nil
+	}
+	f, err := os.Open(furl)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
 }

@@ -42,6 +42,20 @@ Daze can work well on **Windows**, **Linux** and **macOS**. In additional, it ca
 6. Set the proxy for phone: WLAN -> Settings -> Proxy -> Fill in `127.0.0.1:51959`
 7. Now, you are free to visit Internet.
 
+# Use custom rules
+
+daze use a RULE file to custom your own rules(optional). RULE has the highest priority in filters, so that you should carefully maintain it. This is a RULE document located at "/tmp/rule.ls", use `daze client -r /tmp/rule.ls` to apply it.
+
+```
+0 a.com *.a.com
+1 b.com *.b.com
+2 c.com *.c.com
+```
+
+- 0 means using local network
+- 1 means using proxy
+- 2 means block it
+
 # More
 
 You can find all the information here by using `daze server -h` and `daze client -h`. The cli provides
