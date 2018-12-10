@@ -732,9 +732,12 @@ func NewLocale(listen string, dialer Dialer) *Locale {
 // to empty the data directory.
 func Data() string {
 	var data string
-	if runtime.GOOS == "windows" {
+	switch {
+	case runtime.GOOS == "windows":
 		data = filepath.Join(os.Getenv("localappdata"), "daze")
-	} else {
+	case runtime.GOOS == "linux" && runtime.GOARCH == "arm":
+		data = "./data"
+	default:
 		u, _ := user.Current()
 		data = filepath.Join(u.HomeDir, ".daze")
 	}
