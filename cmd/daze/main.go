@@ -93,6 +93,7 @@ func main() {
 		log.Println("Roader join rule", *flRulels)
 		roaderRule := daze.NewRoaderRule()
 		if err := roaderRule.Load(*flRulels); err == nil {
+			filter.Host = roaderRule.Host
 			filter.JoinRoader(roaderRule)
 		}
 		log.Println("Roader join reserved IPv4/6 CIDRs")

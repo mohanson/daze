@@ -47,14 +47,15 @@ Daze can work well on **Windows**, **Linux** and **macOS**. In additional, it ca
 daze use a RULE file to custom your own rules(optional). RULE has the highest priority in filters, so that you should carefully maintain it. This is a RULE document located at "/tmp/rule.ls", use `daze client -r /tmp/rule.ls` to apply it.
 
 ```
-0 a.com *.a.com
-1 b.com *.b.com
-2 c.com *.c.com
+F a.com b.com
+L a.com
+R b.com
+B c.com
 ```
-
-- 0 means using local network
-- 1 means using proxy
-- 2 means block it
+- F(orward) means using b.com instead of a.com
+- L(ocale) means using local network
+- R(emote) means using proxy
+- B(anned) means block it
 
 # More
 

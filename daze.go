@@ -275,6 +275,7 @@ type Roader interface {
 // NewRoaderRule returns a new RoaderRule.
 func NewRoaderRule() *RoaderRule {
 	return &RoaderRule{
+		Host: map[string]string{},
 		Rule: map[string]int{},
 	}
 }
@@ -294,14 +295,17 @@ func NewRoaderRule() *RoaderRule {
 //   h[a-b]llo matches hallo and hbllo
 //
 // This is a RULE document:
-//   0 a.com *.a.com
-//   1 b.com *.b.com
-//   2 c.com *.c.com
+//   F a.com b.com
+//   L a.com
+//   R b.com
+//   B c.com
 //
-// 0 means using local network
-// 1 means using proxy
-// 2 means block it
+// F(orward) means using b.com instead of a.com
+// L(ocale)  means using local network
+// R(emote)  means using proxy
+// B(anned)  means block it
 type RoaderRule struct {
+	Host map[string]string
 	Rule map[string]int
 }
 
@@ -331,12 +335,22 @@ func (r *RoaderRule) Load(name string) error {
 		if len(seps) < 2 {
 			continue
 		}
-		road, err := strconv.Atoi(seps[0])
-		if err != nil {
-			return err
-		}
-		for _, e := range seps[1:] {
-			r.Rule[e] = road
+		switch seps[0] {
+		case "#":
+		case "F":
+			r.Host[seps[1]] = seps[2]
+		case "L":
+			for _, e := range seps[1:] {
+				r.Rule[e] = RoadLocale
+			}
+		case "R":
+			for _, e := range seps[1:] {
+				r.Rule[e] = RoadRemote
+			}
+		case "B":
+			for _, e := range seps[1:] {
+				r.Rule[e] = RoadFucked
+			}
 		}
 	}
 	return scanner.Err()
@@ -404,6 +418,7 @@ func NewFilter(dialer Dialer) *Filter {
 type Filter struct {
 	Client Dialer
 	Namedb acdb.Client
+	Host   map[string]string
 	Roader []Roader
 }
 
@@ -417,10 +432,15 @@ func (f *Filter) JoinRoader(roader Roader) {
 func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 	var (
 		host string
+		port string
 		road int
 		err  error
 	)
-	host, _, err = net.SplitHostPort(address)
+	host, port, err = net.SplitHostPort(address)
+	if cure, ok := f.Host[host]; ok {
+		host = cure
+		address = host + ":" + port
+	}
 	if err != nil {
 		return nil, err
 	}
