@@ -323,7 +323,7 @@ func (r *RoaderRule) Road(host string) int {
 
 // Load a RULE file.
 func (r *RoaderRule) Load(name string) error {
-	f, err := Read(name)
+	f, err := OpenFile(name)
 	if err != nil {
 		return err
 	}
@@ -771,8 +771,8 @@ func Data() string {
 	return data
 }
 
-// Read a file from URL or disk.
-func Read(furl string) (io.ReadCloser, error) {
+// Open a file from URL or disk.
+func OpenFile(furl string) (io.ReadCloser, error) {
 	if strings.HasPrefix(furl, "http") {
 		r, err := http.Get(furl)
 		if err != nil {
