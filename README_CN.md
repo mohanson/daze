@@ -58,6 +58,8 @@ B c.com
 - R 表示使用代理进行访问
 - B 表示屏蔽该地址的流量
 
+支持通配符, 例如 `R *.google.com`
+
 # 了解更多
 
 你可以在 `daze server -h` 和 `daze client -h` 了解到所有信息. Cli 提供了如下可配置项目

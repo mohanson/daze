@@ -8,6 +8,7 @@ import (
 	"crypto/rc4"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -67,6 +68,74 @@ func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
 		Writer: cipher.StreamWriter{S: cw, W: conn},
 		Closer: conn,
 	}
+}
+
+// Open a file from URL or cache with expiration.
+func OpenFile(furl string, name string, ex time.Duration) (io.ReadCloser, error) {
+	var (
+		res *http.Response
+		f   *os.File
+		fin os.FileInfo
+		raw []byte
+		err error
+	)
+	if furl == "" && name == "" {
+		return nil, errors.New("daze: furl/name does not specified")
+	}
+	if furl != "" && name == "" {
+		res, err = http.Get(furl)
+		if err != nil {
+			return nil, err
+		}
+		return res.Body, nil
+	}
+	if furl == "" && name != "" {
+		return os.Open(name)
+	}
+	fin, err = os.Stat(name)
+	if err != nil {
+		if os.IsNotExist(err) {
+			goto HERE
+		}
+		return nil, err
+	}
+	if time.Since(fin.ModTime()) > ex {
+		goto HERE
+	}
+	goto NEXT
+HERE:
+	res, err = http.Get(furl)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	raw, err = ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+	f, err = os.OpenFile(name, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	_, err = f.Write(raw)
+	if err != nil {
+		return nil, err
+	}
+NEXT:
+	f, err = os.Open(name)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
+}
+
+// Kiss a file from URL or local.
+func KissFile(furl string) (io.ReadCloser, error) {
+	if strings.HasPrefix(furl, "http") {
+		return OpenFile(furl, "", time.Duration(0))
+	}
+	return OpenFile("", furl, time.Duration(0))
 }
 
 // Resolve modifies the net.DefaultResolver(which is the resolver used by the
@@ -190,39 +259,9 @@ func IPv6ReservedIPNet() *NetBox {
 
 // CNIPNet returns full ipv4/6 CIDR in CN.
 func CNIPNet() *NetBox {
-	data := Data()
-	apnf := filepath.Join(data, "delegated-apnic-latest")
-	info, err := os.Stat(apnf)
-	if err != nil {
-		if os.IsNotExist(err) {
-			goto HERE
-		}
-		log.Fatalln(err)
-	}
-	if time.Since(info.ModTime()) > time.Hour*24*64 {
-		goto HERE
-	}
-	goto NEXT
-HERE:
-	func() {
-		res, err := http.Get("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")
-		if err != nil {
-			log.Fatalln(err)
-		}
-		defer res.Body.Close()
-		raw, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		f, err := os.OpenFile(apnf, os.O_CREATE|os.O_WRONLY, 0644)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		defer f.Close()
-		f.Write(raw)
-	}()
-NEXT:
-	f, err := os.Open(apnf)
+	furl := "http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest"
+	name := filepath.Join(Data(), "delegated-apnic-latest")
+	f, err := OpenFile(furl, name, time.Hour*24*64)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -323,7 +362,7 @@ func (r *RoaderRule) Road(host string) int {
 
 // Load a RULE file.
 func (r *RoaderRule) Load(name string) error {
-	f, err := OpenFile(name)
+	f, err := KissFile(name)
 	if err != nil {
 		return err
 	}
@@ -773,20 +812,4 @@ func Data() string {
 		log.Fatalln(err)
 	}
 	return cacheData
-}
-
-// Open a file from URL or disk.
-func OpenFile(furl string) (io.ReadCloser, error) {
-	if strings.HasPrefix(furl, "http") {
-		r, err := http.Get(furl)
-		if err != nil {
-			return nil, err
-		}
-		return r.Body, nil
-	}
-	f, err := os.Open(furl)
-	if err != nil {
-		return nil, err
-	}
-	return f, nil
 }
