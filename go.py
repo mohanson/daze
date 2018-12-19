@@ -10,7 +10,7 @@ def call(command):
 
 
 def main():
-    call(f'go install -i github.com/mohanson/daze/cmd/daze')
+    call(f'go install github.com/mohanson/daze/cmd/daze')
 
 
 if __name__ == '__main__':

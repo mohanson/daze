@@ -748,27 +748,31 @@ func NewLocale(listen string, dialer Dialer) *Locale {
 	}
 }
 
+var cacheData string
+
 // Data file storage path. If you want to completely remove the daze, remember
 // to empty the data directory.
 func Data() string {
-	var data string
+	if cacheData != "" {
+		return cacheData
+	}
 	switch {
 	case runtime.GOOS == "windows":
-		data = filepath.Join(os.Getenv("localappdata"), "daze")
+		cacheData = filepath.Join(os.Getenv("localappdata"), "daze")
 	case runtime.GOOS == "linux" && runtime.GOARCH == "arm":
-		data = "./data"
+		cacheData = "./data"
 	default:
 		u, _ := user.Current()
-		data = filepath.Join(u.HomeDir, ".daze")
+		cacheData = filepath.Join(u.HomeDir, ".daze")
 	}
-	_, err := os.Stat(data)
+	_, err := os.Stat(cacheData)
 	if err == nil || os.IsExist(err) {
-		return data
+		return cacheData
 	}
-	if err := os.Mkdir(data, 0755); err != nil {
+	if err := os.Mkdir(cacheData, 0755); err != nil {
 		log.Fatalln(err)
 	}
-	return data
+	return cacheData
 }
 
 // Open a file from URL or disk.
