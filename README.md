@@ -57,6 +57,8 @@ B c.com
 - R(emote) means using proxy
 - B(anned) means block it
 
+Glob is supported, such as `R *.google.com`.
+
 # More
 
 You can find all the information here by using `daze server -h` and `daze client -h`. The cli provides
