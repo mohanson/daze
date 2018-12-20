@@ -36,10 +36,10 @@ func main() {
 	switch subCommand {
 	case "server":
 		var (
-			flListen = flag.String("l", "0.0.0.0:51958", "listen address")
+			flListen = flag.String("l", "0.0.0.0:10200", "listen address")
 			flCipher = flag.String("k", "daze", "cipher, for encryption")
 			flMasker = flag.String("m", "http://httpbin.org", "masker, for confusion")
-			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
+			flEngine = flag.String("e", "asheshadow", "engine {ashe, asheshadow}")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
@@ -65,10 +65,10 @@ func main() {
 		}
 	case "client":
 		var (
-			flListen = flag.String("l", "127.0.0.1:51959", "listen address")
-			flServer = flag.String("s", "127.0.0.1:51958", "server address")
+			flListen = flag.String("l", "127.0.0.1:2080", "listen address")
+			flServer = flag.String("s", "127.0.0.1:10200", "server address")
 			flCipher = flag.String("k", "daze", "cipher, for encryption")
-			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
+			flEngine = flag.String("e", "asheshadow", "engine {ashe, asheshadow}")
 			flRulels = flag.String("r", filepath.Join(daze.Data(), "rule.ls"), "rule path")
 			flFilter = flag.String("f", "ipcn", "filter {auto, none, ipcn}")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
@@ -119,7 +119,7 @@ func main() {
 		}
 	case "cmd":
 		var (
-			flClient = flag.String("c", "127.0.0.1:51959", "client address")
+			flClient = flag.String("c", "127.0.0.1:2080", "client address")
 		)
 		if len(os.Args) <= 1 {
 			return
