@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mohanson/daze"
+	"github.com/frankpen/dazel"
 )
 
 type Server struct {
