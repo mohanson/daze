@@ -8,9 +8,9 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/frankpen/dazel/tree/master"
-	"github.com/frankpen/dazel/tree/master/protocol/ashe"
-	"github.com/frankpen/dazel/tree/master/protocol/asheshadow"
+	"github.com/frankpen/dazel"
+	"github.com/frankpen/dazel/protocol/ashe"
+	"github.com/frankpen/dazel/protocol/asheshadow"
 )
 
 const help = `usage: daze <command> [<args>]
