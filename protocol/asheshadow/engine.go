@@ -85,7 +85,7 @@ var responsePrefix = func() string {
 }()
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("From") == "daze" {
+	if r.Header.Get("Accept") == "application/daze" {
 		hj, _ := w.(http.Hijacker)
 		cc, rw, _ := hj.Hijack()
 		defer cc.Close()
@@ -162,13 +162,13 @@ func (c *Client) Dial(network, address string) (io.ReadWriteCloser, error) {
 		}
 	}()
 
-	rand.Read(buf[:4])
-	name := hex.EncodeToString(buf[:4])
-	req, err = http.NewRequest("POST", "http://"+c.Server+"/bin/exchange?name="+name, http.NoBody)
+	rand.Read(buf[:8])
+	name := hex.EncodeToString(buf[:8])
+	req, err = http.NewRequest("POST", "http://"+c.Server+"/"+name, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("From", "daze")
+	req.Header.Set("Accept", "application/daze")
 	req.Write(conn)
 	io.ReadFull(conn, buf[:len(responsePrefix)])
 
