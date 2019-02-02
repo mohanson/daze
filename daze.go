@@ -8,7 +8,6 @@ import (
 	"crypto/rc4"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -25,6 +24,22 @@ import (
 	"time"
 
 	"github.com/mohanson/acdb"
+)
+
+var (
+	// DataPath describes the data directory location of the daze. If you
+	// want to remove daze completely, remember to clear this path.
+	DataPath = func() string {
+		switch {
+		case runtime.GOOS == "windows":
+			return filepath.Join(os.Getenv("localappdata"), "daze")
+		case runtime.GOOS == "linux" && runtime.GOARCH == "arm":
+			return "./data"
+		default:
+			u, _ := user.Current()
+			return filepath.Join(u.HomeDir, ".daze")
+		}
+	}()
 )
 
 // Link copies from src to dst and dst to src until either EOF is reached.
@@ -70,8 +85,13 @@ func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
 	}
 }
 
-// Open a file from URL or cache with expiration.
-func OpenFile(furl string, name string, ex time.Duration) (io.ReadCloser, error) {
+// Open a file from URL or disk. If ex(expiration) != 0, cache will be used.
+//
+// Examples:
+//   OpenFile("~/.daze/rule.ls", "", 0)
+//   OpenFile("http://a.com/rule.ls", "", 0)
+//   OpenFile("http://a.com/rule.ls", "/tmp/rule.ls", time.Hour)
+func OpenFile(furl string, rp string, ex time.Duration) (io.ReadCloser, error) {
 	var (
 		res *http.Response
 		f   *os.File
@@ -79,63 +99,40 @@ func OpenFile(furl string, name string, ex time.Duration) (io.ReadCloser, error)
 		raw []byte
 		err error
 	)
-	if furl == "" && name == "" {
-		return nil, errors.New("daze: furl/name does not specified")
+	if !strings.HasPrefix(furl, "http") {
+		return os.Open(furl)
 	}
-	if furl != "" && name == "" {
+	if ex == 0 {
 		res, err = http.Get(furl)
 		if err != nil {
 			return nil, err
 		}
 		return res.Body, nil
 	}
-	if furl == "" && name != "" {
-		return os.Open(name)
-	}
-	fin, err = os.Stat(name)
-	if err != nil {
-		if os.IsNotExist(err) {
-			goto HERE
+	fin, err = os.Stat(rp)
+	if err != nil || time.Since(fin.ModTime()) > ex {
+		res, err = http.Get(furl)
+		if err != nil {
+			return nil, err
 		}
-		return nil, err
+		defer res.Body.Close()
+		raw, err = ioutil.ReadAll(res.Body)
+		if err != nil {
+			return nil, err
+		}
+		f, err = os.OpenFile(rp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+		f.Write(raw)
+		return ioutil.NopCloser(bytes.NewReader(raw)), nil
 	}
-	if time.Since(fin.ModTime()) > ex {
-		goto HERE
-	}
-	goto NEXT
-HERE:
-	res, err = http.Get(furl)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	raw, err = ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-	f, err = os.OpenFile(name, os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	_, err = f.Write(raw)
-	if err != nil {
-		return nil, err
-	}
-NEXT:
-	f, err = os.Open(name)
+	f, err = os.Open(rp)
 	if err != nil {
 		return nil, err
 	}
 	return f, nil
-}
-
-// Kiss a file from URL or local.
-func KissFile(furl string) (io.ReadCloser, error) {
-	if strings.HasPrefix(furl, "http") {
-		return OpenFile(furl, "", time.Duration(0))
-	}
-	return OpenFile("", furl, time.Duration(0))
 }
 
 // Resolve modifies the net.DefaultResolver(which is the resolver used by the
@@ -260,7 +257,7 @@ func IPv6ReservedIPNet() *NetBox {
 // CNIPNet returns full ipv4/6 CIDR in CN.
 func CNIPNet() *NetBox {
 	furl := "http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest"
-	name := filepath.Join(Data(), "delegated-apnic-latest")
+	name := filepath.Join(DataPath, "delegated-apnic-latest")
 	f, err := OpenFile(furl, name, time.Hour*24*64)
 	if err != nil {
 		log.Fatalln(err)
@@ -324,7 +321,7 @@ func NewRoaderRule() *RoaderRule {
 // RULE file aims to be a minimal configuration file format that's easy to
 // read due to obvious semantics.
 // There are two parts per line on RULE file: road and glob. road are on the
-// left of the space sign and glob are on the right. road is an int and
+// left of the space sign and glob are on the right. road is an char and
 // describes whether the host should go proxy, glob supported glob-style
 // patterns:
 //   h?llo matches hello, hallo and hxllo
@@ -362,7 +359,7 @@ func (r *RoaderRule) Road(host string) int {
 
 // Load a RULE file.
 func (r *RoaderRule) Load(name string) error {
-	f, err := KissFile(name)
+	f, err := OpenFile(name, "", 0)
 	if err != nil {
 		return err
 	}
@@ -787,29 +784,8 @@ func NewLocale(listen string, dialer Dialer) *Locale {
 	}
 }
 
-var cacheData string
-
-// Data file storage path. If you want to completely remove the daze, remember
-// to empty the data directory.
-func Data() string {
-	if cacheData != "" {
-		return cacheData
-	}
-	switch {
-	case runtime.GOOS == "windows":
-		cacheData = filepath.Join(os.Getenv("localappdata"), "daze")
-	case runtime.GOOS == "linux" && runtime.GOARCH == "arm":
-		cacheData = "./data"
-	default:
-		u, _ := user.Current()
-		cacheData = filepath.Join(u.HomeDir, ".daze")
-	}
-	_, err := os.Stat(cacheData)
-	if err == nil || os.IsExist(err) {
-		return cacheData
-	}
-	if err := os.Mkdir(cacheData, 0755); err != nil {
-		log.Fatalln(err)
-	}
-	return cacheData
+func init() {
+	func() {
+		os.Mkdir(DataPath, 0755)
+	}()
 }
