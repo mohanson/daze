@@ -321,7 +321,7 @@ func NewRoaderRule() *RoaderRule {
 // RULE file aims to be a minimal configuration file format that's easy to
 // read due to obvious semantics.
 // There are two parts per line on RULE file: road and glob. road are on the
-// left of the space sign and glob are on the right. road is an int and
+// left of the space sign and glob are on the right. road is an char and
 // describes whether the host should go proxy, glob supported glob-style
 // patterns:
 //   h?llo matches hello, hallo and hxllo

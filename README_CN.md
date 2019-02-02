@@ -53,12 +53,12 @@ R b.com
 B c.com
 ```
 
-- F 表示使用 b.com 替换 a.com
-- L 表示使用本地网络进行访问
-- R 表示使用代理进行访问
-- B 表示屏蔽该地址的流量
+- F(orward) 表示使用 b.com 替换 a.com
+- L(ocale) 表示使用本地网络进行访问
+- R(emote) 表示使用代理进行访问
+- B(anned) 表示屏蔽该地址的流量
 
-支持通配符, 例如 `R *.google.com`
+支持通配符, 例如 `R *.google.com`.
 
 # 了解更多
 
