@@ -17,6 +17,8 @@ import (
 	"github.com/mohanson/daze"
 )
 
+// This protocol has obvious fingerprints, please modify the code here
+// randomly after you read this advice. God bless you.
 type Server struct {
 	Listen string
 	Cipher [16]byte
