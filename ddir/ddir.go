@@ -10,10 +10,15 @@ import (
 
 var (
 	cBase = "./"
+	cDone = false
 )
 
 func Base(base string) {
+	if cDone {
+		log.Fatalln("ddir: cannot call Base() multiple times")
+	}
 	cBase = base
+	cDone = true
 }
 
 func Auto(name string) {
