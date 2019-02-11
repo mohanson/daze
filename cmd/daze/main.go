@@ -6,9 +6,9 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 
 	"github.com/mohanson/daze"
+	"github.com/mohanson/daze/ddir"
 	"github.com/mohanson/daze/protocol/ashe"
 	"github.com/mohanson/daze/protocol/asheshadow"
 )
@@ -31,6 +31,8 @@ func main() {
 	if len(os.Args) <= 1 {
 		printHelpAndExit()
 	}
+	ddir.Auto("daze")
+	ddir.Tree()
 	subCommand := os.Args[1]
 	os.Args = os.Args[1:len(os.Args)]
 	switch subCommand {
@@ -69,7 +71,7 @@ func main() {
 			flServer = flag.String("s", "127.0.0.1:51958", "server address")
 			flCipher = flag.String("k", "daze", "cipher, for encryption")
 			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
-			flRulels = flag.String("r", filepath.Join(daze.DataPath, "rule.ls"), "rule path")
+			flRulels = flag.String("r", ddir.Join("rule.ls"), "rule path")
 			flFilter = flag.String("f", "ipcn", "filter {auto, none, ipcn}")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)

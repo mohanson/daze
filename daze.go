@@ -14,31 +14,14 @@ import (
 	"math"
 	"net"
 	"net/http"
-	"os"
-	"os/user"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/mohanson/acdb" // Make a LRU cache
-	"github.com/mohanson/aget" // Read contents from disk or http server
-)
-
-var (
-	// DataPath describes the data directory location of the daze.
-	DataPath = func() string {
-		switch {
-		case runtime.GOOS == "windows":
-			return filepath.Join(os.Getenv("localappdata"), "daze")
-		case runtime.GOOS == "linux" && runtime.GOARCH == "arm":
-			return "./data"
-		default:
-			u, _ := user.Current()
-			return filepath.Join(u.HomeDir, ".daze")
-		}
-	}()
+	"github.com/mohanson/acdb"
+	"github.com/mohanson/aget"
+	"github.com/mohanson/daze/ddir"
 )
 
 // Link copies from src to dst and dst to src until either EOF is reached.
@@ -206,7 +189,7 @@ func IPv6ReservedIPNet() *NetBox {
 // CNIPNet returns full ipv4/6 CIDR in CN.
 func CNIPNet() *NetBox {
 	furl := "http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest"
-	name := filepath.Join(DataPath, "delegated-apnic-latest")
+	name := ddir.Join("delegated-apnic-latest")
 	f, err := aget.OpenEx(furl, name, time.Hour*24*64)
 	if err != nil {
 		log.Fatalln(err)
@@ -731,10 +714,4 @@ func NewLocale(listen string, dialer Dialer) *Locale {
 		Listen: listen,
 		Dialer: dialer,
 	}
-}
-
-func init() {
-	func() {
-		os.Mkdir(DataPath, 0755)
-	}()
 }
