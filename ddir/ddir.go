@@ -37,7 +37,7 @@ func Join(elem ...string) string {
 
 func Tree(elem ...string) {
 	err := os.Mkdir(Join(elem...), 0755)
-	if err != nil || !os.IsExist(err) {
+	if err != nil && !os.IsExist(err) {
 		log.Fatalln(err)
 	}
 }
