@@ -21,7 +21,7 @@ import (
 
 	"github.com/mohanson/acdb"
 	"github.com/mohanson/aget"
-	"github.com/mohanson/daze/ddir"
+	"github.com/mohanson/ddir"
 )
 
 // Link copies from src to dst and dst to src until either EOF is reached.

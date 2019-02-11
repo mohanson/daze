@@ -2,3 +2,7 @@ github.com/mohanson/acdb v0.0.0-20181107132025-4711ede81166 h1:0JD8Os9dIUIDzr+tV
 github.com/mohanson/acdb v0.0.0-20181107132025-4711ede81166/go.mod h1:SFSq3No783fJ1DC/zyAkX5/B2PQue+hv8betzCiV16w=
 github.com/mohanson/aget v0.0.0-20190210111337-8d6159fca90d h1:jKlcvVMMWG/VpHWmXLJnNRsiOsn0y0Qu6qzA3/yWb8s=
 github.com/mohanson/aget v0.0.0-20190210111337-8d6159fca90d/go.mod h1:lNS0rM5eMgZFDvNN4oTaVQVlHq1MXwNJcJUu4JMw2LE=
+github.com/mohanson/aget v0.0.0-20190210114640-bd181becb662 h1:CaddZx23XDCz3o1q5t3lIoTkbKKFp7vq94ruepsPO6Y=
+github.com/mohanson/aget v0.0.0-20190210114640-bd181becb662/go.mod h1:lNS0rM5eMgZFDvNN4oTaVQVlHq1MXwNJcJUu4JMw2LE=
+github.com/mohanson/ddir v0.0.0-20190211110923-4d5fb834640d h1:gY1YRHqav2EFP37/gEKNWxZjZIe6dd5wpMUuNH1/g2g=
+github.com/mohanson/ddir v0.0.0-20190211110923-4d5fb834640d/go.mod h1:Q88ssP5UvvFbz5aKH/fgC7XHj8k26q2EyArKvbZn1lQ=
