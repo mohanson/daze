@@ -32,7 +32,6 @@ func main() {
 		printHelpAndExit()
 	}
 	ddir.Auto("daze")
-	ddir.Make()
 	subCommand := os.Args[1]
 	os.Args = os.Args[1:len(os.Args)]
 	switch subCommand {
