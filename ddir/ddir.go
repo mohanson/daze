@@ -35,7 +35,7 @@ func Join(elem ...string) string {
 	return filepath.Join(append([]string{cBase}, elem...)...)
 }
 
-func Tree(elem ...string) {
+func Make(elem ...string) {
 	err := os.Mkdir(Join(elem...), 0755)
 	if err != nil && !os.IsExist(err) {
 		log.Fatalln(err)
