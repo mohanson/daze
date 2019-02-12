@@ -10,36 +10,18 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"math"
 	"net"
 	"net/http"
-	"os"
-	"os/user"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/mohanson/acdb"
-)
-
-var (
-	// DataPath describes the data directory location of the daze. If you
-	// want to remove daze completely, remember to clear this path.
-	DataPath = func() string {
-		switch {
-		case runtime.GOOS == "windows":
-			return filepath.Join(os.Getenv("localappdata"), "daze")
-		case runtime.GOOS == "linux" && runtime.GOARCH == "arm":
-			return "./data"
-		default:
-			u, _ := user.Current()
-			return filepath.Join(u.HomeDir, ".daze")
-		}
-	}()
+	"github.com/godump/acdb"
+	"github.com/godump/aget"
+	"github.com/godump/ddir"
 )
 
 // Link copies from src to dst and dst to src until either EOF is reached.
@@ -83,56 +65,6 @@ func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
 		Writer: cipher.StreamWriter{S: cw, W: conn},
 		Closer: conn,
 	}
-}
-
-// Open a file from URL or disk. If ex(expiration) != 0, cache will be used.
-//
-// Examples:
-//   OpenFile("~/.daze/rule.ls", "", 0)
-//   OpenFile("http://a.com/rule.ls", "", 0)
-//   OpenFile("http://a.com/rule.ls", "/tmp/rule.ls", time.Hour)
-func OpenFile(furl string, rp string, ex time.Duration) (io.ReadCloser, error) {
-	var (
-		res *http.Response
-		f   *os.File
-		fin os.FileInfo
-		raw []byte
-		err error
-	)
-	if !strings.HasPrefix(furl, "http") {
-		return os.Open(furl)
-	}
-	if ex == 0 {
-		res, err = http.Get(furl)
-		if err != nil {
-			return nil, err
-		}
-		return res.Body, nil
-	}
-	fin, err = os.Stat(rp)
-	if err != nil || time.Since(fin.ModTime()) > ex {
-		res, err = http.Get(furl)
-		if err != nil {
-			return nil, err
-		}
-		defer res.Body.Close()
-		raw, err = ioutil.ReadAll(res.Body)
-		if err != nil {
-			return nil, err
-		}
-		f, err = os.OpenFile(rp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
-		if err != nil {
-			return nil, err
-		}
-		defer f.Close()
-		f.Write(raw)
-		return ioutil.NopCloser(bytes.NewReader(raw)), nil
-	}
-	f, err = os.Open(rp)
-	if err != nil {
-		return nil, err
-	}
-	return f, nil
 }
 
 // Resolve modifies the net.DefaultResolver(which is the resolver used by the
@@ -257,8 +189,8 @@ func IPv6ReservedIPNet() *NetBox {
 // CNIPNet returns full ipv4/6 CIDR in CN.
 func CNIPNet() *NetBox {
 	furl := "http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest"
-	name := filepath.Join(DataPath, "delegated-apnic-latest")
-	f, err := OpenFile(furl, name, time.Hour*24*64)
+	name := ddir.Join("delegated-apnic-latest")
+	f, err := aget.OpenEx(furl, name, time.Hour*24*64)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -359,7 +291,7 @@ func (r *RoaderRule) Road(host string) int {
 
 // Load a RULE file.
 func (r *RoaderRule) Load(name string) error {
-	f, err := OpenFile(name, "", 0)
+	f, err := aget.Open(name)
 	if err != nil {
 		return err
 	}
@@ -782,10 +714,4 @@ func NewLocale(listen string, dialer Dialer) *Locale {
 		Listen: listen,
 		Dialer: dialer,
 	}
-}
-
-func init() {
-	func() {
-		os.Mkdir(DataPath, 0755)
-	}()
 }

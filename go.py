@@ -10,7 +10,7 @@ def call(command):
 
 
 def main():
-    call('go install github.com/mohanson/daze/cmd/daze')
+    call('go install github.com/godump/daze/cmd/daze')
 
 
 if __name__ == '__main__':
