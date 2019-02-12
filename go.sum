@@ -1,12 +1,6 @@
+github.com/godump/ddir v0.0.0-20190212130137-c00c85770093 h1:h/lkbljDA7RTvjgUA0aMBgMiAWSqkw84QZPiEMsEB/0=
+github.com/godump/ddir v0.0.0-20190212130137-c00c85770093/go.mod h1:bPAadYMsefeJItkZNDsCqBDtSJHhyX7pnmCB0Vur9iU=
 github.com/mohanson/acdb v0.0.0-20181107132025-4711ede81166 h1:0JD8Os9dIUIDzr+tV2GgYhBOnJycwc+H0uAZM/Eaa8w=
 github.com/mohanson/acdb v0.0.0-20181107132025-4711ede81166/go.mod h1:SFSq3No783fJ1DC/zyAkX5/B2PQue+hv8betzCiV16w=
-github.com/mohanson/aget v0.0.0-20190210111337-8d6159fca90d h1:jKlcvVMMWG/VpHWmXLJnNRsiOsn0y0Qu6qzA3/yWb8s=
-github.com/mohanson/aget v0.0.0-20190210111337-8d6159fca90d/go.mod h1:lNS0rM5eMgZFDvNN4oTaVQVlHq1MXwNJcJUu4JMw2LE=
 github.com/mohanson/aget v0.0.0-20190210114640-bd181becb662 h1:CaddZx23XDCz3o1q5t3lIoTkbKKFp7vq94ruepsPO6Y=
 github.com/mohanson/aget v0.0.0-20190210114640-bd181becb662/go.mod h1:lNS0rM5eMgZFDvNN4oTaVQVlHq1MXwNJcJUu4JMw2LE=
-github.com/mohanson/ddir v0.0.0-20190211110923-4d5fb834640d h1:gY1YRHqav2EFP37/gEKNWxZjZIe6dd5wpMUuNH1/g2g=
-github.com/mohanson/ddir v0.0.0-20190211110923-4d5fb834640d/go.mod h1:Q88ssP5UvvFbz5aKH/fgC7XHj8k26q2EyArKvbZn1lQ=
-github.com/mohanson/ddir v0.0.0-20190211152801-6165a769a2c0 h1:admQJc9P+RCuLAjelWnW8Ibv1mRDtK9lZw3D8AdfU30=
-github.com/mohanson/ddir v0.0.0-20190211152801-6165a769a2c0/go.mod h1:Q88ssP5UvvFbz5aKH/fgC7XHj8k26q2EyArKvbZn1lQ=
-github.com/mohanson/ddir v0.0.0-20190212050225-6d96734281c9 h1:1m5NmIvnUzXOaUUzGc/Omh3qyq2Furox/kPPAVVpkvc=
-github.com/mohanson/ddir v0.0.0-20190212050225-6d96734281c9/go.mod h1:Q88ssP5UvvFbz5aKH/fgC7XHj8k26q2EyArKvbZn1lQ=
