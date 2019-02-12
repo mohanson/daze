@@ -1,6 +1,6 @@
-github.com/godump/ddir v0.0.0-20190212130137-c00c85770093 h1:h/lkbljDA7RTvjgUA0aMBgMiAWSqkw84QZPiEMsEB/0=
-github.com/godump/ddir v0.0.0-20190212130137-c00c85770093/go.mod h1:bPAadYMsefeJItkZNDsCqBDtSJHhyX7pnmCB0Vur9iU=
-github.com/mohanson/acdb v0.0.0-20181107132025-4711ede81166 h1:0JD8Os9dIUIDzr+tV2GgYhBOnJycwc+H0uAZM/Eaa8w=
-github.com/mohanson/acdb v0.0.0-20181107132025-4711ede81166/go.mod h1:SFSq3No783fJ1DC/zyAkX5/B2PQue+hv8betzCiV16w=
-github.com/mohanson/aget v0.0.0-20190210114640-bd181becb662 h1:CaddZx23XDCz3o1q5t3lIoTkbKKFp7vq94ruepsPO6Y=
-github.com/mohanson/aget v0.0.0-20190210114640-bd181becb662/go.mod h1:lNS0rM5eMgZFDvNN4oTaVQVlHq1MXwNJcJUu4JMw2LE=
+github.com/godump/acdb v0.0.0-20190212131104-e54c687eda6a h1:f9BQehITmhNM4ymF5ws8UDn6YvskkRB55IlXQnVQ50s=
+github.com/godump/acdb v0.0.0-20190212131104-e54c687eda6a/go.mod h1:ytkQBtP6ewjBJ/TzvT0N4dJaRnXhS4jxyVJdIZkmMHo=
+github.com/godump/aget v0.0.0-20190212130558-51b371c721d8 h1:W0kCs50S/Bec8PrKQSxDCMrfvPcmpgMgk9IoJ0vubjo=
+github.com/godump/aget v0.0.0-20190212130558-51b371c721d8/go.mod h1:m+vp2IbZ++E7+GKVo6KlAWwB71WCeYRKBuSx0qLWDME=
+github.com/godump/ddir v0.0.0-20190212130920-1f24e32bc845 h1:ILD1ouXv4Wz7e0pDNsBe2Lg94v4jJqPAFBrutpQnQ9I=
+github.com/godump/ddir v0.0.0-20190212130920-1f24e32bc845/go.mod h1:bPAadYMsefeJItkZNDsCqBDtSJHhyX7pnmCB0Vur9iU=

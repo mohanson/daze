@@ -19,9 +19,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/godump/acdb"
+	"github.com/godump/aget"
 	"github.com/godump/ddir"
-	"github.com/mohanson/acdb"
-	"github.com/mohanson/aget"
 )
 
 // Link copies from src to dst and dst to src until either EOF is reached.
