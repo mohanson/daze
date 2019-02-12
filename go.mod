@@ -1,4 +1,4 @@
-module github.com/mohanson/daze
+module github.com/godump/daze
 
 require (
 	github.com/godump/acdb v0.0.0-20190212131104-e54c687eda6a

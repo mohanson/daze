@@ -11,7 +11,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/mohanson/daze"
+	"github.com/godump/daze"
 )
 
 // This document specifies an Internet protocol for the Internet community.

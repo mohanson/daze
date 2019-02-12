@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mohanson/daze"
+	"github.com/godump/daze"
 )
 
 // This protocol has obvious fingerprints, please modify the code here
