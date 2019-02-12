@@ -8,3 +8,5 @@ github.com/mohanson/ddir v0.0.0-20190211110923-4d5fb834640d h1:gY1YRHqav2EFP37/g
 github.com/mohanson/ddir v0.0.0-20190211110923-4d5fb834640d/go.mod h1:Q88ssP5UvvFbz5aKH/fgC7XHj8k26q2EyArKvbZn1lQ=
 github.com/mohanson/ddir v0.0.0-20190211152801-6165a769a2c0 h1:admQJc9P+RCuLAjelWnW8Ibv1mRDtK9lZw3D8AdfU30=
 github.com/mohanson/ddir v0.0.0-20190211152801-6165a769a2c0/go.mod h1:Q88ssP5UvvFbz5aKH/fgC7XHj8k26q2EyArKvbZn1lQ=
+github.com/mohanson/ddir v0.0.0-20190212050225-6d96734281c9 h1:1m5NmIvnUzXOaUUzGc/Omh3qyq2Furox/kPPAVVpkvc=
+github.com/mohanson/ddir v0.0.0-20190212050225-6d96734281c9/go.mod h1:Q88ssP5UvvFbz5aKH/fgC7XHj8k26q2EyArKvbZn1lQ=
