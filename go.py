@@ -9,8 +9,12 @@ def call(command):
         sys.exit(r)
 
 
-def main():
+def make():
     call('go install github.com/godump/daze/cmd/daze')
+
+
+def main():
+    make()
 
 
 if __name__ == '__main__':
