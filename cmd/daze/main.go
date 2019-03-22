@@ -6,11 +6,13 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 
-	"github.com/godump/ddir"
 	"github.com/godump/daze"
 	"github.com/godump/daze/protocol/ashe"
 	"github.com/godump/daze/protocol/asheshadow"
+	"github.com/godump/ddir"
 )
 
 const help = `usage: daze <command> [<args>]
@@ -31,7 +33,14 @@ func main() {
 	if len(os.Args) <= 1 {
 		printHelpAndExit()
 	}
-	ddir.Auto("daze")
+	switch {
+	case runtime.GOOS == "windows":
+		ddir.Base(filepath.Join(os.Getenv("localappdata"), "Daze"))
+	case runtime.GOOS == "linux" && runtime.GOARCH == "arm":
+		ddir.Base("")
+	default:
+		ddir.Base(filepath.Join(ddir.Home(), ".daze"))
+	}
 	subCommand := os.Args[1]
 	os.Args = os.Args[1:len(os.Args)]
 	switch subCommand {
