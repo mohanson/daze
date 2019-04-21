@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/godump/daze"
-	"github.com/godump/daze/protocol/ashe"
-	"github.com/godump/daze/protocol/asheshadow"
 	"github.com/godump/ddir"
+	"github.com/mohanson/daze"
+	"github.com/mohanson/daze/protocol/ashe"
+	"github.com/mohanson/daze/protocol/asheshadow"
 )
 
 const help = `usage: daze <command> [<args>]

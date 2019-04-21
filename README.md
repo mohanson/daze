@@ -6,10 +6,10 @@ Daze is a tool to help you link to the **Internet**.
 
 # Usage
 
-Compile or [Download](https://github.com/godump/daze/releases) daze:
+Compile or [Download](https://github.com/mohanson/daze/releases) daze:
 
 ```sh
-$ go get -u -v github.com/godump/daze/cmd/daze
+$ go get -u -v github.com/mohanson/daze/cmd/daze
 ```
 
 Daze is dead simple to use:
@@ -36,7 +36,7 @@ Daze can work well on **Windows**, **Linux** and **macOS**. In additional, it ca
 
 1. Download [SDK Platform Tools](https://developer.android.com/studio/releases/platform-tools) and make sure you can use `adb` normally.
 2. Connect your phone to your computer with USB. Use `adb devices` to list devices.
-2. Cross compile daze for android: `GOOS=linux GOARCH=arm go build -o daze github.com/godump/daze/cmd/daze`
+2. Cross compile daze for android: `GOOS=linux GOARCH=arm go build -o daze github.com/mohanson/daze/cmd/daze`
 4. Push binary and open shell: `adb push daze /data/local/tmp/daze`, `adb shell`
 5. Open daze client: `cd /data/local/tmp`, `chmod +x daze`, `daze client -s $SERVER:51958 -l 127.0.0.1:51959 -dns 114.114.114.114:53`. Attention, you may wish use `setsid` to run daze in a new session.
 6. Set the proxy for phone: WLAN -> Settings -> Proxy -> Fill in `127.0.0.1:51959`

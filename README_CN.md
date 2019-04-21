@@ -6,10 +6,10 @@ Daze 是一款帮助你连接至**互联网**的工具.
 
 # 使用
 
-编译或[下载](https://github.com/godump/daze/releases) daze:
+编译或[下载](https://github.com/mohanson/daze/releases) daze:
 
 ```sh
-$ go get -u -v github.com/godump/daze/cmd/daze
+$ go get -u -v github.com/mohanson/daze/cmd/daze
 ```
 
 使用 daze 该死的简单:
@@ -36,7 +36,7 @@ Daze 可以在 **Windows**, **Linux** 和 **macOS** 下正常工作. 另外, 它
 
 1. 下载 [SDK Platform Tools](https://developer.android.com/studio/releases/platform-tools) 并确保你能正常使用 `adb` 命令.
 2. 使用 USB 连接你的手机和电脑. 使用 `adb devices` 可显示已连接的设备, 确保连接成功.
-2. 交叉编译: `GOOS=linux GOARCH=arm go build -o daze github.com/godump/daze/cmd/daze`
+2. 交叉编译: `GOOS=linux GOARCH=arm go build -o daze github.com/mohanson/daze/cmd/daze`
 4. 推送二进制文件至手机并进入 Shell: `adb push daze /data/local/tmp/daze`, `adb shell`
 5. 启动 daze 客户端: `cd /data/local/tmp`, `chmod +x daze`, `daze client -s $SERVER:51958 -l 127.0.0.1:51959 -dns 114.114.114.114:53`. 注意的是, 你可能需要使用 `setsid` 命令将客户端程序托管至后台运行.
 6. 设置代理: 连接任意 Wifi -> 设置 -> 代理 -> 填写 `127.0.0.1:51959`

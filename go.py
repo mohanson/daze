@@ -10,7 +10,7 @@ def call(command):
 
 
 def make():
-    call('go install github.com/godump/daze/cmd/daze')
+    call('go install github.com/mohanson/daze/cmd/daze')
 
 
 def main():
