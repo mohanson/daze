@@ -103,7 +103,9 @@ func main() {
 		log.Println("Roader join rule", *flRulels)
 		roaderRule := daze.NewRoaderRule()
 		if err := roaderRule.Load(*flRulels); err != nil {
-			log.Fatalln(err)
+			if *flRulels != ddir.Join("rule.ls") {
+				log.Fatalln(err)
+			}
 		}
 		filter.Host = roaderRule.Host
 		filter.JoinRoader(roaderRule)
