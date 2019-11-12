@@ -2,5 +2,5 @@ github.com/godump/acdb v0.0.0-20190215163958-5670aa9f98b2 h1:2TGjoBVtp2I/8UKGv/+
 github.com/godump/acdb v0.0.0-20190215163958-5670aa9f98b2/go.mod h1:ytkQBtP6ewjBJ/TzvT0N4dJaRnXhS4jxyVJdIZkmMHo=
 github.com/godump/aget v0.0.0-20190219105714-5266f06a64f4 h1:YeWFNMjSvWgf/4bDcOGh6vhyKNCdUduYD5jZS+9aZ6M=
 github.com/godump/aget v0.0.0-20190219105714-5266f06a64f4/go.mod h1:m+vp2IbZ++E7+GKVo6KlAWwB71WCeYRKBuSx0qLWDME=
-github.com/godump/ddir v0.0.0-20191022002412-818021ddc737 h1:qG3h7mYKghzIhFeroTUDu10Yjh81VLVsHkIArAn7yyA=
-github.com/godump/ddir v0.0.0-20191022002412-818021ddc737/go.mod h1:/s/q6AITixtOM4JFxVTylEh4e5CtS7ZIzrSnbusZ/SI=
+github.com/godump/ddir v0.0.0-20191112032039-5651607ce88e h1:aXyVb9cD9M/oe6W0rjh9UHZJue8r3YunGHXG23nZcbs=
+github.com/godump/ddir v0.0.0-20191112032039-5651607ce88e/go.mod h1:/s/q6AITixtOM4JFxVTylEh4e5CtS7ZIzrSnbusZ/SI=
