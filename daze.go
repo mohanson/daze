@@ -358,17 +358,6 @@ func (r *RoaderBull) Road(host string) RoadMode {
 	return r.Path
 }
 
-// NewFilter returns a Filter. The poor Nier doesn't have enough brain
-// capacity, it can only remember 2048 addresses(Because LRU is used to avoid
-// memory transition expansion).
-func NewFilter(dialer Dialer) *Filter {
-	return &Filter{
-		Client: dialer,
-		Namedb: acdb.Lru(2048),
-		Roader: []Roader{},
-	}
-}
-
 // Filter determines whether the traffic should uses the proxy based on the
 // destination's IP address or domain.
 type Filter struct {
@@ -438,6 +427,17 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 		return serv, nil
 	}
 	return nil, err
+}
+
+// NewFilter returns a Filter. The poor Nier doesn't have enough brain
+// capacity, it can only remember 2048 addresses(Because LRU is used to avoid
+// memory transition expansion).
+func NewFilter(dialer Dialer) *Filter {
+	return &Filter{
+		Client: dialer,
+		Namedb: acdb.Lru(2048),
+		Roader: []Roader{},
+	}
 }
 
 // Locale is the main process of daze. In most cases, it is usually deployed
