@@ -7,7 +7,6 @@ import (
 	"crypto/cipher"
 	"crypto/rc4"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
@@ -103,91 +102,72 @@ type Server interface {
 	Run() error
 }
 
-// NetBox is the collection of *net.IPNet. It just provides some easy ways.
-type NetBox struct {
-	L []*net.IPNet
-}
-
-// Add a new *net.IPNet into NetBox.
-func (n *NetBox) Add(ipNet *net.IPNet) {
-	n.L = append(n.L, ipNet)
-}
-
-// Mrg is short for "Merge".
-func (n *NetBox) Mrg(box *NetBox) {
-	for _, e := range box.L {
-		n.Add(e)
-	}
-}
-
-// Whether ip is in the collection.
-func (n *NetBox) Has(ip net.IP) bool {
-	for _, entry := range n.L {
-		if entry.Contains(ip) {
-			return true
-		}
-	}
-	return false
-}
-
 // IPv4ReservedIPNet returns reserved IPv4 addresses.
 //
 // Introduction:
 //   See https://en.wikipedia.org/wiki/Reserved_IP_addresses
-func IPv4ReservedIPNet() *NetBox {
-	netBox := &NetBox{}
-	for _, entry := range [][2]string{
-		[2]string{"00000000", "FF000000"},
-		[2]string{"0A000000", "FF000000"},
-		[2]string{"7F000000", "FF000000"},
-		[2]string{"A9FE0000", "FFFF0000"},
-		[2]string{"AC100000", "FFF00000"},
-		[2]string{"C0000000", "FFFFFFF8"},
-		[2]string{"C00000AA", "FFFFFFFE"},
-		[2]string{"C0000200", "FFFFFF00"},
-		[2]string{"C0A80000", "FFFF0000"},
-		[2]string{"C6120000", "FFFE0000"},
-		[2]string{"C6336400", "FFFFFF00"},
-		[2]string{"CB007100", "FFFFFF00"},
-		[2]string{"F0000000", "F0000000"},
-		[2]string{"FFFFFFFF", "FFFFFFFF"},
+func IPv4ReservedIPNet() []*net.IPNet {
+	r := []*net.IPNet{}
+	for _, e := range []string{
+		"0.0.0.0/8",
+		"10.0.0.0/8",
+		"100.64.0.0/10",
+		"127.0.0.0/8",
+		"169.254.0.0/16",
+		"172.16.0.0/12",
+		"192.0.0.0/24",
+		"192.0.2.0/24",
+		"192.88.99.0/24",
+		"192.168.0.0/16",
+		"198.18.0.0/15",
+		"198.51.100.0/24",
+		"203.0.113.0/24",
+		"224.0.0.0/4",
+		"240.0.0.0/4",
+		"255.255.255.255/32",
 	} {
-		i, _ := hex.DecodeString(entry[0])
-		m, _ := hex.DecodeString(entry[1])
-		netBox.Add(&net.IPNet{IP: i, Mask: m})
+		_, a, err := net.ParseCIDR(e)
+		if err != nil {
+			log.Panicln(err)
+		}
+		r = append(r, a)
 	}
-	return netBox
+	return r
 }
 
 // IPv6ReservedIPNet returns reserved IPv6 addresses.
 //
 // Introduction:
 //   See https://en.wikipedia.org/wiki/Reserved_IP_addresses
-func IPv6ReservedIPNet() *NetBox {
-	netBox := &NetBox{}
-	for _, entry := range [][2]string{
-		[2]string{"00000000000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
-		[2]string{"00000000000000000000000000000001", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
-		[2]string{"01000000000000000000000000000000", "FFFFFFFFFFFFFFFF0000000000000000"},
-		[2]string{"0064FF9B000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFF00000000"},
-		[2]string{"20010000000000000000000000000000", "FFFFFFFF000000000000000000000000"},
-		[2]string{"20010010000000000000000000000000", "FFFFFFF0000000000000000000000000"},
-		[2]string{"20010020000000000000000000000000", "FFFFFFF0000000000000000000000000"},
-		[2]string{"20010DB8000000000000000000000000", "FFFFFFFF000000000000000000000000"},
-		[2]string{"20020000000000000000000000000000", "FFFF0000000000000000000000000000"},
-		[2]string{"FC000000000000000000000000000000", "FE000000000000000000000000000000"},
-		[2]string{"FE800000000000000000000000000000", "FFC00000000000000000000000000000"},
-		[2]string{"FF000000000000000000000000000000", "FF000000000000000000000000000000"},
+func IPv6ReservedIPNet() []*net.IPNet {
+	r := []*net.IPNet{}
+	for _, e := range []string{
+		"::/0",
+		"::/128",
+		"::1/128",
+		"::ffff:0:0/96",
+		"::ffff:0:0:0/96",
+		"64:ff9b::/96",
+		"100::/64",
+		"2001::/32",
+		"2001:20::/28",
+		"2001:db8::/32",
+		"2002::/16",
+		"fc00::/7",
+		"fe80::/10",
+		"ff00::/8",
 	} {
-		i, _ := hex.DecodeString(entry[0])
-		m, _ := hex.DecodeString(entry[1])
-		netBox.Add(&net.IPNet{IP: i, Mask: m})
+		_, a, err := net.ParseCIDR(e)
+		if err != nil {
+			log.Panicln(err)
+		}
+		r = append(r, a)
 	}
-	return netBox
+	return r
 }
 
 // CNIPNet returns full ipv4/6 CIDR in CN.
-func CNIPNet() *NetBox {
+func CNIPNet() []*net.IPNet {
 	furl := "http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest"
 	name := ddir.Join("delegated-apnic-latest")
 	f, err := aget.OpenEx(furl, name, time.Hour*24*64)
@@ -195,7 +175,7 @@ func CNIPNet() *NetBox {
 		log.Fatalln(err)
 	}
 	defer f.Close()
-	netBox := &NetBox{}
+	r := []*net.IPNet{}
 	s := bufio.NewScanner(f)
 	for s.Scan() {
 		line := s.Text()
@@ -214,7 +194,7 @@ func CNIPNet() *NetBox {
 			if err != nil {
 				log.Fatalln(err)
 			}
-			netBox.Add(cidr)
+			r = append(r, cidr)
 		case strings.HasPrefix(line, "apnic|CN|ipv6"):
 			seps := strings.Split(line, "|")
 			sep4 := seps[4]
@@ -222,10 +202,10 @@ func CNIPNet() *NetBox {
 			if err != nil {
 				log.Fatalln(err)
 			}
-			netBox.Add(cidr)
+			r = append(r, cidr)
 		}
 	}
-	return netBox
+	return r
 }
 
 const (
@@ -327,17 +307,17 @@ func (r *RoaderRule) Load(name string) error {
 // NewRoaderIP returns a new RoaderIP.
 func NewRoaderIP(in, no int) *RoaderIP {
 	return &RoaderIP{
-		NetBox: NetBox{},
-		In:     in,
-		No:     no,
+		Data: []*net.IPNet{},
+		In:   in,
+		No:   no,
 	}
 }
 
 // RoaderRule routing based on the IP.
 type RoaderIP struct {
-	NetBox NetBox
-	In     int
-	No     int
+	Data []*net.IPNet
+	In   int
+	No   int
 }
 
 // Road.
@@ -346,8 +326,10 @@ func (r *RoaderIP) Road(host string) int {
 	if err != nil {
 		return RoadUnknow
 	}
-	if r.NetBox.Has(ips[0]) {
-		return r.In
+	for _, e := range r.Data {
+		if e.Contains(ips[0]) {
+			return r.In
+		}
 	}
 	return r.No
 }
