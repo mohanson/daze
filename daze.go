@@ -7,6 +7,7 @@ import (
 	"crypto/cipher"
 	"crypto/rc4"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
@@ -108,29 +109,25 @@ type Server interface {
 //   See https://en.wikipedia.org/wiki/Reserved_IP_addresses
 func IPv4ReservedIPNet() []*net.IPNet {
 	r := []*net.IPNet{}
-	for _, e := range []string{
-		"0.0.0.0/8",
-		"10.0.0.0/8",
-		"100.64.0.0/10",
-		"127.0.0.0/8",
-		"169.254.0.0/16",
-		"172.16.0.0/12",
-		"192.0.0.0/24",
-		"192.0.2.0/24",
-		"192.88.99.0/24",
-		"192.168.0.0/16",
-		"198.18.0.0/15",
-		"198.51.100.0/24",
-		"203.0.113.0/24",
-		"224.0.0.0/4",
-		"240.0.0.0/4",
-		"255.255.255.255/32",
+	for _, entry := range [][2]string{
+		[2]string{"00000000", "FF000000"},
+		[2]string{"0A000000", "FF000000"},
+		[2]string{"7F000000", "FF000000"},
+		[2]string{"A9FE0000", "FFFF0000"},
+		[2]string{"AC100000", "FFF00000"},
+		[2]string{"C0000000", "FFFFFFF8"},
+		[2]string{"C00000AA", "FFFFFFFE"},
+		[2]string{"C0000200", "FFFFFF00"},
+		[2]string{"C0A80000", "FFFF0000"},
+		[2]string{"C6120000", "FFFE0000"},
+		[2]string{"C6336400", "FFFFFF00"},
+		[2]string{"CB007100", "FFFFFF00"},
+		[2]string{"F0000000", "F0000000"},
+		[2]string{"FFFFFFFF", "FFFFFFFF"},
 	} {
-		_, a, err := net.ParseCIDR(e)
-		if err != nil {
-			log.Panicln(err)
-		}
-		r = append(r, a)
+		i, _ := hex.DecodeString(entry[0])
+		m, _ := hex.DecodeString(entry[1])
+		r = append(r, &net.IPNet{IP: i, Mask: m})
 	}
 	return r
 }
@@ -141,27 +138,23 @@ func IPv4ReservedIPNet() []*net.IPNet {
 //   See https://en.wikipedia.org/wiki/Reserved_IP_addresses
 func IPv6ReservedIPNet() []*net.IPNet {
 	r := []*net.IPNet{}
-	for _, e := range []string{
-		"::/0",
-		"::/128",
-		"::1/128",
-		"::ffff:0:0/96",
-		"::ffff:0:0:0/96",
-		"64:ff9b::/96",
-		"100::/64",
-		"2001::/32",
-		"2001:20::/28",
-		"2001:db8::/32",
-		"2002::/16",
-		"fc00::/7",
-		"fe80::/10",
-		"ff00::/8",
+	for _, entry := range [][2]string{
+		[2]string{"00000000000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
+		[2]string{"00000000000000000000000000000001", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
+		[2]string{"01000000000000000000000000000000", "FFFFFFFFFFFFFFFF0000000000000000"},
+		[2]string{"0064FF9B000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFF00000000"},
+		[2]string{"20010000000000000000000000000000", "FFFFFFFF000000000000000000000000"},
+		[2]string{"20010010000000000000000000000000", "FFFFFFF0000000000000000000000000"},
+		[2]string{"20010020000000000000000000000000", "FFFFFFF0000000000000000000000000"},
+		[2]string{"20010DB8000000000000000000000000", "FFFFFFFF000000000000000000000000"},
+		[2]string{"20020000000000000000000000000000", "FFFF0000000000000000000000000000"},
+		[2]string{"FC000000000000000000000000000000", "FE000000000000000000000000000000"},
+		[2]string{"FE800000000000000000000000000000", "FFC00000000000000000000000000000"},
+		[2]string{"FF000000000000000000000000000000", "FF000000000000000000000000000000"},
 	} {
-		_, a, err := net.ParseCIDR(e)
-		if err != nil {
-			log.Panicln(err)
-		}
-		r = append(r, a)
+		i, _ := hex.DecodeString(entry[0])
+		m, _ := hex.DecodeString(entry[1])
+		r = append(r, &net.IPNet{IP: i, Mask: m})
 	}
 	return r
 }
