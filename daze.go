@@ -261,7 +261,10 @@ type RoaderRule struct {
 func (r *RoaderRule) Road(host string) int {
 	for p, i := range r.Rule {
 		b, err := filepath.Match(p, host)
-		if err != nil || !b {
+		if err != nil {
+			log.Panicln(err)
+		}
+		if !b {
 			continue
 		}
 		return i
