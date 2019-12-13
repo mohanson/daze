@@ -172,7 +172,7 @@ func CNIPNet() []*net.IPNet {
 	name := ddir.Join("delegated-apnic-latest")
 	f, err := aget.OpenEx(furl, name, time.Hour*24*64)
 	if err != nil {
-		log.Fatalln(err)
+		log.Panicln(err)
 	}
 	defer f.Close()
 	r := []*net.IPNet{}
@@ -187,12 +187,12 @@ func CNIPNet() []*net.IPNet {
 			seps := strings.Split(line, "|")
 			sep4, err := strconv.Atoi(seps[4])
 			if err != nil {
-				log.Fatalln(err)
+				log.Panicln(err)
 			}
 			mask := 32 - int(math.Log2(float64(sep4)))
 			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%d", seps[3], mask))
 			if err != nil {
-				log.Fatalln(err)
+				log.Panicln(err)
 			}
 			r = append(r, cidr)
 		case strings.HasPrefix(line, "apnic|CN|ipv6"):
@@ -200,7 +200,7 @@ func CNIPNet() []*net.IPNet {
 			sep4 := seps[4]
 			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%s", seps[3], sep4))
 			if err != nil {
-				log.Fatalln(err)
+				log.Panicln(err)
 			}
 			r = append(r, cidr)
 		}
