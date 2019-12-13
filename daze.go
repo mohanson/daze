@@ -98,7 +98,7 @@ type Dialer interface {
 // You can easily implement your own protocals to fight against the watching
 // of the big brother.
 type Server interface {
-	Serve(user io.ReadWriteCloser) error
+	Serve(conn io.ReadWriteCloser) error
 	Run() error
 }
 
