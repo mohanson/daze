@@ -84,7 +84,7 @@ func Resolve(addr string) {
 
 // Dialer contains options for connecting to an address.
 type Dialer interface {
-	Dial(network, address string) (io.ReadWriteCloser, error)
+	Dial(network string, address string) (io.ReadWriteCloser, error)
 }
 
 // Server is the main process of daze. In most cases, it is usually deployed
@@ -374,7 +374,7 @@ func (f *Filter) JoinRoader(roader Roader) {
 
 // Dial connects to the address on the named network. If necessary, Filter
 // will use f.Client.Dial, else net.Dial instead.
-func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
+func (f *Filter) Dial(network string, address string) (io.ReadWriteCloser, error) {
 	var (
 		host string
 		port string
@@ -701,5 +701,63 @@ func NewLocale(listen string, dialer Dialer) *Locale {
 	return &Locale{
 		Listen: listen,
 		Dialer: dialer,
+	}
+}
+
+// Direct is the default dialer for connecting to an address.
+type Direct struct {
+}
+
+func (d *Direct) Dial(network string, address string) (io.ReadWriteCloser, error) {
+	return net.Dial(network, address)
+}
+
+type Squire struct {
+	Dialer Dialer
+	Direct Dialer
+	Memory acdb.Client
+}
+
+func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error) {
+	var (
+		host string
+		port string
+		mode RoadMode
+		conn io.ReadWriteCloser
+		err  error
+	)
+	host, port, err = net.SplitHostPort(address)
+	address = host + ":" + port
+	err = s.Memory.Get(host, &mode)
+	if err == nil {
+		switch mode {
+		case MLocale:
+			return s.Direct.Dial(network, address)
+		case MRemote:
+			return s.Dialer.Dial(network, address)
+		}
+		log.Panicln("")
+	}
+	if err != acdb.ErrNotExist {
+		return nil, err
+	}
+	conn, err = s.Direct.Dial(network, address)
+	if err == nil {
+		s.Memory.Set(host, MLocale)
+		return conn, nil
+	}
+	conn, err = s.Dialer.Dial(network, address)
+	if err == nil {
+		s.Memory.Set(host, MRemote)
+		return conn, nil
+	}
+	return nil, err
+}
+
+// NewSquire.
+func NewSquire(dialer Dialer) *Squire {
+	return &Squire{
+		Dialer: dialer,
+		Memory: acdb.Lru(1024),
 	}
 }
