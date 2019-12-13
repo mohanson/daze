@@ -801,6 +801,7 @@ type Squire struct {
 	Direct Dialer
 	Memory acdb.Client
 	Rulels *Rulels
+	IPNets []*net.IPNet
 }
 
 func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error) {
@@ -808,7 +809,7 @@ func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error
 		host string
 		port string
 		mode RoadMode
-		conn io.ReadWriteCloser
+		ips  []net.IP
 		err  error
 	)
 	host, port, err = net.SplitHostPort(address)
@@ -844,17 +845,24 @@ func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error
 	case MPuzzle:
 	}
 
-	conn, err = s.Direct.Dial(network, address)
-	if err == nil {
+	ips, err = net.LookupIP(host)
+	if err != nil {
+		return nil, err
+	}
+	if func() int {
+		for _, e := range s.IPNets {
+			if e.Contains(ips[0]) {
+				return 1
+			}
+		}
+		return 0
+	}() == 1 {
 		s.Memory.Set(host, MLocale)
-		return conn, nil
-	}
-	conn, err = s.Dialer.Dial(network, address)
-	if err == nil {
+		return s.Direct.Dial(network, address)
+	} else {
 		s.Memory.Set(host, MRemote)
-		return conn, nil
+		return s.Dialer.Dial(network, address)
 	}
-	return nil, err
 }
 
 // NewSquire.
