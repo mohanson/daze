@@ -728,6 +728,7 @@ func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error
 	)
 	host, port, err = net.SplitHostPort(address)
 	address = host + ":" + port
+
 	err = s.Memory.Get(host, &mode)
 	if err == nil {
 		switch mode {
@@ -741,6 +742,7 @@ func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error
 	if err != acdb.ErrNotExist {
 		return nil, err
 	}
+
 	conn, err = s.Direct.Dial(network, address)
 	if err == nil {
 		s.Memory.Set(host, MLocale)
