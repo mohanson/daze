@@ -487,7 +487,7 @@ type Direct struct {
 }
 
 func (d *Direct) Dial(network string, address string) (io.ReadWriteCloser, error) {
-	return net.DialTimeout(network, address, time.Second)
+	return net.Dial(network, address)
 }
 
 // RULE file aims to be a minimal configuration file format that's easy to
