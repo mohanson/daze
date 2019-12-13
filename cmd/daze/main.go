@@ -83,6 +83,13 @@ func main() {
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
+		if _, err := os.Stat(ddir.Join("rule.ls")); err != nil {
+			f, er := os.Create(ddir.Join("rule.ls"))
+			if er != nil {
+				log.Panicln(er)
+			}
+			f.Close()
+		}
 		log.Println("Remote server is", *flServer)
 		log.Println("Client cipher is", *flCipher)
 		if *flDnserv != "" {
@@ -102,18 +109,13 @@ func main() {
 		squire := daze.NewSquire(client)
 		log.Println("Roader join rule", *flRulels)
 		if err := squire.Rulels.Load(*flRulels); err != nil {
-			if *flRulels != ddir.Join("rule.ls") {
-				log.Panicln(err)
-			}
+			log.Panicln(err)
 		}
 		log.Println("Roader join reserved IPv4/6 CIDRs")
 		squire.IPNets = append(squire.IPNets, daze.IPv4ReservedIPNet()...)
 		squire.IPNets = append(squire.IPNets, daze.IPv6ReservedIPNet()...)
 		log.Println("Roader join CN(China PR) CIDRs")
-		go func() {
-			squire.IPNets = append(squire.IPNets, daze.CNIPNet()...)
-		}()
-
+		squire.IPNets = append(squire.IPNets, daze.CNIPNet()...)
 		locale := daze.NewLocale(*flListen, squire)
 		if err := locale.Run(); err != nil {
 			log.Panicln(err)
