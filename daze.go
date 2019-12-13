@@ -208,16 +208,6 @@ func CNIPNet() []*net.IPNet {
 	return r
 }
 
-// A RoadMode represents a host's road mode.
-type RoadMode int
-
-const (
-	MLocale RoadMode = iota
-	MRemote
-	MFucked
-	MPuzzle
-)
-
 // Locale is the main process of daze. In most cases, it is usually deployed
 // as a daemon on a local machine.
 type Locale struct {
@@ -489,6 +479,16 @@ type Direct struct {
 func (d *Direct) Dial(network string, address string) (io.ReadWriteCloser, error) {
 	return net.Dial(network, address)
 }
+
+// A RoadMode represents a host's road mode.
+type RoadMode int
+
+const (
+	MLocale RoadMode = iota
+	MRemote
+	MFucked
+	MPuzzle
+)
 
 // RULE file aims to be a minimal configuration file format that's easy to
 // read due to obvious semantics.
