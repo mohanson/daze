@@ -62,16 +62,16 @@ func main() {
 		case "ashe":
 			server := ashe.NewServer(*flListen, *flCipher)
 			if err := server.Run(); err != nil {
-				log.Fatalln(err)
+				log.Panicln(err)
 			}
 		case "asheshadow":
 			server := asheshadow.NewServer(*flListen, *flCipher)
 			server.Masker = *flMasker
 			if err := server.Run(); err != nil {
-				log.Fatalln(err)
+				log.Panicln(err)
 			}
 		default:
-			log.Fatalln(*flEngine, "is not an engine")
+			log.Panicln(*flEngine, "is not an engine")
 		}
 	case "client":
 		var (
@@ -80,7 +80,6 @@ func main() {
 			flCipher = flag.String("k", "daze", "cipher, for encryption")
 			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
 			flRulels = flag.String("r", ddir.Join("rule.ls"), "rule path")
-			flFilter = flag.String("f", "ipcn", "filter {auto, none, ipcn}")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
@@ -96,39 +95,28 @@ func main() {
 			client = ashe.NewClient(*flServer, *flCipher)
 		case "asheshadow":
 			client = asheshadow.NewClient(*flServer, *flCipher)
-		default:
-			log.Fatalln("daze: unknown engine", *flEngine)
 		}
-		filter := daze.NewFilter(client)
+		if client == nil {
+			log.Panicln("daze: unknown engine", *flEngine)
+		}
+		squire := daze.NewSquire(client)
 		log.Println("Roader join rule", *flRulels)
-		roaderRule := daze.NewRoaderRule()
-		if err := roaderRule.Load(*flRulels); err != nil {
+		if err := squire.Rulels.Load(*flRulels); err != nil {
 			if *flRulels != ddir.Join("rule.ls") {
-				log.Fatalln(err)
+				log.Panicln(err)
 			}
 		}
-		filter.Host = roaderRule.Host
-		filter.JoinRoader(roaderRule)
 		log.Println("Roader join reserved IPv4/6 CIDRs")
-		roaderIPre := daze.NewRoaderIP(daze.MLocale, daze.MPuzzle)
-		roaderIPre.Data = append(roaderIPre.Data, daze.IPv4ReservedIPNet()...)
-		roaderIPre.Data = append(roaderIPre.Data, daze.IPv6ReservedIPNet()...)
-		filter.JoinRoader(roaderIPre)
-		switch *flFilter {
-		case "auto":
-		case "none":
-			filter.JoinRoader(daze.NewRoaderBull(daze.MRemote))
-		case "ipcn":
-			log.Println("Roader join CN(China PR) CIDRs")
-			roaderIPcn := daze.NewRoaderIP(daze.MLocale, daze.MRemote)
-			go func() {
-				roaderIPre.Data = append(roaderIPre.Data, daze.CNIPNet()...)
-			}()
-			filter.JoinRoader(roaderIPcn)
-		}
-		locale := daze.NewLocale(*flListen, filter)
+		squire.IPNets = append(squire.IPNets, daze.IPv4ReservedIPNet()...)
+		squire.IPNets = append(squire.IPNets, daze.IPv6ReservedIPNet()...)
+		log.Println("Roader join CN(China PR) CIDRs")
+		go func() {
+			squire.IPNets = append(squire.IPNets, daze.CNIPNet()...)
+		}()
+
+		locale := daze.NewLocale(*flListen, squire)
 		if err := locale.Run(); err != nil {
-			log.Fatalln(err)
+			log.Panicln(err)
 		}
 	case "cmd":
 		var (
@@ -145,7 +133,7 @@ func main() {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			log.Fatalln(err)
+			log.Panicln(err)
 		}
 	default:
 		printHelpAndExit()
