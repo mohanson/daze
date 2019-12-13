@@ -712,10 +712,95 @@ func (d *Direct) Dial(network string, address string) (io.ReadWriteCloser, error
 	return net.Dial(network, address)
 }
 
+// RULE file aims to be a minimal configuration file format that's easy to
+// read due to obvious semantics.
+// There are two parts per line on RULE file: mode and glob. mode are on the
+// left of the space sign and glob are on the right. mode is an char and
+// describes whether the host should go proxy, glob supported glob-style
+// patterns:
+//   h?llo matches hello, hallo and hxllo
+//   h*llo matches hllo and heeeello
+//   h[ae]llo matches hello and hallo, but not hillo
+//   h[^e]llo matches hallo, hbllo, ... but not hello
+//   h[a-b]llo matches hallo and hbllo
+//
+// This is a RULE document:
+//   F a.com b.com
+//   L a.com
+//   R b.com
+//   B c.com
+//
+// F(orward) means using b.com instead of a.com
+// L(ocale)  means using locale network
+// R(emote)  means using remote network
+// B(anned)  means block it
+type Rulels struct {
+	Host map[string]string
+	Rule map[string]RoadMode
+}
+
+func (r *Rulels) Road(host string) RoadMode {
+	for p, i := range r.Rule {
+		b, err := filepath.Match(p, host)
+		if err != nil {
+			log.Panicln(err)
+		}
+		if !b {
+			continue
+		}
+		return i
+	}
+	return MPuzzle
+}
+
+// Load a RULE file.
+func (r *Rulels) Load(name string) error {
+	f, err := aget.Open(name)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		seps := strings.Split(line, " ")
+		if len(seps) < 2 {
+			continue
+		}
+		switch seps[0] {
+		case "#":
+		case "F":
+			r.Host[seps[1]] = seps[2]
+		case "L":
+			for _, e := range seps[1:] {
+				r.Rule[e] = MLocale
+			}
+		case "R":
+			for _, e := range seps[1:] {
+				r.Rule[e] = MRemote
+			}
+		case "B":
+			for _, e := range seps[1:] {
+				r.Rule[e] = MFucked
+			}
+		}
+	}
+	return scanner.Err()
+}
+
+// NewRoaderRule returns a new RoaderRule.
+func NewRulels() *Rulels {
+	return &Rulels{
+		Host: map[string]string{},
+		Rule: map[string]RoadMode{},
+	}
+}
+
 type Squire struct {
 	Dialer Dialer
 	Direct Dialer
 	Memory acdb.Client
+	Rulels *Rulels
 }
 
 func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error) {
@@ -727,7 +812,11 @@ func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error
 		err  error
 	)
 	host, port, err = net.SplitHostPort(address)
-	address = host + ":" + port
+
+	if a, ok := s.Rulels.Host[host]; ok {
+		host = a
+		address = host + ":" + port
+	}
 
 	err = s.Memory.Get(host, &mode)
 	if err == nil {
@@ -741,6 +830,18 @@ func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error
 	}
 	if err != acdb.ErrNotExist {
 		return nil, err
+	}
+
+	switch s.Rulels.Road(host) {
+	case MLocale:
+		s.Memory.Set(host, MLocale)
+		return s.Direct.Dial(network, address)
+	case MRemote:
+		s.Memory.Set(host, MRemote)
+		return s.Dialer.Dial(network, address)
+	case MFucked:
+		return nil, fmt.Errorf("daze: %s has been blocked", host)
+	case MPuzzle:
 	}
 
 	conn, err = s.Direct.Dial(network, address)
@@ -760,6 +861,8 @@ func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error
 func NewSquire(dialer Dialer) *Squire {
 	return &Squire{
 		Dialer: dialer,
+		Direct: &Direct{},
 		Memory: acdb.Lru(1024),
+		Rulels: NewRulels(),
 	}
 }
