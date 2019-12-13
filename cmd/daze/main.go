@@ -110,17 +110,17 @@ func main() {
 		filter.Host = roaderRule.Host
 		filter.JoinRoader(roaderRule)
 		log.Println("Roader join reserved IPv4/6 CIDRs")
-		roaderIPre := daze.NewRoaderIP(daze.RoadLocale, daze.RoadUnknow)
+		roaderIPre := daze.NewRoaderIP(daze.MLocale, daze.MPuzzle)
 		roaderIPre.Data = append(roaderIPre.Data, daze.IPv4ReservedIPNet()...)
 		roaderIPre.Data = append(roaderIPre.Data, daze.IPv6ReservedIPNet()...)
 		filter.JoinRoader(roaderIPre)
 		switch *flFilter {
 		case "auto":
 		case "none":
-			filter.JoinRoader(daze.NewRoaderBull(daze.RoadRemote))
+			filter.JoinRoader(daze.NewRoaderBull(daze.MRemote))
 		case "ipcn":
 			log.Println("Roader join CN(China PR) CIDRs")
-			roaderIPcn := daze.NewRoaderIP(daze.RoadLocale, daze.RoadRemote)
+			roaderIPcn := daze.NewRoaderIP(daze.MLocale, daze.MRemote)
 			go func() {
 				roaderIPre.Data = append(roaderIPre.Data, daze.CNIPNet()...)
 			}()

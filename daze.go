@@ -208,23 +208,26 @@ func CNIPNet() []*net.IPNet {
 	return r
 }
 
+// A RoadMode represents a host's road mode.
+type RoadMode int
+
 const (
-	RoadLocale = 0x00
-	RoadRemote = 0x01
-	RoadFucked = 0x02
-	RoadUnknow = 0x09
+	MLocale RoadMode = iota
+	MRemote
+	MFucked
+	MPuzzle
 )
 
 // Roader is the interface that groups the basic Road method.
 type Roader interface {
-	Road(host string) int
+	Road(host string) RoadMode
 }
 
 // NewRoaderRule returns a new RoaderRule.
 func NewRoaderRule() *RoaderRule {
 	return &RoaderRule{
 		Host: map[string]string{},
-		Rule: map[string]int{},
+		Rule: map[string]RoadMode{},
 	}
 }
 
@@ -254,11 +257,11 @@ func NewRoaderRule() *RoaderRule {
 // B(anned)  means block it
 type RoaderRule struct {
 	Host map[string]string
-	Rule map[string]int
+	Rule map[string]RoadMode
 }
 
 // Road.
-func (r *RoaderRule) Road(host string) int {
+func (r *RoaderRule) Road(host string) RoadMode {
 	for p, i := range r.Rule {
 		b, err := filepath.Match(p, host)
 		if err != nil {
@@ -269,7 +272,7 @@ func (r *RoaderRule) Road(host string) int {
 		}
 		return i
 	}
-	return RoadUnknow
+	return MPuzzle
 }
 
 // Load a RULE file.
@@ -292,15 +295,15 @@ func (r *RoaderRule) Load(name string) error {
 			r.Host[seps[1]] = seps[2]
 		case "L":
 			for _, e := range seps[1:] {
-				r.Rule[e] = RoadLocale
+				r.Rule[e] = MLocale
 			}
 		case "R":
 			for _, e := range seps[1:] {
-				r.Rule[e] = RoadRemote
+				r.Rule[e] = MRemote
 			}
 		case "B":
 			for _, e := range seps[1:] {
-				r.Rule[e] = RoadFucked
+				r.Rule[e] = MFucked
 			}
 		}
 	}
@@ -308,7 +311,7 @@ func (r *RoaderRule) Load(name string) error {
 }
 
 // NewRoaderIP returns a new RoaderIP.
-func NewRoaderIP(in, no int) *RoaderIP {
+func NewRoaderIP(in, no RoadMode) *RoaderIP {
 	return &RoaderIP{
 		Data: []*net.IPNet{},
 		In:   in,
@@ -319,15 +322,15 @@ func NewRoaderIP(in, no int) *RoaderIP {
 // RoaderRule routing based on the IP.
 type RoaderIP struct {
 	Data []*net.IPNet
-	In   int
-	No   int
+	In   RoadMode
+	No   RoadMode
 }
 
 // Road.
-func (r *RoaderIP) Road(host string) int {
+func (r *RoaderIP) Road(host string) RoadMode {
 	ips, err := net.LookupIP(host)
 	if err != nil {
-		return RoadUnknow
+		return MPuzzle
 	}
 	for _, e := range r.Data {
 		if e.Contains(ips[0]) {
@@ -338,7 +341,7 @@ func (r *RoaderIP) Road(host string) int {
 }
 
 // NewRoaderBull returns a new RoaderBull.
-func NewRoaderBull(road int) *RoaderBull {
+func NewRoaderBull(road RoadMode) *RoaderBull {
 	return &RoaderBull{
 		Path: road,
 	}
@@ -347,11 +350,11 @@ func NewRoaderBull(road int) *RoaderBull {
 // RoaderBull routing based on ... wow, it is stubborn like a bull, it always
 // heads in one direction and do nothing.
 type RoaderBull struct {
-	Path int
+	Path RoadMode
 }
 
 // Road.
-func (r *RoaderBull) Road(host string) int {
+func (r *RoaderBull) Road(host string) RoadMode {
 	return r.Path
 }
 
@@ -386,7 +389,7 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 	var (
 		host string
 		port string
-		road int
+		road RoadMode
 		err  error
 	)
 	host, port, err = net.SplitHostPort(address)
@@ -400,9 +403,9 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 	err = f.Namedb.Get(host, &road)
 	if err == nil {
 		switch road {
-		case RoadLocale:
+		case MLocale:
 			return net.Dial(network, address)
-		case RoadRemote:
+		case MRemote:
 			return f.Client.Dial(network, address)
 		}
 	}
@@ -412,26 +415,26 @@ func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
 	for _, roader := range f.Roader {
 		road = roader.Road(host)
 		switch road {
-		case RoadLocale:
-			f.Namedb.SetNone(host, RoadLocale)
+		case MLocale:
+			f.Namedb.SetNone(host, MLocale)
 			return net.Dial(network, address)
-		case RoadRemote:
-			f.Namedb.SetNone(host, RoadRemote)
+		case MRemote:
+			f.Namedb.SetNone(host, MRemote)
 			return f.Client.Dial(network, address)
-		case RoadFucked:
+		case MFucked:
 			return nil, fmt.Errorf("daze: %s has been blocked", host)
-		case RoadUnknow:
+		case MPuzzle:
 			continue
 		}
 	}
 	user, err := net.DialTimeout(network, address, time.Second*4)
 	if err == nil {
-		f.Namedb.SetNone(host, RoadLocale)
+		f.Namedb.SetNone(host, MLocale)
 		return user, nil
 	}
 	serv, err := f.Client.Dial(network, address)
 	if err == nil {
-		f.Namedb.SetNone(host, RoadRemote)
+		f.Namedb.SetNone(host, MRemote)
 		return serv, nil
 	}
 	return nil, err
