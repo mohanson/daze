@@ -131,14 +131,8 @@ func (c *Client) DialConn(conn io.ReadWriteCloser, network string, address strin
 	if n > 256 {
 		return nil, fmt.Errorf("daze: destination address too long: %s", address)
 	}
-	_, err = rand.Read(buf[:128])
-	if err != nil {
-		return nil, err
-	}
-	_, err = conn.Write(buf[:128])
-	if err != nil {
-		return nil, err
-	}
+	rand.Read(buf[:128])
+	conn.Write(buf[:128])
 	conn = daze.Gravity(conn, append(buf[:128], c.Cipher[:]...))
 	buf[0x00] = 0xFF
 	buf[0x01] = 0xFF
@@ -146,7 +140,10 @@ func (c *Client) DialConn(conn io.ReadWriteCloser, network string, address strin
 	buf[0x0a] = 0x01
 	buf[0x0b] = uint8(n)
 	copy(buf[12:], []byte(address))
-	conn.Write(buf[:12+n])
+	_, err = conn.Write(buf[:12+n])
+	if err != nil {
+		return nil, err
+	}
 	return conn, nil
 }
 
@@ -155,11 +152,25 @@ func (c *Client) DialConn(conn io.ReadWriteCloser, network string, address strin
 // socks5 official library. That is a good code which is opened with
 // expectation, and closed with delight and profit.
 func (c *Client) Dial(network string, address string) (io.ReadWriteCloser, error) {
-	conn, err := net.DialTimeout("tcp", c.Server, time.Second*4)
+	var (
+		conn io.ReadWriteCloser
+		serv io.ReadWriteCloser
+		kill *time.Timer
+		err  error
+	)
+	conn, err = net.DialTimeout("tcp", c.Server, time.Second*4)
 	if err != nil {
 		return nil, err
 	}
-	return c.DialConn(conn, network, address)
+	kill = time.AfterFunc(4*time.Second, func() {
+		conn.Close()
+	})
+	serv, err = c.DialConn(conn, network, address)
+	if err != nil {
+		return nil, err
+	}
+	kill.Stop()
+	return serv, nil
 }
 
 // NewClient returns a new Client. A secret data needs to be passed in Cipher,

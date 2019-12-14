@@ -15,6 +15,21 @@ import (
 	"github.com/mohanson/daze/protocol/ashe"
 )
 
+var (
+	prefix = func() string {
+		ls := []string{
+			"HTTP/1.1 400 Bad Request",
+			"Content-Length: 0",
+			"Content-Type: text/plain; charset=utf-8",
+			"Date: Tue, 06 Feb 2018 15:46:24 GMT",
+			"X-Content-Type-Options: nosniff",
+		}
+		return strings.Join(ls, "\r\n") + "\r\n"
+	}()
+	header = "Accept"
+	symbol = "application/daze"
+)
+
 // This protocol has obvious fingerprints, please modify the code here
 // randomly after you read this advice. God bless you.
 type Server struct {
@@ -23,25 +38,14 @@ type Server struct {
 	Origin *ashe.Server
 }
 
-var responsePrefix = func() string {
-	ls := []string{
-		"HTTP/1.1 400 Bad Request",
-		"Content-Length: 0",
-		"Content-Type: text/plain; charset=utf-8",
-		"Date: Tue, 06 Feb 2018 15:46:24 GMT",
-		"X-Content-Type-Options: nosniff",
-	}
-	return strings.Join(ls, "\r\n") + "\r\n"
-}()
-
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("Accept") == "application/daze" {
+	if r.Header.Get(header) == symbol {
 		hj, _ := w.(http.Hijacker)
 		cc, rw, _ := hj.Hijack()
 		defer cc.Close()
 		defer rw.Flush()
 
-		sr := strings.Replace(responsePrefix, "Tue, 06 Feb 2018 15:46:24 GMT", time.Now().Format(time.RFC1123), 1)
+		sr := strings.Replace(prefix, "Tue, 06 Feb 2018 15:46:24 GMT", time.Now().Format(time.RFC1123), 1)
 		cc.Write([]byte(sr))
 
 		connl := &daze.ReadWriteCloser{
@@ -54,24 +58,24 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	req2, err := http.NewRequest(r.Method, s.Masker+r.RequestURI, r.Body)
+	q, err := http.NewRequest(r.Method, s.Masker+r.RequestURI, r.Body)
 	if err != nil {
 		return
 	}
-	req2.Header = r.Header
-	resp, err := http.DefaultClient.Do(req2)
+	q.Header = r.Header
+	p, err := http.DefaultClient.Do(q)
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
+	defer p.Body.Close()
 
-	for k, v := range resp.Header {
+	for k, v := range p.Header {
 		for _, e := range v {
 			w.Header().Add(k, e)
 		}
 	}
-	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
+	w.WriteHeader(p.StatusCode)
+	io.Copy(w, p.Body)
 }
 
 func (s *Server) Run() error {
@@ -82,6 +86,7 @@ func (s *Server) Run() error {
 func NewServer(listen, cipher string) *Server {
 	return &Server{
 		Listen: listen,
+		Masker: "http://httpbin.org",
 		Origin: &ashe.Server{
 			Cipher: md5.Sum([]byte(cipher)),
 		},
@@ -96,31 +101,36 @@ type Client struct {
 func (c *Client) Dial(network string, address string) (io.ReadWriteCloser, error) {
 	var (
 		conn io.ReadWriteCloser
+		serv io.ReadWriteCloser
+		kill *time.Timer
 		buf  = make([]byte, 1024)
 		req  *http.Request
 		err  error
 	)
-	conn, err = net.DialTimeout("tcp", c.Server, time.Second*8)
+	conn, err = net.DialTimeout("tcp", c.Server, time.Second*4)
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		if err != nil {
-			conn.Close()
-		}
-	}()
-
-	rand.Read(buf[:8])
-	name := hex.EncodeToString(buf[:8])
-	req, err = http.NewRequest("POST", "http://"+c.Server+"/"+name, http.NoBody)
+	kill = time.AfterFunc(4*time.Second, func() {
+		conn.Close()
+	})
+	_, err = rand.Read(buf[:8])
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", "application/daze")
+	req, err = http.NewRequest("POST", "http://"+c.Server+"/"+hex.EncodeToString(buf[:8]), http.NoBody)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set(header, symbol)
 	req.Write(conn)
-	io.ReadFull(conn, buf[:len(responsePrefix)])
-
-	return c.Origin.DialConn(conn, network, address)
+	io.ReadFull(conn, buf[:len(prefix)])
+	serv, err = c.Origin.DialConn(conn, network, address)
+	if err != nil {
+		return nil, err
+	}
+	kill.Stop()
+	return serv, nil
 }
 
 func NewClient(server, cipher string) *Client {
