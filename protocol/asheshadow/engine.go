@@ -3,76 +3,24 @@ package asheshadow
 import (
 	"crypto/md5"
 	"crypto/rand"
-	"encoding/binary"
 	"encoding/hex"
-	"fmt"
 	"io"
 	"log"
-	"math"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/mohanson/daze"
+	"github.com/mohanson/daze/protocol/ashe"
 )
 
 // This protocol has obvious fingerprints, please modify the code here
 // randomly after you read this advice. God bless you.
 type Server struct {
 	Listen string
-	Cipher [16]byte
 	Masker string
-}
-
-func (s *Server) ServeDaze(connl io.ReadWriteCloser) error {
-	var (
-		buf   = make([]byte, 1024)
-		dst   string
-		connr io.ReadWriteCloser
-		err   error
-	)
-	killer := time.AfterFunc(time.Second*8, func() {
-		connl.Close()
-	})
-	defer killer.Stop()
-
-	_, err = io.ReadFull(connl, buf[:128])
-	if err != nil {
-		return err
-	}
-	connl = daze.Gravity(connl, append(buf[:128], s.Cipher[:]...))
-
-	_, err = io.ReadFull(connl, buf[:12])
-	if err != nil {
-		return err
-	}
-	if buf[0] != 0xFF || buf[1] != 0xFF {
-		return fmt.Errorf("daze: malformed request: %v", buf[:2])
-	}
-	d := int64(binary.BigEndian.Uint64(buf[2:10]))
-	if math.Abs(float64(time.Now().Unix()-d)) > 120 {
-		return fmt.Errorf("daze: expired: %v", time.Unix(d, 0))
-	}
-	_, err = io.ReadFull(connl, buf[12:12+buf[11]])
-	if err != nil {
-		return err
-	}
-	killer.Stop()
-	dst = string(buf[12 : 12+buf[11]])
-	log.Println("Connect[asheshadow]", dst)
-	if buf[10] == 0x03 {
-		connr, err = net.DialTimeout("udp", dst, time.Second*8)
-	} else {
-		connr, err = net.DialTimeout("tcp", dst, time.Second*8)
-	}
-	if err != nil {
-		return err
-	}
-	defer connr.Close()
-
-	daze.Link(connl, connr)
-	return nil
+	Origin *ashe.Server
 }
 
 var responsePrefix = func() string {
@@ -101,7 +49,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Writer: cc,
 			Closer: cc,
 		}
-		if err := s.ServeDaze(connl); err != nil {
+		if err := s.Origin.Serve(connl); err != nil {
 			log.Println(err)
 		}
 		return
@@ -134,25 +82,23 @@ func (s *Server) Run() error {
 func NewServer(listen, cipher string) *Server {
 	return &Server{
 		Listen: listen,
-		Cipher: md5.Sum([]byte(cipher)),
+		Origin: &ashe.Server{
+			Cipher: md5.Sum([]byte(cipher)),
+		},
 	}
 }
 
 type Client struct {
 	Server string
-	Cipher [16]byte
+	Origin *ashe.Client
 }
 
-func (c *Client) Dial(network, address string) (io.ReadWriteCloser, error) {
-	if len(address) > 256 {
-		return nil, fmt.Errorf("daze: destination address too long: %s", address)
-	}
+func (c *Client) Dial(network string, address string) (io.ReadWriteCloser, error) {
 	var (
 		conn io.ReadWriteCloser
 		buf  = make([]byte, 1024)
 		req  *http.Request
 		err  error
-		n    = len(address)
 	)
 	conn, err = net.DialTimeout("tcp", c.Server, time.Second*8)
 	if err != nil {
@@ -174,33 +120,14 @@ func (c *Client) Dial(network, address string) (io.ReadWriteCloser, error) {
 	req.Write(conn)
 	io.ReadFull(conn, buf[:len(responsePrefix)])
 
-	_, err = conn.Write(buf[:128])
-	if err != nil {
-		return nil, err
-	}
-	conn = daze.Gravity(conn, append(buf[:128], c.Cipher[:]...))
-
-	buf[0] = 0xFF
-	buf[1] = 0xFF
-	binary.BigEndian.PutUint64(buf[2:10], uint64(time.Now().Unix()))
-	switch network {
-	case "tcp", "tcp4", "tcp6":
-		buf[10] = 0x01
-	case "udp", "udp4", "udp6":
-		buf[10] = 0x03
-	}
-	buf[11] = uint8(n)
-	copy(buf[12:], []byte(address))
-	_, err = conn.Write(buf[:12+n])
-	if err != nil {
-		return nil, err
-	}
-	return conn, nil
+	return c.Origin.Make(conn, network, address)
 }
 
 func NewClient(server, cipher string) *Client {
 	return &Client{
 		Server: server,
-		Cipher: md5.Sum([]byte(cipher)),
+		Origin: &ashe.Client{
+			Cipher: md5.Sum([]byte(cipher)),
+		},
 	}
 }

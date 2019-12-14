@@ -88,21 +88,6 @@ type Dialer interface {
 	Dial(network string, address string) (io.ReadWriteCloser, error)
 }
 
-// Server is the main process of daze. In most cases, it is usually deployed
-// as a daemon on a linux machine.
-//
-// Different protocols implement different Servers. In the current version,
-// daze implements few protocols. the source code is located:
-//   ./protocol/ashe
-//   ./protocol/asheshadow
-//
-// You can easily implement your own protocals to fight against the watching
-// of the big brother.
-type Server interface {
-	Serve(conn io.ReadWriteCloser) error
-	Run() error
-}
-
 // IPv4ReservedIPNet returns reserved IPv4 addresses.
 //
 // Introduction:
