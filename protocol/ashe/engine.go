@@ -44,25 +44,25 @@ type Server struct {
 }
 
 // Serve.
-func (s *Server) Serve(connl io.ReadWriteCloser) error {
+func (s *Server) Serve(conn io.ReadWriteCloser) error {
 	var (
-		buf   = make([]byte, 1024)
-		dst   string
-		connr io.ReadWriteCloser
-		err   error
+		buf  = make([]byte, 1024)
+		dst  string
+		serv io.ReadWriteCloser
+		err  error
 	)
 	killer := time.AfterFunc(time.Second*8, func() {
-		connl.Close()
+		conn.Close()
 	})
 	defer killer.Stop()
 
-	_, err = io.ReadFull(connl, buf[:128])
+	_, err = io.ReadFull(conn, buf[:128])
 	if err != nil {
 		return err
 	}
-	connl = daze.Gravity(connl, append(buf[:128], s.Cipher[:]...))
+	conn = daze.Gravity(conn, append(buf[:128], s.Cipher[:]...))
 
-	_, err = io.ReadFull(connl, buf[:12])
+	_, err = io.ReadFull(conn, buf[:12])
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func (s *Server) Serve(connl io.ReadWriteCloser) error {
 	if math.Abs(float64(time.Now().Unix()-d)) > 120 {
 		return fmt.Errorf("daze: expired: %v", time.Unix(d, 0))
 	}
-	_, err = io.ReadFull(connl, buf[12:12+buf[11]])
+	_, err = io.ReadFull(conn, buf[12:12+buf[11]])
 	if err != nil {
 		return err
 	}
@@ -81,16 +81,16 @@ func (s *Server) Serve(connl io.ReadWriteCloser) error {
 	dst = string(buf[12 : 12+buf[11]])
 	log.Println("Connect[ashe]", dst)
 	if buf[10] == 0x03 {
-		connr, err = net.DialTimeout("udp", dst, time.Second*8)
+		serv, err = net.DialTimeout("udp", dst, time.Second*8)
 	} else {
-		connr, err = net.DialTimeout("tcp", dst, time.Second*8)
+		serv, err = net.DialTimeout("tcp", dst, time.Second*8)
 	}
 	if err != nil {
 		return err
 	}
-	defer connr.Close()
+	defer serv.Close()
 
-	daze.Link(connl, connr)
+	daze.Link(conn, serv)
 	return nil
 }
 
