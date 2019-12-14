@@ -107,15 +107,17 @@ func main() {
 			log.Panicln("daze: unknown engine", *flEngine)
 		}
 		squire := daze.NewSquire(client)
-		log.Println("Roader join rule", *flRulels)
+		log.Println("Load rule", *flRulels)
 		if err := squire.Rulels.Load(*flRulels); err != nil {
 			log.Panicln(err)
 		}
-		log.Println("Roader join reserved IPv4/6 CIDRs")
+		log.Println("Load rule reserved IPv4/6 CIDRs")
 		squire.IPNets = append(squire.IPNets, daze.IPv4ReservedIPNet()...)
 		squire.IPNets = append(squire.IPNets, daze.IPv6ReservedIPNet()...)
-		log.Println("Roader join CN(China PR) CIDRs")
-		squire.IPNets = append(squire.IPNets, daze.CNIPNet()...)
+		log.Println("Load rule CN(China PR) CIDRs")
+		go func() {
+			squire.IPNets = append(squire.IPNets, daze.CNIPNet()...)
+		}()
 		locale := daze.NewLocale(*flListen, squire)
 		if err := locale.Run(); err != nil {
 			log.Panicln(err)
