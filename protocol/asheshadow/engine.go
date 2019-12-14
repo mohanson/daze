@@ -120,7 +120,7 @@ func (c *Client) Dial(network string, address string) (io.ReadWriteCloser, error
 	req.Write(conn)
 	io.ReadFull(conn, buf[:len(responsePrefix)])
 
-	return c.Origin.Build(conn, network, address)
+	return c.Origin.DialConn(conn, network, address)
 }
 
 func NewClient(server, cipher string) *Client {

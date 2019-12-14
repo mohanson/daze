@@ -122,7 +122,7 @@ type Client struct {
 	Cipher [16]byte
 }
 
-func (c *Client) Build(conn io.ReadWriteCloser, network string, address string) (io.ReadWriteCloser, error) {
+func (c *Client) DialConn(conn io.ReadWriteCloser, network string, address string) (io.ReadWriteCloser, error) {
 	var (
 		buf = make([]byte, 512)
 		n   = len(address)
@@ -159,7 +159,7 @@ func (c *Client) Dial(network string, address string) (io.ReadWriteCloser, error
 	if err != nil {
 		return nil, err
 	}
-	return c.Build(conn, network, address)
+	return c.DialConn(conn, network, address)
 }
 
 // NewClient returns a new Client. A secret data needs to be passed in Cipher,
