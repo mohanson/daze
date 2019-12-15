@@ -2,8 +2,7 @@ package asheshadow
 
 import (
 	"crypto/md5"
-	"crypto/rand"
-	"encoding/hex"
+	"encoding/base64"
 	"io"
 	"log"
 	"net"
@@ -29,8 +28,6 @@ var (
 		}
 		return strings.Join(ls, "\r\n") + "\r\n"
 	}()
-	header = "Accept"
-	symbol = "application/daze"
 )
 
 type Server struct {
@@ -40,7 +37,9 @@ type Server struct {
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get(header) == symbol {
+	date := r.Header.Get("Date")
+	hash := md5.Sum(append([]byte(date), s.Origin.Cipher[:]...))
+	if r.Header.Get("Content-MD5") == base64.StdEncoding.EncodeToString(hash[:]) {
 		hj, _ := w.(http.Hijacker)
 		cc, rw, _ := hj.Hijack()
 		defer cc.Close()
@@ -103,6 +102,8 @@ func (c *Client) Dial(network string, address string) (io.ReadWriteCloser, error
 	var (
 		conn io.ReadWriteCloser
 		buf  = make([]byte, 1024)
+		date string
+		hash [16]byte
 		req  *http.Request
 		err  error
 	)
@@ -110,15 +111,14 @@ func (c *Client) Dial(network string, address string) (io.ReadWriteCloser, error
 	if err != nil {
 		return nil, err
 	}
-	_, err = rand.Read(buf[:8])
+	req, err = http.NewRequest("POST", "http://"+c.Server, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
-	req, err = http.NewRequest("POST", "http://"+c.Server+"/"+hex.EncodeToString(buf[:8]), http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set(header, symbol)
+	date = time.Now().Format(time.RFC1123)
+	req.Header.Set("Date", date)
+	hash = md5.Sum(append([]byte(date), c.Origin.Cipher[:]...))
+	req.Header.Set("Content-MD5", base64.StdEncoding.EncodeToString(hash[:]))
 	req.Write(conn)
 	io.ReadFull(conn, buf[:len(prefix)])
 	return c.Origin.DialConn(conn, network, address)
