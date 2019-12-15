@@ -101,8 +101,6 @@ type Client struct {
 func (c *Client) Dial(network string, address string) (io.ReadWriteCloser, error) {
 	var (
 		conn io.ReadWriteCloser
-		serv io.ReadWriteCloser
-		kill *time.Timer
 		buf  = make([]byte, 1024)
 		req  *http.Request
 		err  error
@@ -111,9 +109,6 @@ func (c *Client) Dial(network string, address string) (io.ReadWriteCloser, error
 	if err != nil {
 		return nil, err
 	}
-	kill = time.AfterFunc(4*time.Second, func() {
-		conn.Close()
-	})
 	_, err = rand.Read(buf[:8])
 	if err != nil {
 		return nil, err
@@ -125,12 +120,7 @@ func (c *Client) Dial(network string, address string) (io.ReadWriteCloser, error
 	req.Header.Set(header, symbol)
 	req.Write(conn)
 	io.ReadFull(conn, buf[:len(prefix)])
-	serv, err = c.Origin.DialConn(conn, network, address)
-	if err != nil {
-		return nil, err
-	}
-	kill.Stop()
-	return serv, nil
+	return c.Origin.DialConn(conn, network, address)
 }
 
 func NewClient(server, cipher string) *Client {

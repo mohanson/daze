@@ -152,25 +152,11 @@ func (c *Client) DialConn(conn io.ReadWriteCloser, network string, address strin
 // socks5 official library. That is a good code which is opened with
 // expectation, and closed with delight and profit.
 func (c *Client) Dial(network string, address string) (io.ReadWriteCloser, error) {
-	var (
-		conn io.ReadWriteCloser
-		serv io.ReadWriteCloser
-		kill *time.Timer
-		err  error
-	)
-	conn, err = net.DialTimeout("tcp", c.Server, time.Second*4)
+	conn, err := net.DialTimeout("tcp", c.Server, time.Second*4)
 	if err != nil {
 		return nil, err
 	}
-	kill = time.AfterFunc(4*time.Second, func() {
-		conn.Close()
-	})
-	serv, err = c.DialConn(conn, network, address)
-	if err != nil {
-		return nil, err
-	}
-	kill.Stop()
-	return serv, nil
+	return c.DialConn(conn, network, address)
 }
 
 // NewClient returns a new Client. A secret data needs to be passed in Cipher,
