@@ -14,8 +14,8 @@ import (
 	"github.com/mohanson/daze/protocol/ashe"
 )
 
-// This protocol has obvious fingerprints, please modify the code here
-// randomly after you read this advice. God bless you.
+// This protocol is an upgraded version of ashe, which uses the HTTP
+// obfuscation mechanism.
 
 var (
 	prefix = func() string {
