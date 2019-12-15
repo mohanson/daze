@@ -15,6 +15,9 @@ import (
 	"github.com/mohanson/daze/protocol/ashe"
 )
 
+// This protocol has obvious fingerprints, please modify the code here
+// randomly after you read this advice. God bless you.
+
 var (
 	prefix = func() string {
 		ls := []string{
@@ -30,8 +33,6 @@ var (
 	symbol = "application/daze"
 )
 
-// This protocol has obvious fingerprints, please modify the code here
-// randomly after you read this advice. God bless you.
 type Server struct {
 	Listen string
 	Masker string
