@@ -2,98 +2,50 @@ package asheshadow
 
 import (
 	"crypto/md5"
-	"crypto/rand"
-	"encoding/binary"
-	"encoding/hex"
-	"fmt"
+	"encoding/base64"
 	"io"
 	"log"
-	"math"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/mohanson/daze"
+	"github.com/mohanson/daze/protocol/ashe"
 )
 
-// This protocol has obvious fingerprints, please modify the code here
-// randomly after you read this advice. God bless you.
+// This protocol is an upgraded version of ashe, which uses the HTTP
+// obfuscation mechanism.
+
+var (
+	prefix = func() string {
+		ls := []string{
+			"HTTP/1.1 400 Bad Request",
+			"Content-Length: 0",
+			"Content-Type: text/plain; charset=utf-8",
+			"Date: Tue, 06 Feb 2018 15:46:24 GMT",
+			"X-Content-Type-Options: nosniff",
+		}
+		return strings.Join(ls, "\r\n") + "\r\n"
+	}()
+)
+
 type Server struct {
 	Listen string
-	Cipher [16]byte
 	Masker string
+	Origin *ashe.Server
 }
-
-func (s *Server) ServeDaze(connl io.ReadWriteCloser) error {
-	var (
-		buf   = make([]byte, 1024)
-		dst   string
-		connr io.ReadWriteCloser
-		err   error
-	)
-	killer := time.AfterFunc(time.Second*8, func() {
-		connl.Close()
-	})
-	defer killer.Stop()
-
-	_, err = io.ReadFull(connl, buf[:128])
-	if err != nil {
-		return err
-	}
-	connl = daze.Gravity(connl, append(buf[:128], s.Cipher[:]...))
-
-	_, err = io.ReadFull(connl, buf[:12])
-	if err != nil {
-		return err
-	}
-	if buf[0] != 0xFF || buf[1] != 0xFF {
-		return fmt.Errorf("daze: malformed request: %v", buf[:2])
-	}
-	d := int64(binary.BigEndian.Uint64(buf[2:10]))
-	if math.Abs(float64(time.Now().Unix()-d)) > 120 {
-		return fmt.Errorf("daze: expired: %v", time.Unix(d, 0))
-	}
-	_, err = io.ReadFull(connl, buf[12:12+buf[11]])
-	if err != nil {
-		return err
-	}
-	killer.Stop()
-	dst = string(buf[12 : 12+buf[11]])
-	log.Println("Connect[asheshadow]", dst)
-	if buf[10] == 0x03 {
-		connr, err = net.DialTimeout("udp", dst, time.Second*8)
-	} else {
-		connr, err = net.DialTimeout("tcp", dst, time.Second*8)
-	}
-	if err != nil {
-		return err
-	}
-	defer connr.Close()
-
-	daze.Link(connl, connr)
-	return nil
-}
-
-var responsePrefix = func() string {
-	ls := []string{
-		"HTTP/1.1 400 Bad Request",
-		"Content-Length: 0",
-		"Content-Type: text/plain; charset=utf-8",
-		"Date: Tue, 06 Feb 2018 15:46:24 GMT",
-		"X-Content-Type-Options: nosniff",
-	}
-	return strings.Join(ls, "\r\n") + "\r\n"
-}()
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("Accept") == "application/daze" {
+	date := r.Header.Get("Date")
+	hash := md5.Sum(append([]byte(date), s.Origin.Cipher[:]...))
+	if r.Header.Get("Content-MD5") == base64.StdEncoding.EncodeToString(hash[:]) {
 		hj, _ := w.(http.Hijacker)
 		cc, rw, _ := hj.Hijack()
 		defer cc.Close()
 		defer rw.Flush()
 
-		sr := strings.Replace(responsePrefix, "Tue, 06 Feb 2018 15:46:24 GMT", time.Now().Format(time.RFC1123), 1)
+		sr := strings.Replace(prefix, "Tue, 06 Feb 2018 15:46:24 GMT", time.Now().Format(time.RFC1123), 1)
 		cc.Write([]byte(sr))
 
 		connl := &daze.ReadWriteCloser{
@@ -101,29 +53,29 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Writer: cc,
 			Closer: cc,
 		}
-		if err := s.ServeDaze(connl); err != nil {
+		if err := s.Origin.Serve(connl); err != nil {
 			log.Println(err)
 		}
 		return
 	}
-	req2, err := http.NewRequest(r.Method, s.Masker+r.RequestURI, r.Body)
+	q, err := http.NewRequest(r.Method, s.Masker+r.RequestURI, r.Body)
 	if err != nil {
 		return
 	}
-	req2.Header = r.Header
-	resp, err := http.DefaultClient.Do(req2)
+	q.Header = r.Header
+	p, err := http.DefaultClient.Do(q)
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
+	defer p.Body.Close()
 
-	for k, v := range resp.Header {
+	for k, v := range p.Header {
 		for _, e := range v {
 			w.Header().Add(k, e)
 		}
 	}
-	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body)
+	w.WriteHeader(p.StatusCode)
+	io.Copy(w, p.Body)
 }
 
 func (s *Server) Run() error {
@@ -134,73 +86,49 @@ func (s *Server) Run() error {
 func NewServer(listen, cipher string) *Server {
 	return &Server{
 		Listen: listen,
-		Cipher: md5.Sum([]byte(cipher)),
+		Masker: "http://httpbin.org",
+		Origin: &ashe.Server{
+			Cipher: md5.Sum([]byte(cipher)),
+		},
 	}
 }
 
 type Client struct {
 	Server string
-	Cipher [16]byte
+	Origin *ashe.Client
 }
 
-func (c *Client) Dial(network, address string) (io.ReadWriteCloser, error) {
-	if len(address) > 256 {
-		return nil, fmt.Errorf("daze: destination address too long: %s", address)
-	}
+func (c *Client) Dial(network string, address string) (io.ReadWriteCloser, error) {
 	var (
 		conn io.ReadWriteCloser
 		buf  = make([]byte, 1024)
+		date string
+		hash [16]byte
 		req  *http.Request
 		err  error
-		n    = len(address)
 	)
-	conn, err = net.DialTimeout("tcp", c.Server, time.Second*8)
+	conn, err = net.DialTimeout("tcp", c.Server, time.Second*4)
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		if err != nil {
-			conn.Close()
-		}
-	}()
-
-	rand.Read(buf[:8])
-	name := hex.EncodeToString(buf[:8])
-	req, err = http.NewRequest("POST", "http://"+c.Server+"/"+name, http.NoBody)
+	req, err = http.NewRequest("POST", "http://"+c.Server, http.NoBody)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Accept", "application/daze")
+	date = time.Now().Format(time.RFC1123)
+	req.Header.Set("Date", date)
+	hash = md5.Sum(append([]byte(date), c.Origin.Cipher[:]...))
+	req.Header.Set("Content-MD5", base64.StdEncoding.EncodeToString(hash[:]))
 	req.Write(conn)
-	io.ReadFull(conn, buf[:len(responsePrefix)])
-
-	_, err = conn.Write(buf[:128])
-	if err != nil {
-		return nil, err
-	}
-	conn = daze.Gravity(conn, append(buf[:128], c.Cipher[:]...))
-
-	buf[0] = 0xFF
-	buf[1] = 0xFF
-	binary.BigEndian.PutUint64(buf[2:10], uint64(time.Now().Unix()))
-	switch network {
-	case "tcp", "tcp4", "tcp6":
-		buf[10] = 0x01
-	case "udp", "udp4", "udp6":
-		buf[10] = 0x03
-	}
-	buf[11] = uint8(n)
-	copy(buf[12:], []byte(address))
-	_, err = conn.Write(buf[:12+n])
-	if err != nil {
-		return nil, err
-	}
-	return conn, nil
+	io.ReadFull(conn, buf[:len(prefix)])
+	return c.Origin.DialConn(conn, network, address)
 }
 
 func NewClient(server, cipher string) *Client {
 	return &Client{
 		Server: server,
-		Cipher: md5.Sum([]byte(cipher)),
+		Origin: &ashe.Client{
+			Cipher: md5.Sum([]byte(cipher)),
+		},
 	}
 }

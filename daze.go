@@ -85,57 +85,15 @@ func Resolve(addr string) {
 
 // Dialer contains options for connecting to an address.
 type Dialer interface {
-	Dial(network, address string) (io.ReadWriteCloser, error)
-}
-
-// Server is the main process of daze. In most cases, it is usually deployed
-// as a daemon on a linux machine.
-//
-// Different protocols implement different Servers. In the current version,
-// daze implements few protocols. the source code is located:
-//   ./protocol/ashe
-//   ./protocol/asheshadow
-//
-// You can easily implement your own protocals to fight against the watching
-// of the big brother.
-type Server interface {
-	Serve(connl io.ReadWriteCloser) error
-	Run() error
-}
-
-// NetBox is the collection of *net.IPNet. It just provides some easy ways.
-type NetBox struct {
-	L []*net.IPNet
-}
-
-// Add a new *net.IPNet into NetBox.
-func (n *NetBox) Add(ipNet *net.IPNet) {
-	n.L = append(n.L, ipNet)
-}
-
-// Mrg is short for "Merge".
-func (n *NetBox) Mrg(box *NetBox) {
-	for _, e := range box.L {
-		n.Add(e)
-	}
-}
-
-// Whether ip is in the collection.
-func (n *NetBox) Has(ip net.IP) bool {
-	for _, entry := range n.L {
-		if entry.Contains(ip) {
-			return true
-		}
-	}
-	return false
+	Dial(network string, address string) (io.ReadWriteCloser, error)
 }
 
 // IPv4ReservedIPNet returns reserved IPv4 addresses.
 //
 // Introduction:
 //   See https://en.wikipedia.org/wiki/Reserved_IP_addresses
-func IPv4ReservedIPNet() *NetBox {
-	netBox := &NetBox{}
+func IPv4ReservedIPNet() []*net.IPNet {
+	r := []*net.IPNet{}
 	for _, entry := range [][2]string{
 		[2]string{"00000000", "FF000000"},
 		[2]string{"0A000000", "FF000000"},
@@ -154,17 +112,17 @@ func IPv4ReservedIPNet() *NetBox {
 	} {
 		i, _ := hex.DecodeString(entry[0])
 		m, _ := hex.DecodeString(entry[1])
-		netBox.Add(&net.IPNet{IP: i, Mask: m})
+		r = append(r, &net.IPNet{IP: i, Mask: m})
 	}
-	return netBox
+	return r
 }
 
 // IPv6ReservedIPNet returns reserved IPv6 addresses.
 //
 // Introduction:
 //   See https://en.wikipedia.org/wiki/Reserved_IP_addresses
-func IPv6ReservedIPNet() *NetBox {
-	netBox := &NetBox{}
+func IPv6ReservedIPNet() []*net.IPNet {
+	r := []*net.IPNet{}
 	for _, entry := range [][2]string{
 		[2]string{"00000000000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
 		[2]string{"00000000000000000000000000000001", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
@@ -181,21 +139,21 @@ func IPv6ReservedIPNet() *NetBox {
 	} {
 		i, _ := hex.DecodeString(entry[0])
 		m, _ := hex.DecodeString(entry[1])
-		netBox.Add(&net.IPNet{IP: i, Mask: m})
+		r = append(r, &net.IPNet{IP: i, Mask: m})
 	}
-	return netBox
+	return r
 }
 
 // CNIPNet returns full ipv4/6 CIDR in CN.
-func CNIPNet() *NetBox {
+func CNIPNet() []*net.IPNet {
 	furl := "http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest"
 	name := ddir.Join("delegated-apnic-latest")
 	f, err := aget.OpenEx(furl, name, time.Hour*24*64)
 	if err != nil {
-		log.Fatalln(err)
+		log.Panicln(err)
 	}
 	defer f.Close()
-	netBox := &NetBox{}
+	r := []*net.IPNet{}
 	s := bufio.NewScanner(f)
 	for s.Scan() {
 		line := s.Text()
@@ -207,249 +165,25 @@ func CNIPNet() *NetBox {
 			seps := strings.Split(line, "|")
 			sep4, err := strconv.Atoi(seps[4])
 			if err != nil {
-				log.Fatalln(err)
+				log.Panicln(err)
 			}
 			mask := 32 - int(math.Log2(float64(sep4)))
 			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%d", seps[3], mask))
 			if err != nil {
-				log.Fatalln(err)
+				log.Panicln(err)
 			}
-			netBox.Add(cidr)
+			r = append(r, cidr)
 		case strings.HasPrefix(line, "apnic|CN|ipv6"):
 			seps := strings.Split(line, "|")
 			sep4 := seps[4]
 			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%s", seps[3], sep4))
 			if err != nil {
-				log.Fatalln(err)
+				log.Panicln(err)
 			}
-			netBox.Add(cidr)
+			r = append(r, cidr)
 		}
 	}
-	return netBox
-}
-
-const (
-	RoadLocale = 0x00
-	RoadRemote = 0x01
-	RoadFucked = 0x02
-	RoadUnknow = 0x09
-)
-
-// Roader is the interface that groups the basic Road method.
-type Roader interface {
-	Road(host string) int
-}
-
-// NewRoaderRule returns a new RoaderRule.
-func NewRoaderRule() *RoaderRule {
-	return &RoaderRule{
-		Host: map[string]string{},
-		Rule: map[string]int{},
-	}
-}
-
-// RoaderRule routing based on the RULE file.
-//
-// RULE file aims to be a minimal configuration file format that's easy to
-// read due to obvious semantics.
-// There are two parts per line on RULE file: road and glob. road are on the
-// left of the space sign and glob are on the right. road is an char and
-// describes whether the host should go proxy, glob supported glob-style
-// patterns:
-//   h?llo matches hello, hallo and hxllo
-//   h*llo matches hllo and heeeello
-//   h[ae]llo matches hello and hallo, but not hillo
-//   h[^e]llo matches hallo, hbllo, ... but not hello
-//   h[a-b]llo matches hallo and hbllo
-//
-// This is a RULE document:
-//   F a.com b.com
-//   L a.com
-//   R b.com
-//   B c.com
-//
-// F(orward) means using b.com instead of a.com
-// L(ocale)  means using local network
-// R(emote)  means using proxy
-// B(anned)  means block it
-type RoaderRule struct {
-	Host map[string]string
-	Rule map[string]int
-}
-
-// Road.
-func (r *RoaderRule) Road(host string) int {
-	for p, i := range r.Rule {
-		b, err := filepath.Match(p, host)
-		if err != nil || !b {
-			continue
-		}
-		return i
-	}
-	return RoadUnknow
-}
-
-// Load a RULE file.
-func (r *RoaderRule) Load(name string) error {
-	f, err := aget.Open(name)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := scanner.Text()
-		seps := strings.Split(line, " ")
-		if len(seps) < 2 {
-			continue
-		}
-		switch seps[0] {
-		case "#":
-		case "F":
-			r.Host[seps[1]] = seps[2]
-		case "L":
-			for _, e := range seps[1:] {
-				r.Rule[e] = RoadLocale
-			}
-		case "R":
-			for _, e := range seps[1:] {
-				r.Rule[e] = RoadRemote
-			}
-		case "B":
-			for _, e := range seps[1:] {
-				r.Rule[e] = RoadFucked
-			}
-		}
-	}
-	return scanner.Err()
-}
-
-// NewRoaderIP returns a new RoaderIP.
-func NewRoaderIP(in, no int) *RoaderIP {
-	return &RoaderIP{
-		NetBox: NetBox{},
-		In:     in,
-		No:     no,
-	}
-}
-
-// RoaderRule routing based on the IP.
-type RoaderIP struct {
-	NetBox NetBox
-	In     int
-	No     int
-}
-
-// Road.
-func (r *RoaderIP) Road(host string) int {
-	ips, err := net.LookupIP(host)
-	if err != nil {
-		return RoadUnknow
-	}
-	if r.NetBox.Has(ips[0]) {
-		return r.In
-	}
-	return r.No
-}
-
-// NewRoaderBull returns a new RoaderBull.
-func NewRoaderBull(road int) *RoaderBull {
-	return &RoaderBull{
-		Path: road,
-	}
-}
-
-// RoaderBull routing based on ... wow, it is stubborn like a bull, it always
-// heads in one direction and do nothing.
-type RoaderBull struct {
-	Path int
-}
-
-// Road.
-func (r *RoaderBull) Road(host string) int {
-	return r.Path
-}
-
-// NewFilter returns a Filter. The poor Nier doesn't have enough brain
-// capacity, it can only remember 2048 addresses(Because LRU is used to avoid
-// memory transition expansion).
-func NewFilter(dialer Dialer) *Filter {
-	return &Filter{
-		Client: dialer,
-		Namedb: acdb.Lru(2048),
-		Roader: []Roader{},
-	}
-}
-
-// Filter determines whether the traffic should uses the proxy based on the
-// destination's IP address or domain.
-type Filter struct {
-	Client Dialer
-	Namedb acdb.Client
-	Host   map[string]string
-	Roader []Roader
-}
-
-// JoinRoader.
-func (f *Filter) JoinRoader(roader Roader) {
-	f.Roader = append(f.Roader, roader)
-}
-
-// Dial connects to the address on the named network. If necessary, Filter
-// will use f.Client.Dial, else net.Dial instead.
-func (f *Filter) Dial(network, address string) (io.ReadWriteCloser, error) {
-	var (
-		host string
-		port string
-		road int
-		err  error
-	)
-	host, port, err = net.SplitHostPort(address)
-	if cure, ok := f.Host[host]; ok {
-		host = cure
-		address = host + ":" + port
-	}
-	if err != nil {
-		return nil, err
-	}
-	err = f.Namedb.Get(host, &road)
-	if err == nil {
-		switch road {
-		case RoadLocale:
-			return net.Dial(network, address)
-		case RoadRemote:
-			return f.Client.Dial(network, address)
-		}
-	}
-	if err != acdb.ErrNotExist {
-		return nil, err
-	}
-	for _, roader := range f.Roader {
-		road = roader.Road(host)
-		switch road {
-		case RoadLocale:
-			f.Namedb.SetNone(host, RoadLocale)
-			return net.Dial(network, address)
-		case RoadRemote:
-			f.Namedb.SetNone(host, RoadRemote)
-			return f.Client.Dial(network, address)
-		case RoadFucked:
-			return nil, fmt.Errorf("daze: %s has been blocked", host)
-		case RoadUnknow:
-			continue
-		}
-	}
-	connl, err := net.DialTimeout(network, address, time.Second*4)
-	if err == nil {
-		f.Namedb.SetNone(host, RoadLocale)
-		return connl, nil
-	}
-	connr, err := f.Client.Dial(network, address)
-	if err == nil {
-		f.Namedb.SetNone(host, RoadRemote)
-		return connr, nil
-	}
-	return nil, err
+	return r
 }
 
 // Locale is the main process of daze. In most cases, it is usually deployed
@@ -472,12 +206,12 @@ type Locale struct {
 // Firefox always sends traffic from different sites to the one persistent
 // connection. I have been debugging for a long time.
 // Fuck.
-func (l *Locale) ServeProxy(connl io.ReadWriteCloser) error {
-	connlReader := bufio.NewReader(connl)
+func (l *Locale) ServeProxy(conn io.ReadWriteCloser) error {
+	reader := bufio.NewReader(conn)
 
 	for {
 		if err := func() error {
-			r, err := http.ReadRequest(connlReader)
+			r, err := http.ReadRequest(reader)
 			if err != nil {
 				return err
 			}
@@ -489,39 +223,39 @@ func (l *Locale) ServeProxy(connl io.ReadWriteCloser) error {
 				port = r.URL.Port()
 			}
 
-			connr, err := l.Dialer.Dial("tcp", r.URL.Hostname()+":"+port)
+			serv, err := l.Dialer.Dial("tcp", r.URL.Hostname()+":"+port)
 			if err != nil {
 				return err
 			}
-			defer connr.Close()
-			connrReader := bufio.NewReader(connr)
+			defer serv.Close()
+			servReader := bufio.NewReader(serv)
 
 			if r.Method == "CONNECT" {
 				log.Println("Connect[tunnel]", r.URL.Hostname()+":"+port)
-				_, err := connl.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+				_, err := conn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
 				if err != nil {
 					return err
 				}
-				Link(connl, connr)
+				Link(conn, serv)
 				return nil
 			}
 
 			log.Println("Connect[hproxy]", r.URL.Hostname()+":"+port)
 			if r.Method == "GET" && r.Header.Get("Upgrade") == "websocket" {
-				if err := r.Write(connr); err != nil {
+				if err := r.Write(serv); err != nil {
 					return err
 				}
-				Link(connl, connr)
+				Link(conn, serv)
 				return nil
 			}
-			if err := r.Write(connr); err != nil {
+			if err := r.Write(serv); err != nil {
 				return err
 			}
-			resp, err := http.ReadResponse(connrReader, r)
+			resp, err := http.ReadResponse(servReader, r)
 			if err != nil {
 				return err
 			}
-			return resp.Write(connl)
+			return resp.Write(conn)
 		}(); err != nil {
 			break
 		}
@@ -534,9 +268,9 @@ func (l *Locale) ServeProxy(connl io.ReadWriteCloser) error {
 // Introduction:
 //   See https://en.wikipedia.org/wiki/SOCKS
 //   See http://ftp.icm.edu.pl/packages/socks/socks4/SOCKS4.protocol
-func (l *Locale) ServeSocks4(connl io.ReadWriteCloser) error {
+func (l *Locale) ServeSocks4(conn io.ReadWriteCloser) error {
 	var (
-		reader    = bufio.NewReader(connl)
+		reader    = bufio.NewReader(conn)
 		fCode     uint8
 		fDstPort  = make([]byte, 2)
 		fDstIP    = make([]byte, 4)
@@ -544,13 +278,13 @@ func (l *Locale) ServeSocks4(connl io.ReadWriteCloser) error {
 		dstHost   string
 		dstPort   uint16
 		dst       string
-		connr     io.ReadWriteCloser
+		serv      io.ReadWriteCloser
 		err       error
 	)
-	connl = ReadWriteCloser{
+	conn = ReadWriteCloser{
 		Reader: reader,
-		Writer: connl,
-		Closer: connl,
+		Writer: conn,
+		Closer: conn,
 	}
 	reader.Discard(1)
 	fCode, _ = reader.ReadByte()
@@ -575,14 +309,14 @@ func (l *Locale) ServeSocks4(connl io.ReadWriteCloser) error {
 	log.Println("Connect[socks4]", dst)
 	switch fCode {
 	case 0x01:
-		connr, err = l.Dialer.Dial("tcp", dst)
+		serv, err = l.Dialer.Dial("tcp", dst)
 		if err != nil {
-			connl.Write([]byte{0x00, 0x5B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+			conn.Write([]byte{0x00, 0x5B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 			return err
 		}
-		defer connr.Close()
-		connl.Write([]byte{0x00, 0x5A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-		Link(connl, connr)
+		defer serv.Close()
+		conn.Write([]byte{0x00, 0x5A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		Link(conn, serv)
 		return nil
 	case 0x02:
 	}
@@ -594,9 +328,9 @@ func (l *Locale) ServeSocks4(connl io.ReadWriteCloser) error {
 // Introduction:
 //   See https://en.wikipedia.org/wiki/SOCKS
 //   See https://tools.ietf.org/html/rfc1928
-func (l *Locale) ServeSocks5(connl io.ReadWriteCloser) error {
+func (l *Locale) ServeSocks5(conn io.ReadWriteCloser) error {
 	var (
-		reader   = bufio.NewReader(connl)
+		reader   = bufio.NewReader(conn)
 		fN       uint8
 		fCmd     uint8
 		fAT      uint8
@@ -605,18 +339,18 @@ func (l *Locale) ServeSocks5(connl io.ReadWriteCloser) error {
 		dstHost  string
 		dstPort  uint16
 		dst      string
-		connr    io.ReadWriteCloser
+		serv     io.ReadWriteCloser
 		err      error
 	)
-	connl = ReadWriteCloser{
+	conn = ReadWriteCloser{
 		Reader: reader,
-		Writer: connl,
-		Closer: connl,
+		Writer: conn,
+		Closer: conn,
 	}
 	reader.Discard(1)
 	fN, _ = reader.ReadByte()
 	reader.Discard(int(fN))
-	connl.Write([]byte{0x05, 0x00})
+	conn.Write([]byte{0x05, 0x00})
 	reader.Discard(1)
 	fCmd, _ = reader.ReadByte()
 	reader.Discard(1)
@@ -636,7 +370,7 @@ func (l *Locale) ServeSocks5(connl io.ReadWriteCloser) error {
 		io.ReadFull(reader, fDstAddr)
 		dstHost = net.IP(fDstAddr).String()
 	}
-	if _, err = io.ReadFull(connl, fDstPort); err != nil {
+	if _, err = io.ReadFull(conn, fDstPort); err != nil {
 		return err
 	}
 	dstPort = binary.BigEndian.Uint16(fDstPort)
@@ -644,14 +378,14 @@ func (l *Locale) ServeSocks5(connl io.ReadWriteCloser) error {
 	log.Println("Connect[socks5]", dst)
 	switch fCmd {
 	case 0x01:
-		connr, err = l.Dialer.Dial("tcp", dst)
+		serv, err = l.Dialer.Dial("tcp", dst)
 		if err != nil {
-			connl.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+			conn.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 			return err
 		}
-		defer connr.Close()
-		connl.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-		Link(connl, connr)
+		defer serv.Close()
+		conn.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		Link(conn, serv)
 		return nil
 	case 0x02:
 	case 0x03:
@@ -661,27 +395,27 @@ func (l *Locale) ServeSocks5(connl io.ReadWriteCloser) error {
 
 // We should be very clear about what it does. It judges the traffic type and
 // processes it with a different handler(ServeProxy/ServeSocks4/ServeSocks5).
-func (l *Locale) Serve(connl io.ReadWriteCloser) error {
+func (l *Locale) Serve(conn io.ReadWriteCloser) error {
 	var (
 		buf = make([]byte, 1)
 		err error
 	)
-	_, err = io.ReadFull(connl, buf)
+	_, err = io.ReadFull(conn, buf)
 	if err != nil {
 		return err
 	}
-	connl = ReadWriteCloser{
-		Reader: io.MultiReader(bytes.NewReader(buf), connl),
-		Writer: connl,
-		Closer: connl,
+	conn = ReadWriteCloser{
+		Reader: io.MultiReader(bytes.NewReader(buf), conn),
+		Writer: conn,
+		Closer: conn,
 	}
 	if buf[0] == 0x05 {
-		return l.ServeSocks5(connl)
+		return l.ServeSocks5(conn)
 	}
 	if buf[0] == 0x04 {
-		return l.ServeSocks4(connl)
+		return l.ServeSocks4(conn)
 	}
-	return l.ServeProxy(connl)
+	return l.ServeProxy(conn)
 }
 
 // Run.
@@ -713,5 +447,186 @@ func NewLocale(listen string, dialer Dialer) *Locale {
 	return &Locale{
 		Listen: listen,
 		Dialer: dialer,
+	}
+}
+
+// Direct is the default dialer for connecting to an address.
+type Direct struct {
+}
+
+func (d *Direct) Dial(network string, address string) (io.ReadWriteCloser, error) {
+	return net.Dial(network, address)
+}
+
+// A RoadMode represents a host's road mode.
+type RoadMode int
+
+const (
+	MLocale RoadMode = iota
+	MRemote
+	MFucked
+	MPuzzle
+)
+
+// RULE file aims to be a minimal configuration file format that's easy to
+// read due to obvious semantics.
+// There are two parts per line on RULE file: mode and glob. mode are on the
+// left of the space sign and glob are on the right. mode is an char and
+// describes whether the host should go proxy, glob supported glob-style
+// patterns:
+//   h?llo matches hello, hallo and hxllo
+//   h*llo matches hllo and heeeello
+//   h[ae]llo matches hello and hallo, but not hillo
+//   h[^e]llo matches hallo, hbllo, ... but not hello
+//   h[a-b]llo matches hallo and hbllo
+//
+// This is a RULE document:
+//   F a.com b.com
+//   L a.com
+//   R b.com
+//   B c.com
+//
+// F(orward) means using b.com instead of a.com
+// L(ocale)  means using locale network
+// R(emote)  means using remote network
+// B(anned)  means block it
+type Rulels struct {
+	Host map[string]string
+	Rule map[string]RoadMode
+}
+
+func (r *Rulels) Road(host string) RoadMode {
+	for p, i := range r.Rule {
+		b, err := filepath.Match(p, host)
+		if err != nil {
+			log.Panicln(err)
+		}
+		if !b {
+			continue
+		}
+		return i
+	}
+	return MPuzzle
+}
+
+// Load a RULE file.
+func (r *Rulels) Load(name string) error {
+	f, err := aget.Open(name)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		seps := strings.Split(line, " ")
+		if len(seps) < 2 {
+			continue
+		}
+		switch seps[0] {
+		case "#":
+		case "F":
+			r.Host[seps[1]] = seps[2]
+		case "L":
+			for _, e := range seps[1:] {
+				r.Rule[e] = MLocale
+			}
+		case "R":
+			for _, e := range seps[1:] {
+				r.Rule[e] = MRemote
+			}
+		case "B":
+			for _, e := range seps[1:] {
+				r.Rule[e] = MFucked
+			}
+		}
+	}
+	return scanner.Err()
+}
+
+// NewRoaderRule returns a new RoaderRule.
+func NewRulels() *Rulels {
+	return &Rulels{
+		Host: map[string]string{},
+		Rule: map[string]RoadMode{},
+	}
+}
+
+type Squire struct {
+	Dialer Dialer
+	Direct Dialer
+	Memory acdb.Client
+	Rulels *Rulels
+	IPNets []*net.IPNet
+}
+
+func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error) {
+	var (
+		host string
+		port string
+		mode RoadMode
+		ips  []net.IP
+		err  error
+	)
+	host, port, err = net.SplitHostPort(address)
+
+	if a, ok := s.Rulels.Host[host]; ok {
+		host = a
+		address = host + ":" + port
+	}
+
+	err = s.Memory.Get(host, &mode)
+	if err == nil {
+		switch mode {
+		case MLocale:
+			return s.Direct.Dial(network, address)
+		case MRemote:
+			return s.Dialer.Dial(network, address)
+		}
+		log.Panicln("")
+	}
+	if err != acdb.ErrNotExist {
+		return nil, err
+	}
+
+	switch s.Rulels.Road(host) {
+	case MLocale:
+		s.Memory.Set(host, MLocale)
+		return s.Direct.Dial(network, address)
+	case MRemote:
+		s.Memory.Set(host, MRemote)
+		return s.Dialer.Dial(network, address)
+	case MFucked:
+		return nil, fmt.Errorf("daze: %s has been blocked", host)
+	case MPuzzle:
+	}
+
+	ips, err = net.LookupIP(host)
+	if err != nil {
+		return nil, err
+	}
+	if func() int {
+		for _, e := range s.IPNets {
+			if e.Contains(ips[0]) {
+				return 1
+			}
+		}
+		return 0
+	}() == 1 {
+		s.Memory.Set(host, MLocale)
+		return s.Direct.Dial(network, address)
+	} else {
+		s.Memory.Set(host, MRemote)
+		return s.Dialer.Dial(network, address)
+	}
+}
+
+// NewSquire.
+func NewSquire(dialer Dialer) *Squire {
+	return &Squire{
+		Dialer: dialer,
+		Direct: &Direct{},
+		Memory: acdb.Lru(1024),
+		Rulels: NewRulels(),
 	}
 }

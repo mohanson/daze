@@ -44,25 +44,20 @@ type Server struct {
 }
 
 // Serve.
-func (s *Server) Serve(connl io.ReadWriteCloser) error {
+func (s *Server) Serve(conn io.ReadWriteCloser) error {
 	var (
-		buf   = make([]byte, 1024)
-		dst   string
-		connr io.ReadWriteCloser
-		err   error
+		buf  = make([]byte, 1024)
+		dst  string
+		serv io.ReadWriteCloser
+		err  error
 	)
-	killer := time.AfterFunc(time.Second*8, func() {
-		connl.Close()
-	})
-	defer killer.Stop()
-
-	_, err = io.ReadFull(connl, buf[:128])
+	_, err = io.ReadFull(conn, buf[:128])
 	if err != nil {
 		return err
 	}
-	connl = daze.Gravity(connl, append(buf[:128], s.Cipher[:]...))
+	conn = daze.Gravity(conn, append(buf[:128], s.Cipher[:]...))
 
-	_, err = io.ReadFull(connl, buf[:12])
+	_, err = io.ReadFull(conn, buf[:12])
 	if err != nil {
 		return err
 	}
@@ -73,24 +68,18 @@ func (s *Server) Serve(connl io.ReadWriteCloser) error {
 	if math.Abs(float64(time.Now().Unix()-d)) > 120 {
 		return fmt.Errorf("daze: expired: %v", time.Unix(d, 0))
 	}
-	_, err = io.ReadFull(connl, buf[12:12+buf[11]])
+	_, err = io.ReadFull(conn, buf[12:12+buf[11]])
 	if err != nil {
 		return err
 	}
-	killer.Stop()
 	dst = string(buf[12 : 12+buf[11]])
 	log.Println("Connect[ashe]", dst)
-	if buf[10] == 0x03 {
-		connr, err = net.DialTimeout("udp", dst, time.Second*8)
-	} else {
-		connr, err = net.DialTimeout("tcp", dst, time.Second*8)
-	}
+	serv, err = net.DialTimeout("tcp", dst, time.Second*4)
 	if err != nil {
 		return err
 	}
-	defer connr.Close()
-
-	daze.Link(connl, connr)
+	defer serv.Close()
+	daze.Link(conn, serv)
 	return nil
 }
 
@@ -120,7 +109,7 @@ func (s *Server) Run() error {
 
 // NewServer returns a new Server. A secret data needs to be passed in Cipher,
 // as a sign to interface with the Client.
-func NewServer(listen, cipher string) *Server {
+func NewServer(listen string, cipher string) *Server {
 	return &Server{
 		Listen: listen,
 		Cipher: md5.Sum([]byte(cipher)),
@@ -133,41 +122,41 @@ type Client struct {
 	Cipher [16]byte
 }
 
-// Dial. It is similar to the server, the only difference is that it constructs
-// the data and the server parses the data. This code I refer to the golang
-// socks5 official library. That is a good code which is opened with
-// expectation, and closed with delight and profit.
-func (c *Client) Dial(network, address string) (io.ReadWriteCloser, error) {
+func (c *Client) DialConn(conn io.ReadWriteCloser, network string, address string) (io.ReadWriteCloser, error) {
 	var (
-		conn io.ReadWriteCloser
-		buf  = make([]byte, 1024)
-		err  error
-		n    = len(address)
+		buf = make([]byte, 512)
+		n   = len(address)
+		err error
 	)
 	if n > 256 {
 		return nil, fmt.Errorf("daze: destination address too long: %s", address)
 	}
-	conn, err = net.DialTimeout("tcp", c.Server, time.Second*8)
-	if err != nil {
-		return nil, err
-	}
 	rand.Read(buf[:128])
 	conn.Write(buf[:128])
 	conn = daze.Gravity(conn, append(buf[:128], c.Cipher[:]...))
-
-	buf[0] = 0xFF
-	buf[1] = 0xFF
+	buf[0x00] = 0xFF
+	buf[0x01] = 0xFF
 	binary.BigEndian.PutUint64(buf[2:10], uint64(time.Now().Unix()))
-	switch network {
-	case "tcp", "tcp4", "tcp6":
-		buf[10] = 0x01
-	case "udp", "udp4", "udp6":
-		buf[10] = 0x03
-	}
-	buf[11] = uint8(n)
+	buf[0x0a] = 0x01
+	buf[0x0b] = uint8(n)
 	copy(buf[12:], []byte(address))
-	conn.Write(buf[:12+n])
+	_, err = conn.Write(buf[:12+n])
+	if err != nil {
+		return nil, err
+	}
 	return conn, nil
+}
+
+// Dial. It is similar to the server, the only difference is that it constructs
+// the data and the server parses the data. This code I refer to the golang
+// socks5 official library. That is a good code which is opened with
+// expectation, and closed with delight and profit.
+func (c *Client) Dial(network string, address string) (io.ReadWriteCloser, error) {
+	conn, err := net.DialTimeout("tcp", c.Server, time.Second*4)
+	if err != nil {
+		return nil, err
+	}
+	return c.DialConn(conn, network, address)
 }
 
 // NewClient returns a new Client. A secret data needs to be passed in Cipher,

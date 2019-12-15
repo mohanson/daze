@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/godump/ddir"
 	"github.com/mohanson/daze"
@@ -37,7 +38,7 @@ func main() {
 	case runtime.GOOS == "windows":
 		ddir.Base(filepath.Join(os.Getenv("localappdata"), "Daze"))
 	case runtime.GOOS == "linux" && runtime.GOARCH == "arm":
-		ddir.Base("")
+		ddir.Base(".")
 	default:
 		ddir.Base(filepath.Join(ddir.Home(), ".daze"))
 	}
@@ -46,7 +47,7 @@ func main() {
 	switch subCommand {
 	case "server":
 		var (
-			flListen = flag.String("l", "0.0.0.0:51958", "listen address")
+			flListen = flag.String("l", "0.0.0.0:1081", "listen address")
 			flCipher = flag.String("k", "daze", "cipher, for encryption")
 			flMasker = flag.String("m", "http://httpbin.org", "masker, for confusion")
 			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
@@ -62,28 +63,34 @@ func main() {
 		case "ashe":
 			server := ashe.NewServer(*flListen, *flCipher)
 			if err := server.Run(); err != nil {
-				log.Fatalln(err)
+				log.Panicln(err)
 			}
 		case "asheshadow":
 			server := asheshadow.NewServer(*flListen, *flCipher)
 			server.Masker = *flMasker
 			if err := server.Run(); err != nil {
-				log.Fatalln(err)
+				log.Panicln(err)
 			}
 		default:
-			log.Fatalln(*flEngine, "is not an engine")
+			log.Panicln(*flEngine, "is not an engine")
 		}
 	case "client":
 		var (
-			flListen = flag.String("l", "127.0.0.1:51959", "listen address")
-			flServer = flag.String("s", "127.0.0.1:51958", "server address")
+			flListen = flag.String("l", "127.0.0.1:1080", "listen address")
+			flServer = flag.String("s", "127.0.0.1:1081", "server address")
 			flCipher = flag.String("k", "daze", "cipher, for encryption")
 			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
 			flRulels = flag.String("r", ddir.Join("rule.ls"), "rule path")
-			flFilter = flag.String("f", "ipcn", "filter {auto, none, ipcn}")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
+		if _, err := os.Stat(ddir.Join("rule.ls")); err != nil {
+			f, er := os.Create(ddir.Join("rule.ls"))
+			if er != nil {
+				log.Panicln(er)
+			}
+			f.Close()
+		}
 		log.Println("Remote server is", *flServer)
 		log.Println("Client cipher is", *flCipher)
 		if *flDnserv != "" {
@@ -96,43 +103,32 @@ func main() {
 			client = ashe.NewClient(*flServer, *flCipher)
 		case "asheshadow":
 			client = asheshadow.NewClient(*flServer, *flCipher)
-		default:
-			log.Fatalln("daze: unknown engine", *flEngine)
 		}
-		filter := daze.NewFilter(client)
-		log.Println("Roader join rule", *flRulels)
-		roaderRule := daze.NewRoaderRule()
-		if err := roaderRule.Load(*flRulels); err != nil {
-			if *flRulels != ddir.Join("rule.ls") {
-				log.Fatalln(err)
-			}
+		if client == nil {
+			log.Panicln("daze: unknown engine", *flEngine)
 		}
-		filter.Host = roaderRule.Host
-		filter.JoinRoader(roaderRule)
-		log.Println("Roader join reserved IPv4/6 CIDRs")
-		roaderIPre := daze.NewRoaderIP(daze.RoadLocale, daze.RoadUnknow)
-		roaderIPre.NetBox.Mrg(daze.IPv4ReservedIPNet())
-		roaderIPre.NetBox.Mrg(daze.IPv6ReservedIPNet())
-		filter.JoinRoader(roaderIPre)
-		switch *flFilter {
-		case "auto":
-		case "none":
-			filter.JoinRoader(daze.NewRoaderBull(daze.RoadRemote))
-		case "ipcn":
-			log.Println("Roader join CN(China PR) CIDRs")
-			roaderIPcn := daze.NewRoaderIP(daze.RoadLocale, daze.RoadRemote)
-			go func() {
-				roaderIPcn.NetBox.Mrg(daze.CNIPNet())
-			}()
-			filter.JoinRoader(roaderIPcn)
+		squire := daze.NewSquire(client)
+		log.Println("Load rule", *flRulels)
+		if err := squire.Rulels.Load(*flRulels); err != nil {
+			log.Panicln(err)
 		}
-		locale := daze.NewLocale(*flListen, filter)
+		log.Println("Load rule reserved IPv4/6 CIDRs")
+		squire.IPNets = append(squire.IPNets, daze.IPv4ReservedIPNet()...)
+		squire.IPNets = append(squire.IPNets, daze.IPv6ReservedIPNet()...)
+		log.Println("Load rule CN(China PR) CIDRs")
+		go func() {
+			time.Sleep(4 * time.Second)
+			os.Setenv("HTTP_PROXY", "http://"+*flListen)
+			squire.IPNets = append(squire.IPNets, daze.CNIPNet()...)
+			os.Setenv("HTTP_PROXY", "")
+		}()
+		locale := daze.NewLocale(*flListen, squire)
 		if err := locale.Run(); err != nil {
-			log.Fatalln(err)
+			log.Panicln(err)
 		}
 	case "cmd":
 		var (
-			flClient = flag.String("c", "127.0.0.1:51959", "client address")
+			flClient = flag.String("c", "127.0.0.1:1080", "client address")
 		)
 		if len(os.Args) <= 1 {
 			return
@@ -145,7 +141,7 @@ func main() {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			log.Fatalln(err)
+			log.Panicln(err)
 		}
 	default:
 		printHelpAndExit()
