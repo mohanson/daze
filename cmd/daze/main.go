@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/godump/ddir"
 	"github.com/mohanson/daze"
@@ -116,7 +117,10 @@ func main() {
 		squire.IPNets = append(squire.IPNets, daze.IPv6ReservedIPNet()...)
 		log.Println("Load rule CN(China PR) CIDRs")
 		go func() {
+			time.Sleep(4 * time.Second)
+			os.Setenv("HTTP_PROXY", "http://"+*flListen)
 			squire.IPNets = append(squire.IPNets, daze.CNIPNet()...)
+			os.Setenv("HTTP_PROXY", "")
 		}()
 		locale := daze.NewLocale(*flListen, squire)
 		if err := locale.Run(); err != nil {
