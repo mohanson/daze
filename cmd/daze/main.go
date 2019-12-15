@@ -37,7 +37,7 @@ func main() {
 	case runtime.GOOS == "windows":
 		ddir.Base(filepath.Join(os.Getenv("localappdata"), "Daze"))
 	case runtime.GOOS == "linux" && runtime.GOARCH == "arm":
-		ddir.Base("")
+		ddir.Base(".")
 	default:
 		ddir.Base(filepath.Join(ddir.Home(), ".daze"))
 	}
