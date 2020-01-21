@@ -147,7 +147,7 @@ func IPv6ReservedIPNet() []*net.IPNet {
 // CNIPNet returns full ipv4/6 CIDR in CN.
 func CNIPNet() []*net.IPNet {
 	furl := "http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest"
-	name := ddir.Join("delegated-apnic-latest")
+	name := ddir.Join("res", "delegated-apnic-latest")
 	f, err := aget.OpenEx(furl, name, time.Hour*24*64)
 	if err != nil {
 		log.Panicln(err)
