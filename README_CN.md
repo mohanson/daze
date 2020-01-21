@@ -11,7 +11,7 @@ Daze 是一款帮助你连接至**互联网**的工具.
 ```sh
 $ git clone https://github.com/mohanson/daze
 $ cd daze
-$ go build -o daze github.com/mohanson/daze/cmd/daze
+$ go build github.com/mohanson/daze/cmd/daze
 ```
 
 使用 daze 该死的简单:

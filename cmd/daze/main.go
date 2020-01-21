@@ -76,8 +76,8 @@ func main() {
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
-		if _, err := os.Stat(ddir.Join("rule.ls")); err != nil {
-			f, er := os.Create(ddir.Join("rule.ls"))
+		if _, err := os.Stat(ddir.Join("res", "rule.ls")); err != nil {
+			f, er := os.Create(ddir.Join("res", "rule.ls"))
 			if er != nil {
 				log.Panicln(er)
 			}

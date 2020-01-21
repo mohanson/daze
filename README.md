@@ -11,7 +11,7 @@ Compile or [Download](https://github.com/mohanson/daze/releases) daze:
 ```sh
 $ git clone https://github.com/mohanson/daze
 $ cd daze
-$ go build -o daze github.com/mohanson/daze/cmd/daze
+$ go build github.com/mohanson/daze/cmd/daze
 ```
 
 Daze is dead simple to use:
