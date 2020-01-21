@@ -8,10 +8,10 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/godump/ddir"
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/protocol/ashe"
 	"github.com/mohanson/daze/protocol/asheshadow"
+	"github.com/mohanson/ddir"
 )
 
 const help = `usage: daze <command> [<args>]
