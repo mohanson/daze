@@ -6,14 +6,12 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"runtime"
 	"time"
 
-	"github.com/godump/ddir"
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/protocol/ashe"
 	"github.com/mohanson/daze/protocol/asheshadow"
+	"github.com/mohanson/ddir"
 )
 
 const help = `usage: daze <command> [<args>]
@@ -34,14 +32,8 @@ func main() {
 	if len(os.Args) <= 1 {
 		printHelpAndExit()
 	}
-	switch {
-	case runtime.GOOS == "windows":
-		ddir.Base(filepath.Join(os.Getenv("localappdata"), "Daze"))
-	case runtime.GOOS == "linux" && runtime.GOARCH == "arm":
-		ddir.Base(".")
-	default:
-		ddir.Base(filepath.Join(ddir.Home(), ".daze"))
-	}
+	ddir.Base(".")
+	ddir.Make("res")
 	subCommand := os.Args[1]
 	os.Args = os.Args[1:len(os.Args)]
 	switch subCommand {
@@ -80,12 +72,12 @@ func main() {
 			flServer = flag.String("s", "127.0.0.1:1081", "server address")
 			flCipher = flag.String("k", "daze", "cipher, for encryption")
 			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
-			flRulels = flag.String("r", ddir.Join("rule.ls"), "rule path")
+			flRulels = flag.String("r", ddir.Join("res", "rule.ls"), "rule path")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
-		if _, err := os.Stat(ddir.Join("rule.ls")); err != nil {
-			f, er := os.Create(ddir.Join("rule.ls"))
+		if _, err := os.Stat(ddir.Join("res", "rule.ls")); err != nil {
+			f, er := os.Create(ddir.Join("res", "rule.ls"))
 			if er != nil {
 				log.Panicln(er)
 			}

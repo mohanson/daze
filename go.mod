@@ -3,7 +3,7 @@ module github.com/mohanson/daze
 go 1.13
 
 require (
-	github.com/godump/acdb v0.0.0-20190215163958-5670aa9f98b2
-	github.com/godump/aget v0.0.0-20191213161339-a71449703d40
-	github.com/godump/ddir v0.0.0-20191112032039-5651607ce88e
+	github.com/mohanson/acdb v0.0.0-20200121141900-d312f8eef815
+	github.com/mohanson/aget v0.0.0-20200121135955-91781155fd7a
+	github.com/mohanson/ddir v0.0.0-20200121134446-529ecd9b98ed
 )

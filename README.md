@@ -9,7 +9,9 @@ Daze is a tool to help you link to the **Internet**.
 Compile or [Download](https://github.com/mohanson/daze/releases) daze:
 
 ```sh
-$ go get -u -v github.com/mohanson/daze/cmd/daze
+$ git clone https://github.com/mohanson/daze
+$ cd daze
+$ go build github.com/mohanson/daze/cmd/daze
 ```
 
 Daze is dead simple to use:

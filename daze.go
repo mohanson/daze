@@ -19,9 +19,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/godump/acdb"
-	"github.com/godump/aget"
-	"github.com/godump/ddir"
+	"github.com/mohanson/acdb"
+	"github.com/mohanson/aget"
+	"github.com/mohanson/ddir"
 )
 
 // Link copies from src to dst and dst to src until either EOF is reached.
@@ -147,7 +147,7 @@ func IPv6ReservedIPNet() []*net.IPNet {
 // CNIPNet returns full ipv4/6 CIDR in CN.
 func CNIPNet() []*net.IPNet {
 	furl := "http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest"
-	name := ddir.Join("delegated-apnic-latest")
+	name := ddir.Join("res", "delegated-apnic-latest")
 	f, err := aget.OpenEx(furl, name, time.Hour*24*64)
 	if err != nil {
 		log.Panicln(err)
