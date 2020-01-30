@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	"github.com/mohanson/daze"
@@ -32,7 +33,7 @@ func main() {
 	if len(os.Args) <= 1 {
 		printHelpAndExit()
 	}
-	ddir.Base(".")
+	ddir.Base(filepath.Dir(os.Args[0]))
 	ddir.Make("res")
 	subCommand := os.Args[1]
 	os.Args = os.Args[1:len(os.Args)]
