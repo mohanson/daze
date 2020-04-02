@@ -34,7 +34,6 @@ func main() {
 		printHelpAndExit()
 	}
 	ddir.Base(filepath.Dir(os.Args[0]))
-	ddir.Make("res")
 	subCommand := os.Args[1]
 	os.Args = os.Args[1:len(os.Args)]
 	switch subCommand {
@@ -73,12 +72,12 @@ func main() {
 			flServer = flag.String("s", "127.0.0.1:1081", "server address")
 			flCipher = flag.String("k", "daze", "cipher, for encryption")
 			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
-			flRulels = flag.String("r", ddir.Join("res", "rule.ls"), "rule path")
+			flRulels = flag.String("r", ddir.Join("rule.ls"), "rule path")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
-		if _, err := os.Stat(ddir.Join("res", "rule.ls")); err != nil {
-			f, er := os.Create(ddir.Join("res", "rule.ls"))
+		if _, err := os.Stat(ddir.Join("rule.ls")); err != nil {
+			f, er := os.Create(ddir.Join("rule.ls"))
 			if er != nil {
 				log.Panicln(er)
 			}
