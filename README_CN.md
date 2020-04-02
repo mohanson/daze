@@ -11,8 +11,10 @@ Daze 是一款帮助你连接至**互联网**的工具.
 ```sh
 $ git clone https://github.com/mohanson/daze
 $ cd daze
-$ go build github.com/mohanson/daze/cmd/daze
+$ go run cmd/make/main.go develop
 ```
+
+构建结果将被保存在目录 `bin/develop` 中. 只有这个目录下的文件是必须的, 你不必保留整份源代码.
 
 使用 daze 该死的简单:
 
@@ -46,7 +48,7 @@ Daze 可以在 **Windows**, **Linux** 和 **macOS** 下正常工作. 另外, 它
 
 # 启用用户规则
 
-daze 使用一份名叫 RULE 的文件来管理用户自定义的过滤规则(可选的). RULE 在流量过滤器中拥有最高优先级, 因此你应该小心的使用它. 这是一份合法的 RULE 文件, 并且位于 "/tmp/rule.ls". 使用 `daze client -r /tmp/rule.ls` 来应用它.
+daze 使用一份名叫 RULE 的文件来管理用户自定义的过滤规则(可选的). RULE 在流量过滤器中拥有最高优先级, 因此你应该小心的使用它. 这是一份合法的 RULE 文件, 并且位于 "./rule.ls". 使用 `daze client -r ./rule.ls` 来应用它.
 
 ```
 F a.com b.com
