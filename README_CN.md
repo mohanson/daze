@@ -51,13 +51,11 @@ Daze 可以在 **Windows**, **Linux** 和 **macOS** 下正常工作. 另外, 它
 daze 使用一份名叫 RULE 的文件来管理用户自定义的过滤规则(可选的). RULE 在流量过滤器中拥有最高优先级, 因此你应该小心的使用它. 这是一份合法的 RULE 文件, 并且位于 "./rule.ls". 使用 `daze client -r ./rule.ls` 来应用它.
 
 ```
-F a.com b.com
 L a.com
 R b.com
 B c.com
 ```
 
-- F(orward) 表示使用 b.com 替换 a.com
 - L(ocale) 表示使用本地网络进行访问
 - R(emote) 表示使用代理进行访问
 - B(anned) 表示屏蔽该地址的流量

@@ -479,22 +479,19 @@ const (
 //   h[a-b]llo matches hallo and hbllo
 //
 // This is a RULE document:
-//   F a.com b.com
 //   L a.com
 //   R b.com
 //   B c.com
 //
-// F(orward) means using b.com instead of a.com
 // L(ocale)  means using locale network
 // R(emote)  means using remote network
 // B(anned)  means block it
 type Rulels struct {
-	Host map[string]string
-	Rule map[string]RoadMode
+	Dict map[string]RoadMode
 }
 
 func (r *Rulels) Road(host string) RoadMode {
-	for p, i := range r.Rule {
+	for p, i := range r.Dict {
 		b, err := filepath.Match(p, host)
 		if err != nil {
 			log.Panicln(err)
@@ -523,19 +520,17 @@ func (r *Rulels) Load(name string) error {
 		}
 		switch seps[0] {
 		case "#":
-		case "F":
-			r.Host[seps[1]] = seps[2]
 		case "L":
 			for _, e := range seps[1:] {
-				r.Rule[e] = MLocale
+				r.Dict[e] = MLocale
 			}
 		case "R":
 			for _, e := range seps[1:] {
-				r.Rule[e] = MRemote
+				r.Dict[e] = MRemote
 			}
 		case "B":
 			for _, e := range seps[1:] {
-				r.Rule[e] = MFucked
+				r.Dict[e] = MFucked
 			}
 		}
 	}
@@ -545,8 +540,7 @@ func (r *Rulels) Load(name string) error {
 // NewRoaderRule returns a new RoaderRule.
 func NewRulels() *Rulels {
 	return &Rulels{
-		Host: map[string]string{},
-		Rule: map[string]RoadMode{},
+		Dict: map[string]RoadMode{},
 	}
 }
 
@@ -559,34 +553,17 @@ type Squire struct {
 }
 
 func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error) {
-	var (
-		host string
-		port string
-		mode RoadMode
-		ips  []net.IP
-		err  error
-	)
-	host, port, err = net.SplitHostPort(address)
-
-	if a, ok := s.Rulels.Host[host]; ok {
-		host = a
-		address = host + ":" + port
-	}
-
-	err = s.Memory.Get(host, &mode)
-	if err == nil {
+	host, _, err := net.SplitHostPort(address)
+	mode := MPuzzle
+	if err = s.Memory.Get(host, &mode); err == nil {
 		switch mode {
 		case MLocale:
 			return s.Direct.Dial(network, address)
 		case MRemote:
 			return s.Dialer.Dial(network, address)
 		}
-		log.Panicln("")
+		log.Panicln("unreachable")
 	}
-	if err != acdb.ErrNotExist {
-		return nil, err
-	}
-
 	switch s.Rulels.Road(host) {
 	case MLocale:
 		s.Memory.Set(host, MLocale)
@@ -597,26 +574,20 @@ func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error
 	case MFucked:
 		return nil, fmt.Errorf("daze: %s has been blocked", host)
 	case MPuzzle:
+		log.Panicln("unreachable")
 	}
-
-	ips, err = net.LookupIP(host)
+	l, err := net.LookupIP(host)
 	if err != nil {
 		return nil, err
 	}
-	if func() int {
-		for _, e := range s.IPNets {
-			if e.Contains(ips[0]) {
-				return 1
-			}
+	for _, e := range s.IPNets {
+		if e.Contains(l[0]) {
+			s.Memory.Set(host, MLocale)
+			return s.Direct.Dial(network, address)
 		}
-		return 0
-	}() == 1 {
-		s.Memory.Set(host, MLocale)
-		return s.Direct.Dial(network, address)
-	} else {
-		s.Memory.Set(host, MRemote)
-		return s.Dialer.Dial(network, address)
 	}
+	s.Memory.Set(host, MRemote)
+	return s.Dialer.Dial(network, address)
 }
 
 // NewSquire.

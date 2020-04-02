@@ -11,12 +11,10 @@
 #   h[a-b]llo matches hallo and hbllo
 #
 # This is a RULE document:
-#   F a.com b.com
 #   L a.com
 #   R b.com
 #   B c.com
 #
-# F(orward) means using b.com instead of a.com
 # L(ocale)  means using locale network
 # R(emote)  means using remote network
 # B(anned)  means block it

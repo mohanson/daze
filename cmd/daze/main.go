@@ -30,7 +30,7 @@ func main() {
 	}
 	p, err := os.Executable()
 	if err != nil {
-		log.Fatalln(err)
+		log.Panicln(err)
 	}
 	ddir.Base(filepath.Dir(p))
 	subCommand := os.Args[1]
