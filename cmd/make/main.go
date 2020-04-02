@@ -2,11 +2,13 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/mohanson/ddir"
@@ -20,6 +22,10 @@ func call(name string, arg ...string) {
 	if err := cmd.Run(); err != nil {
 		log.Fatalln(err)
 	}
+}
+
+func bash(name string) {
+	call("bash", "-c", name)
 }
 
 func wget(furl string, name string) {
@@ -71,10 +77,26 @@ func main() {
 			}
 			call("go", "build", "-o", "bin/develop", "github.com/mohanson/daze/cmd/daze")
 		case "release":
+			os.RemoveAll(ddir.Join("bin", "release"))
 			ddir.Make("bin", "release")
-			wget("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest", ddir.Join("bin", "release", "delegated-apnic-latest"))
-			cp(ddir.Join("res", "rule.ls"), ddir.Join("bin", "release", "rule.ls"))
-			call("go", "build", "-o", "bin/release", "github.com/mohanson/daze/cmd/daze")
+			ddir.Make("bin", "release", "gox")
+			bash("cd bin/release && wget http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")
+			bash("cd bin/release/gox && gox github.com/mohanson/daze/cmd/daze")
+			l, _ := filepath.Glob("bin/release/gox/daze_*")
+			for _, e := range l {
+				b := filepath.Base(e)
+				ext := filepath.Ext(b)
+				pre := b[0 : len(b)-len(ext)]
+				dir := fmt.Sprintf("bin/release/%s", pre)
+				bash(fmt.Sprintf("mkdir %s", dir))
+				bash(fmt.Sprintf("cp bin/release/gox/%s bin/release/%s/daze%s", b, pre, ext))
+				bash(fmt.Sprintf("cp bin/release/delegated-apnic-latest bin/release/%s/delegated-apnic-latest", pre))
+				bash(fmt.Sprintf("cp res/rule.ls bin/release/%s/rule.ls", pre))
+				bash(fmt.Sprintf("cd bin/release && haze zip -c %s.zip %s", pre, pre))
+				bash(fmt.Sprintf("rm -rf bin/release/%s", pre))
+			}
+			bash("rm -rf bin/release/gox")
+			bash("rm bin/release/delegated-apnic-latest")
 		}
 	}
 }
