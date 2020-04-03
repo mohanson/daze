@@ -574,7 +574,6 @@ func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error
 	case MFucked:
 		return nil, fmt.Errorf("daze: %s has been blocked", host)
 	case MPuzzle:
-		log.Panicln("unreachable")
 	}
 	l, err := net.LookupIP(host)
 	if err != nil {

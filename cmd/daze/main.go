@@ -94,8 +94,7 @@ func main() {
 			client = ashe.NewClient(*flServer, *flCipher)
 		case "asheshadow":
 			client = asheshadow.NewClient(*flServer, *flCipher)
-		}
-		if client == nil {
+		default:
 			log.Panicln("daze: unknown engine", *flEngine)
 		}
 		squire := daze.NewSquire(client)
