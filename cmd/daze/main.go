@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"time"
 
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/protocol/ashe"
@@ -24,17 +23,16 @@ The most commonly used daze commands are:
 
 Run 'daze <command> -h' for more information on a command.`
 
-func printHelpAndExit() {
-	fmt.Println(help)
-	os.Exit(0)
-}
-
 func main() {
 	if len(os.Args) <= 1 {
-		printHelpAndExit()
+		fmt.Println(help)
+		os.Exit(0)
 	}
-	ddir.Base(filepath.Dir(os.Args[0]))
-	ddir.Make("res")
+	p, err := os.Executable()
+	if err != nil {
+		log.Panicln(err)
+	}
+	ddir.Base(filepath.Dir(p))
 	subCommand := os.Args[1]
 	os.Args = os.Args[1:len(os.Args)]
 	switch subCommand {
@@ -73,12 +71,12 @@ func main() {
 			flServer = flag.String("s", "127.0.0.1:1081", "server address")
 			flCipher = flag.String("k", "daze", "cipher, for encryption")
 			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
-			flRulels = flag.String("r", ddir.Join("res", "rule.ls"), "rule path")
+			flRulels = flag.String("r", ddir.Join("rule.ls"), "rule path")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
-		if _, err := os.Stat(ddir.Join("res", "rule.ls")); err != nil {
-			f, er := os.Create(ddir.Join("res", "rule.ls"))
+		if _, err := os.Stat(ddir.Join("rule.ls")); err != nil {
+			f, er := os.Create(ddir.Join("rule.ls"))
 			if er != nil {
 				log.Panicln(er)
 			}
@@ -96,8 +94,7 @@ func main() {
 			client = ashe.NewClient(*flServer, *flCipher)
 		case "asheshadow":
 			client = asheshadow.NewClient(*flServer, *flCipher)
-		}
-		if client == nil {
+		default:
 			log.Panicln("daze: unknown engine", *flEngine)
 		}
 		squire := daze.NewSquire(client)
@@ -109,12 +106,9 @@ func main() {
 		squire.IPNets = append(squire.IPNets, daze.IPv4ReservedIPNet()...)
 		squire.IPNets = append(squire.IPNets, daze.IPv6ReservedIPNet()...)
 		log.Println("Load rule CN(China PR) CIDRs")
-		go func() {
-			time.Sleep(4 * time.Second)
-			os.Setenv("HTTP_PROXY", "http://"+*flListen)
-			squire.IPNets = append(squire.IPNets, daze.CNIPNet()...)
-			os.Setenv("HTTP_PROXY", "")
-		}()
+		ipnets := daze.CNIPNet()
+		log.Println("Find", len(ipnets), "IP nets")
+		squire.IPNets = append(squire.IPNets, ipnets...)
 		locale := daze.NewLocale(*flListen, squire)
 		if err := locale.Run(); err != nil {
 			log.Panicln(err)
@@ -137,6 +131,7 @@ func main() {
 			log.Panicln(err)
 		}
 	default:
-		printHelpAndExit()
+		fmt.Println(help)
+		os.Exit(0)
 	}
 }

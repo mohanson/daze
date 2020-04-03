@@ -11,8 +11,10 @@ Compile or [Download](https://github.com/mohanson/daze/releases) daze:
 ```sh
 $ git clone https://github.com/mohanson/daze
 $ cd daze
-$ go build github.com/mohanson/daze/cmd/daze
+$ go run cmd/make/main.go develop
 ```
+
+Build results will be saved in directory `bin/develop`. You can just keep this directory, all other files are not required.
 
 Daze is dead simple to use:
 
@@ -46,15 +48,13 @@ Daze can work well on **Windows**, **Linux** and **macOS**. In additional, it ca
 
 # Use custom rules
 
-daze use a RULE file to custom your own rules(optional). RULE has the highest priority in filters, so that you should carefully maintain it. This is a RULE document located at "/tmp/rule.ls", use `daze client -r /tmp/rule.ls` to apply it.
+daze use a RULE file to custom your own rules(optional). RULE has the highest priority in filters, so that you should carefully maintain it. This is a RULE document located at "./rule.ls", use `daze client -r ./rule.ls` to apply it.
 
 ```
-F a.com b.com
 L a.com
 R b.com
 B c.com
 ```
-- F(orward) means using b.com instead of a.com
 - L(ocale) means using local network
 - R(emote) means using proxy
 - B(anned) means block it
