@@ -2,5 +2,5 @@ github.com/mohanson/acdb v0.0.0-20200121141900-d312f8eef815 h1:i4zoRoC8r64cLpnlu
 github.com/mohanson/acdb v0.0.0-20200121141900-d312f8eef815/go.mod h1:d9hKjlIeIelaGN+rumqzXq7rLSw/tvh8NP7ES24rpf8=
 github.com/mohanson/aget v0.0.0-20200121135955-91781155fd7a h1:G28eRjI5SBRfCCbIl6xku4kb1yOxkoist++3MBPxPRw=
 github.com/mohanson/aget v0.0.0-20200121135955-91781155fd7a/go.mod h1:HAlRhYkqXGYityX5GglZorpKVLIKRVCu6VB+uRqf2Zw=
-github.com/mohanson/ddir v0.0.0-20200121134446-529ecd9b98ed h1:kjHVkERe20s6RxK9cjIticF13VvJmaVkI54mm7UVByI=
-github.com/mohanson/ddir v0.0.0-20200121134446-529ecd9b98ed/go.mod h1:4BAE9OWHRjbScm4FsjDwEvi1YR50guvFr51jlntU+8E=
+github.com/mohanson/ddir v0.0.0-20200325134232-2a67c1bc98a0 h1:QX7VALJdIiAbdq71ApmGmnJqaovN7iYZRazTxOBdAS8=
+github.com/mohanson/ddir v0.0.0-20200325134232-2a67c1bc98a0/go.mod h1:4BAE9OWHRjbScm4FsjDwEvi1YR50guvFr51jlntU+8E=
