@@ -18,5 +18,3 @@
 # L(ocale)  means using locale network
 # R(emote)  means using remote network
 # B(anned)  means block it
-
-B hm.baidu.com
