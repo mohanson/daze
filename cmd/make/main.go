@@ -15,7 +15,7 @@ import (
 )
 
 func call(name string, arg ...string) {
-	log.Println("Run", name, strings.Join(arg, " "))
+	log.Println("call", name, strings.Join(arg, " "))
 	cmd := exec.Command(name, arg...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -29,7 +29,7 @@ func bash(name string) {
 }
 
 func wget(furl string, name string) {
-	log.Println("Get", furl)
+	log.Println("wget", furl)
 	f, err := os.OpenFile(name, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		log.Panicln(err)
@@ -44,7 +44,7 @@ func wget(furl string, name string) {
 }
 
 func cp(src string, dst string) {
-	log.Println("Cp ", src, dst)
+	log.Println("copy", src, dst)
 	a, err := os.Open(src)
 	if err != nil {
 		log.Panicln(err)
@@ -62,20 +62,21 @@ func main() {
 	ddir.Base(".")
 	ddir.Make("bin")
 	flag.Parse()
-	if flag.NArg() == 0 {
-		return
+	args := flag.Args()
+	if len(args) == 0 {
+		args = append(args, "develop")
 	}
 	for _, e := range flag.Args() {
 		switch e {
 		case "develop":
-			ddir.Make("bin", "develop")
-			if _, err := os.Stat(ddir.Join("bin", "develop", "delegated-apnic-latest")); os.IsNotExist(err) {
-				wget("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest", ddir.Join("bin", "develop", "delegated-apnic-latest"))
+			ddir.Make("bin")
+			if _, err := os.Stat(ddir.Join("bin", "delegated-apnic-latest")); os.IsNotExist(err) {
+				wget("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest", ddir.Join("bin", "delegated-apnic-latest"))
 			}
-			if _, err := os.Stat(ddir.Join("bin", "develop", "rule.ls")); os.IsNotExist(err) {
-				cp(ddir.Join("res", "rule.ls"), ddir.Join("bin", "develop", "rule.ls"))
+			if _, err := os.Stat(ddir.Join("bin", "rule.ls")); os.IsNotExist(err) {
+				cp(ddir.Join("res", "rule.ls"), ddir.Join("bin", "rule.ls"))
 			}
-			call("go", "build", "-o", "bin/develop", "github.com/mohanson/daze/cmd/daze")
+			call("go", "build", "-o", "bin", "github.com/mohanson/daze/cmd/daze")
 		case "release":
 			os.RemoveAll(ddir.Join("bin", "release"))
 			ddir.Make("bin", "release")
