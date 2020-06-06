@@ -61,8 +61,8 @@ func (s *Server) Serve(conn io.ReadWriteCloser) error {
 	if err != nil {
 		return err
 	}
-	if buf[0] != 0xFF || buf[1] != 0xFF {
-		return fmt.Errorf("daze: malformed request: %v", buf[:2])
+	if buf[0] != 0xff || buf[1] != 0xff {
+		return fmt.Errorf("daze: malformed request: [%# 02x]", buf[0:2])
 	}
 	d := int64(binary.BigEndian.Uint64(buf[2:10]))
 	if math.Abs(float64(time.Now().Unix()-d)) > 120 {
