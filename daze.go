@@ -238,7 +238,7 @@ func (l *Locale) ServeProxy(conn io.ReadWriteCloser) error {
 			servReader := bufio.NewReader(serv)
 
 			if r.Method == "CONNECT" {
-				log.Println("Connect[tunnel]", r.URL.Hostname()+":"+port)
+				log.Println("connect[tunnel]", r.URL.Hostname()+":"+port)
 				_, err := conn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
 				if err != nil {
 					return err
@@ -247,7 +247,7 @@ func (l *Locale) ServeProxy(conn io.ReadWriteCloser) error {
 				return nil
 			}
 
-			log.Println("Connect[hproxy]", r.URL.Hostname()+":"+port)
+			log.Println("connect[hproxy]", r.URL.Hostname()+":"+port)
 			if r.Method == "GET" && r.Header.Get("Upgrade") == "websocket" {
 				if err := r.Write(serv); err != nil {
 					return err
@@ -313,16 +313,16 @@ func (l *Locale) ServeSocks4(conn io.ReadWriteCloser) error {
 		dstHost = net.IP(fDstIP).String()
 	}
 	dst = dstHost + ":" + strconv.Itoa(int(dstPort))
-	log.Println("Connect[socks4]", dst)
+	log.Println("connect[socks4]", dst)
 	switch fCode {
 	case 0x01:
 		serv, err = l.Dialer.Dial("tcp", dst)
 		if err != nil {
-			conn.Write([]byte{0x00, 0x5B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+			conn.Write([]byte{0x00, 0x5b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 			return err
 		}
 		defer serv.Close()
-		conn.Write([]byte{0x00, 0x5A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		conn.Write([]byte{0x00, 0x5a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 		Link(conn, serv)
 		return nil
 	case 0x02:
@@ -382,7 +382,7 @@ func (l *Locale) ServeSocks5(conn io.ReadWriteCloser) error {
 	}
 	dstPort = binary.BigEndian.Uint16(fDstPort)
 	dst = dstHost + ":" + strconv.Itoa(int(dstPort))
-	log.Println("Connect[socks5]", dst)
+	log.Println("connect[socks5]", dst)
 	switch fCmd {
 	case 0x01:
 		serv, err = l.Dialer.Dial("tcp", dst)
@@ -432,7 +432,7 @@ func (l *Locale) Run() error {
 		return err
 	}
 	defer ln.Close()
-	log.Println("Listen and serve on", l.Listen)
+	log.Println("listen and serve on", l.Listen)
 
 	for {
 		conn, err := ln.Accept()

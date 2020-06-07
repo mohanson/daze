@@ -45,10 +45,10 @@ func main() {
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
-		log.Println("Server cipher is", *flCipher)
+		log.Println("server cipher is", *flCipher)
 		if *flDnserv != "" {
 			daze.Resolve(*flDnserv)
-			log.Println("Domain server is", *flDnserv)
+			log.Println("domain server is", *flDnserv)
 		}
 		switch *flEngine {
 		case "ashe":
@@ -82,11 +82,11 @@ func main() {
 			}
 			f.Close()
 		}
-		log.Println("Remote server is", *flServer)
-		log.Println("Client cipher is", *flCipher)
+		log.Println("remote server is", *flServer)
+		log.Println("client cipher is", *flCipher)
 		if *flDnserv != "" {
 			daze.Resolve(*flDnserv)
-			log.Println("Domain server is", *flDnserv)
+			log.Println("domain server is", *flDnserv)
 		}
 		var client daze.Dialer
 		switch *flEngine {
@@ -98,16 +98,16 @@ func main() {
 			log.Panicln("daze: unknown engine", *flEngine)
 		}
 		squire := daze.NewSquire(client)
-		log.Println("Load rule", *flRulels)
+		log.Println("load rule", *flRulels)
 		if err := squire.Rulels.Load(*flRulels); err != nil {
 			log.Panicln(err)
 		}
-		log.Println("Load rule reserved IPv4/6 CIDRs")
+		log.Println("load rule reserved IPv4/6 CIDRs")
 		squire.IPNets = append(squire.IPNets, daze.IPv4ReservedIPNet()...)
 		squire.IPNets = append(squire.IPNets, daze.IPv6ReservedIPNet()...)
-		log.Println("Load rule CN(China PR) CIDRs")
+		log.Println("load rule CN(China PR) CIDRs")
 		ipnets := daze.CNIPNet()
-		log.Println("Find", len(ipnets), "IP nets")
+		log.Println("find", len(ipnets), "IP nets")
 		squire.IPNets = append(squire.IPNets, ipnets...)
 		locale := daze.NewLocale(*flListen, squire)
 		if err := locale.Run(); err != nil {

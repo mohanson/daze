@@ -79,7 +79,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) Run() error {
-	log.Println("Listen and serve on", s.Listen)
+	log.Println("listen and serve on", s.Listen)
 	return http.ListenAndServe(s.Listen, s)
 }
 

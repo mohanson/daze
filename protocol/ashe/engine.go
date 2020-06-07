@@ -73,7 +73,7 @@ func (s *Server) Serve(conn io.ReadWriteCloser) error {
 		return err
 	}
 	dst = string(buf[12 : 12+buf[11]])
-	log.Println("Connect[ashe]", dst)
+	log.Println("connect[ashe]", dst)
 	serv, err = net.DialTimeout("tcp", dst, time.Second*4)
 	if err != nil {
 		return err
@@ -90,7 +90,7 @@ func (s *Server) Run() error {
 		return err
 	}
 	defer ln.Close()
-	log.Println("Listen and serve on", s.Listen)
+	log.Println("listen and serve on", s.Listen)
 
 	for {
 		conn, err := ln.Accept()
@@ -134,8 +134,8 @@ func (c *Client) DialConn(conn io.ReadWriteCloser, network string, address strin
 	rand.Read(buf[:128])
 	conn.Write(buf[:128])
 	conn = daze.Gravity(conn, append(buf[:128], c.Cipher[:]...))
-	buf[0x00] = 0xFF
-	buf[0x01] = 0xFF
+	buf[0x00] = 0xff
+	buf[0x01] = 0xff
 	binary.BigEndian.PutUint64(buf[2:10], uint64(time.Now().Unix()))
 	buf[0x0a] = 0x01
 	buf[0x0b] = uint8(n)
