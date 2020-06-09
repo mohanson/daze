@@ -14,7 +14,7 @@ $ cd daze
 $ go run cmd/make/main.go develop
 ```
 
-Build results will be saved in directory `bin/develop`. You can just keep this directory, all other files are not required.
+Build results will be saved in directory `bin`. You can just keep this directory, all other files are not required.
 
 Daze is dead simple to use:
 
