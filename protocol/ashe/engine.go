@@ -30,8 +30,8 @@ import (
 //
 // - OTA: random 128 bytes for rc4 key
 // - Handshake: must be 0xFF, 0xFF
-// - Time: Timestamp of request
-// - RSV: Reserved
+// - Time: timestamp of request
+// - RSV: reserved
 // - DST.Len: len of DST. If DST is https://google.com, DST.Len is 0x12
 // - DST: desired destination address
 
