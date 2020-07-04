@@ -213,8 +213,8 @@ type Locale struct {
 // Firefox always sends traffic from different sites to the one persistent
 // connection. I have been debugging for a long time.
 // Fuck.
-func (l *Locale) ServeProxy(conn io.ReadWriteCloser) error {
-	reader := bufio.NewReader(conn)
+func (l *Locale) ServeProxy(app io.ReadWriteCloser) error {
+	reader := bufio.NewReader(app)
 
 	for {
 		if err := func() error {
@@ -230,39 +230,39 @@ func (l *Locale) ServeProxy(conn io.ReadWriteCloser) error {
 				port = r.URL.Port()
 			}
 
-			serv, err := l.Dialer.Dial("tcp", r.URL.Hostname()+":"+port)
+			srv, err := l.Dialer.Dial("tcp", r.URL.Hostname()+":"+port)
 			if err != nil {
 				return err
 			}
-			defer serv.Close()
-			servReader := bufio.NewReader(serv)
+			defer srv.Close()
+			servReader := bufio.NewReader(srv)
 
 			if r.Method == "CONNECT" {
 				log.Println("connect[tunnel]", r.URL.Hostname()+":"+port)
-				_, err := conn.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+				_, err := app.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
 				if err != nil {
 					return err
 				}
-				Link(conn, serv)
+				Link(app, srv)
 				return nil
 			}
 
 			log.Println("connect[hproxy]", r.URL.Hostname()+":"+port)
 			if r.Method == "GET" && r.Header.Get("Upgrade") == "websocket" {
-				if err := r.Write(serv); err != nil {
+				if err := r.Write(srv); err != nil {
 					return err
 				}
-				Link(conn, serv)
+				Link(app, srv)
 				return nil
 			}
-			if err := r.Write(serv); err != nil {
+			if err := r.Write(srv); err != nil {
 				return err
 			}
 			resp, err := http.ReadResponse(servReader, r)
 			if err != nil {
 				return err
 			}
-			return resp.Write(conn)
+			return resp.Write(app)
 		}(); err != nil {
 			break
 		}
@@ -275,9 +275,9 @@ func (l *Locale) ServeProxy(conn io.ReadWriteCloser) error {
 // Introduction:
 //   See https://en.wikipedia.org/wiki/SOCKS
 //   See http://ftp.icm.edu.pl/packages/socks/socks4/SOCKS4.protocol
-func (l *Locale) ServeSocks4(conn io.ReadWriteCloser) error {
+func (l *Locale) ServeSocks4(app io.ReadWriteCloser) error {
 	var (
-		reader    = bufio.NewReader(conn)
+		reader    = bufio.NewReader(app)
 		fCode     uint8
 		fDstPort  = make([]byte, 2)
 		fDstIP    = make([]byte, 4)
@@ -285,13 +285,13 @@ func (l *Locale) ServeSocks4(conn io.ReadWriteCloser) error {
 		dstHost   string
 		dstPort   uint16
 		dst       string
-		serv      io.ReadWriteCloser
+		srv       io.ReadWriteCloser
 		err       error
 	)
-	conn = ReadWriteCloser{
+	app = ReadWriteCloser{
 		Reader: reader,
-		Writer: conn,
-		Closer: conn,
+		Writer: app,
+		Closer: app,
 	}
 	reader.Discard(1)
 	fCode, _ = reader.ReadByte()
@@ -316,15 +316,16 @@ func (l *Locale) ServeSocks4(conn io.ReadWriteCloser) error {
 	log.Println("connect[socks4]", dst)
 	switch fCode {
 	case 0x01:
-		serv, err = l.Dialer.Dial("tcp", dst)
+		srv, err = l.Dialer.Dial("tcp", dst)
 		if err != nil {
-			conn.Write([]byte{0x00, 0x5b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+			app.Write([]byte{0x00, 0x5b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 			return err
+		} else {
+			defer srv.Close()
+			app.Write([]byte{0x00, 0x5a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+			Link(app, srv)
+			return nil
 		}
-		defer serv.Close()
-		conn.Write([]byte{0x00, 0x5a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-		Link(conn, serv)
-		return nil
 	case 0x02:
 	}
 	return nil
@@ -335,9 +336,9 @@ func (l *Locale) ServeSocks4(conn io.ReadWriteCloser) error {
 // Introduction:
 //   See https://en.wikipedia.org/wiki/SOCKS
 //   See https://tools.ietf.org/html/rfc1928
-func (l *Locale) ServeSocks5(conn io.ReadWriteCloser) error {
+func (l *Locale) ServeSocks5(app io.ReadWriteCloser) error {
 	var (
-		reader   = bufio.NewReader(conn)
+		reader   = bufio.NewReader(app)
 		fN       uint8
 		fCmd     uint8
 		fAT      uint8
@@ -346,18 +347,18 @@ func (l *Locale) ServeSocks5(conn io.ReadWriteCloser) error {
 		dstHost  string
 		dstPort  uint16
 		dst      string
-		serv     io.ReadWriteCloser
+		srv      io.ReadWriteCloser
 		err      error
 	)
-	conn = ReadWriteCloser{
+	app = ReadWriteCloser{
 		Reader: reader,
-		Writer: conn,
-		Closer: conn,
+		Writer: app,
+		Closer: app,
 	}
 	reader.Discard(1)
 	fN, _ = reader.ReadByte()
 	reader.Discard(int(fN))
-	conn.Write([]byte{0x05, 0x00})
+	app.Write([]byte{0x05, 0x00})
 	reader.Discard(1)
 	fCmd, _ = reader.ReadByte()
 	reader.Discard(1)
@@ -377,7 +378,7 @@ func (l *Locale) ServeSocks5(conn io.ReadWriteCloser) error {
 		io.ReadFull(reader, fDstAddr)
 		dstHost = net.IP(fDstAddr).String()
 	}
-	if _, err = io.ReadFull(conn, fDstPort); err != nil {
+	if _, err = io.ReadFull(app, fDstPort); err != nil {
 		return err
 	}
 	dstPort = binary.BigEndian.Uint16(fDstPort)
@@ -385,19 +386,20 @@ func (l *Locale) ServeSocks5(conn io.ReadWriteCloser) error {
 	log.Println("connect[socks5]", dst)
 	switch fCmd {
 	case 0x01:
-		serv, err = l.Dialer.Dial("tcp", dst)
+		srv, err = l.Dialer.Dial("tcp", dst)
 		if err != nil {
-			conn.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+			app.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 			return err
+		} else {
+			defer srv.Close()
+			app.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+			Link(app, srv)
+			return nil
 		}
-		defer serv.Close()
-		conn.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-		Link(conn, serv)
-		return nil
 	case 0x02:
-		log.Fatalln("")
+		log.Fatalln("unreachable")
 	case 0x03:
-		l.ServeSocks5UDP(conn)
+		return l.ServeSocks5UDP(app)
 	}
 	return nil
 }
@@ -491,47 +493,47 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 
 // We should be very clear about what it does. It judges the traffic type and
 // processes it with a different handler(ServeProxy/ServeSocks4/ServeSocks5).
-func (l *Locale) Serve(conn io.ReadWriteCloser) error {
+func (l *Locale) Serve(app io.ReadWriteCloser) error {
 	var (
 		buf = make([]byte, 1)
 		err error
 	)
-	_, err = io.ReadFull(conn, buf)
+	_, err = io.ReadFull(app, buf)
 	if err != nil {
 		return err
 	}
-	conn = ReadWriteCloser{
-		Reader: io.MultiReader(bytes.NewReader(buf), conn),
-		Writer: conn,
-		Closer: conn,
+	app = ReadWriteCloser{
+		Reader: io.MultiReader(bytes.NewReader(buf), app),
+		Writer: app,
+		Closer: app,
 	}
 	if buf[0] == 0x05 {
-		return l.ServeSocks5(conn)
+		return l.ServeSocks5(app)
 	}
 	if buf[0] == 0x04 {
-		return l.ServeSocks4(conn)
+		return l.ServeSocks4(app)
 	}
-	return l.ServeProxy(conn)
+	return l.ServeProxy(app)
 }
 
 // Run.
 func (l *Locale) Run() error {
-	ln, err := net.Listen("tcp", l.Listen)
+	s, err := net.Listen("tcp", l.Listen)
 	if err != nil {
 		return err
 	}
-	defer ln.Close()
+	defer s.Close()
 	log.Println("listen and serve on", l.Listen)
 
 	for {
-		conn, err := ln.Accept()
+		c, err := s.Accept()
 		if err != nil {
 			log.Println(err)
 			continue
 		}
 		go func() {
-			defer conn.Close()
-			if err := l.Serve(conn); err != nil {
+			defer c.Close()
+			if err := l.Serve(c); err != nil {
 				log.Println(err)
 			}
 		}()
