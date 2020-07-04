@@ -10,6 +10,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"math"
 	"net"
@@ -406,6 +407,7 @@ func (l *Locale) ServeSocks5(app io.ReadWriteCloser) error {
 }
 
 func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
+	defer app.Close()
 	bndAddr, _ := net.ResolveUDPAddr("udp", "127.0.0.1:0")
 	bnd, _ := net.ListenUDP("udp", bndAddr)
 	defer bnd.Close()
@@ -414,80 +416,83 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 	binary.BigEndian.PutUint16(r[8:10], bndPort)
 	app.Write(r)
 
-	var (
-		buf      = make([]byte, 65536)
-		fDstAddr []byte
-		fDstPort []byte
-		fHead    []byte
-		fData    []byte
-		dstHost  string
-		dstPort  uint16
-		dst      string
-		pool     map[string]*net.UDPConn
-	)
+	go func() {
+		io.Copy(ioutil.Discard, app)
+		bnd.Close()
+	}()
 
+	var (
+		buf     = make([]byte, 65536)
+		dstHost string
+		dstPort uint16
+		dst     = ""
+		srv     = map[string]*net.UDPConn{}
+	)
 	for {
 		n, _, err := bnd.ReadFromUDP(buf)
 		if err != nil {
 			break
 		}
+
+		l := 0
 		switch buf[3] {
 		case 0x01:
-			fDstAddr = buf[4:8]
-			fDstPort = buf[8:10]
-			fHead = buf[:10]
-			fData = buf[10:n]
-			dstHost = net.IP(fDstAddr).String()
+			l = 10
 		case 0x03:
-			m := buf[4]
-			fDstAddr = buf[5 : 5+m]
-			fDstPort = buf[5+m : 7+m]
-			fHead = buf[:7+m]
-			fData = buf[7+m : n]
-			dstHost = string(fDstAddr)
+			l = int(buf[4]) + 7
 		case 0x04:
-			fDstAddr = buf[4:20]
-			fDstPort = buf[20:22]
-			fHead = buf[:22]
-			fData = buf[22:n]
-			dstHost = net.IP(fDstAddr).String()
+			l = 22
 		}
-		dstPort = binary.BigEndian.Uint16(fDstPort)
+
+		head := make([]byte, l)
+		copy(head, buf[0:l])
+		data := make([]byte, n-l)
+		copy(data, buf[l:n])
+
+		switch head[3] {
+		case 0x01:
+			dstHost = net.IP(head[4:8]).String()
+			dstPort = binary.BigEndian.Uint16(head[8:10])
+		case 0x03:
+			l := head[4]
+			dstHost = string(head[5 : 5+l])
+			dstPort = binary.BigEndian.Uint16(head[5+l : 7+l])
+		case 0x04:
+			dstHost = net.IP(buf[4:20]).String()
+			dstPort = binary.BigEndian.Uint16(buf[20:22])
+		}
 		dst = dstHost + ":" + strconv.Itoa(int(dstPort))
-		log.Println(dst, fHead, fData)
+		log.Println(dst, head, data)
 
-		udpc, ok := pool[dst]
-		if !ok {
-			addr, err := net.ResolveUDPAddr("udp", dst)
+		ep, b := srv[dst]
+		if !b {
+			a, err := net.ResolveUDPAddr("udp", dst)
 			if err != nil {
-				log.Println(err)
 				break
 			}
-			udpc, err = net.DialUDP("udp", nil, addr)
+			c, err := net.DialUDP("udp", nil, a)
 			if err != nil {
-				log.Println(err)
 				break
 			}
+			srv[dst] = c
+			ep = c
 
-			header := make([]byte, len(fHead))
-			copy(header, fHead)
-			go func(header []byte) {
+			go func(c *net.UDPConn, head []byte) {
 				buf := make([]byte, 65536)
 				for {
-					n, _, err := udpc.ReadFromUDP(buf)
+					n, _, err := c.ReadFromUDP(buf)
 					if err != nil {
-						log.Println(err)
 						break
 					}
 
-					tbuf := make([]byte, len(header)+n)
-					copy(tbuf, header)
-					copy(tbuf[len(header):], buf[:n])
-					app.Write(tbuf)
+					tbuf := make([]byte, len(head)+n)
+					copy(tbuf, head)
+					copy(tbuf[len(head):], buf[:n])
+					bnd.Write(tbuf)
 				}
-			}(header)
+			}(c, head)
 		}
-		udpc.Write(fData)
+		ep.Write(data)
 	}
 	return nil
 }
