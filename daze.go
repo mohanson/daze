@@ -13,11 +13,13 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
+	"math/rand"
 	"net"
 	"net/http"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/mohanson/acdb"
 	"github.com/mohanson/aget"
@@ -544,9 +546,14 @@ func (l *Locale) Run() error {
 		}
 		go func() {
 			defer c.Close()
+			b := make([]byte, 8)
+			binary.BigEndian.PutUint64(b, uint64(time.Now().Unix())<<4|uint64(rand.Uint32()))
+			z := string(b)
+			log.Println(z, "new")
 			if err := l.Serve(c); err != nil {
 				log.Println(err)
 			}
+			log.Println(z, "done")
 		}()
 	}
 }
