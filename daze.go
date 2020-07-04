@@ -327,6 +327,7 @@ func (l *Locale) ServeSocks4(app io.ReadWriteCloser) error {
 			return nil
 		}
 	case 0x02:
+		log.Panicln("unreachable")
 	}
 	return nil
 }
@@ -397,7 +398,7 @@ func (l *Locale) ServeSocks5(app io.ReadWriteCloser) error {
 			return nil
 		}
 	case 0x02:
-		log.Fatalln("unreachable")
+		log.Panicln("unreachable")
 	case 0x03:
 		return l.ServeSocks5UDP(app)
 	}
