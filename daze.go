@@ -429,7 +429,7 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 		srv     = map[string]*net.UDPConn{}
 	)
 	for {
-		n, _, err := bnd.ReadFromUDP(buf)
+		n, appAddr, err := bnd.ReadFromUDP(buf)
 		if err != nil {
 			break
 		}
@@ -477,7 +477,7 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 			srv[dst] = c
 			ep = c
 
-			go func(c *net.UDPConn, head []byte) {
+			go func(c *net.UDPConn, head []byte, appAddr *net.UDPAddr) {
 				buf := make([]byte, 65536)
 				for {
 					n, _, err := c.ReadFromUDP(buf)
@@ -488,11 +488,14 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 					tbuf := make([]byte, len(head)+n)
 					copy(tbuf, head)
 					copy(tbuf[len(head):], buf[:n])
-					bnd.Write(tbuf)
+					bnd.WriteToUDP(tbuf, appAddr)
 				}
-			}(c, head)
+			}(c, head, appAddr)
 		}
 		ep.Write(data)
+	}
+	for _, v := range srv {
+		v.Close()
 	}
 	return nil
 }
