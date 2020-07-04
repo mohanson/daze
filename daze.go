@@ -395,6 +395,7 @@ func (l *Locale) ServeSocks5(app io.ReadWriteCloser) error {
 	return nil
 }
 
+// Socks5 TCP protocal.
 func (l *Locale) ServeSocks5TCP(app io.ReadWriteCloser, dst string) error {
 	log.Println("connect[socks5]", dst)
 	srv, err := l.Dialer.Dial("tcp", dst)
@@ -409,6 +410,7 @@ func (l *Locale) ServeSocks5TCP(app io.ReadWriteCloser, dst string) error {
 	}
 }
 
+// Socks5 UDP protocal.
 func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 	defer app.Close()
 	bndAddr, _ := net.ResolveUDPAddr("udp", "127.0.0.1:0")
