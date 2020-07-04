@@ -548,7 +548,7 @@ func (l *Locale) Run() error {
 			defer c.Close()
 			b := make([]byte, 8)
 			binary.BigEndian.PutUint64(b, uint64(time.Now().Unix())<<4|uint64(rand.Uint32()))
-			z := string(b)
+			z := hex.EncodeToString(b)
 			log.Println(z, "new")
 			if err := l.Serve(c); err != nil {
 				log.Println(err)
