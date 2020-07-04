@@ -34,7 +34,7 @@ import (
 // - RSV: reserved
 // - DST.Len: len of DST. If DST is https://google.com, DST.Len is 0x12
 // - DST: desired destination address
-//
+
 // Server implemented the ashe protocol. The ASHE server will typically
 // evaluate the request based on source and destination addresses, and return
 // one or more reply messages, as appropriate for the request type.
