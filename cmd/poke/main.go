@@ -9,14 +9,14 @@ import (
 	"time"
 )
 
-var (
-	flListen = flag.String("l", ":8080", "listen address")
-	flServer = flag.String("s", "127.0.0.1:8080", "server address")
+const (
+	tcpListen = "127.0.0.1:2083"
+	udpListen = "127.0.0.1:2084"
 )
 
 func mainTCPServer() {
-	log.Println("listen and server on", *flListen)
-	l, err := net.Listen("tcp", *flListen)
+	log.Println("listen and server on", tcpListen)
+	l, err := net.Listen("tcp", tcpListen)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -37,7 +37,7 @@ func mainTCPServer() {
 }
 
 func mainTCPClient() {
-	c, err := net.Dial("tcp", *flServer)
+	c, err := net.Dial("tcp", tcpListen)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -51,8 +51,8 @@ func mainTCPClient() {
 }
 
 func mainUDPServer() {
-	log.Println("listen and server on", *flListen)
-	a, err := net.ResolveUDPAddr("udp", *flListen)
+	log.Println("listen and server on", udpListen)
+	a, err := net.ResolveUDPAddr("udp", udpListen)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -74,7 +74,7 @@ func mainUDPServer() {
 }
 
 func mainUDPClient() {
-	c, err := net.Dial("udp", *flServer)
+	c, err := net.Dial("udp", udpListen)
 	if err != nil {
 		log.Panicln(err)
 	}
