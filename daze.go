@@ -349,7 +349,6 @@ func (l *Locale) ServeSocks5(app io.ReadWriteCloser) error {
 		dstHost  string
 		dstPort  uint16
 		dst      string
-		srv      io.ReadWriteCloser
 		err      error
 	)
 	app = ReadWriteCloser{
@@ -385,25 +384,29 @@ func (l *Locale) ServeSocks5(app io.ReadWriteCloser) error {
 	}
 	dstPort = binary.BigEndian.Uint16(fDstPort)
 	dst = dstHost + ":" + strconv.Itoa(int(dstPort))
-	log.Println("connect[socks5]", dst)
 	switch fCmd {
 	case 0x01:
-		srv, err = l.Dialer.Dial("tcp", dst)
-		if err != nil {
-			app.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-			return err
-		} else {
-			defer srv.Close()
-			app.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-			Link(app, srv)
-			return nil
-		}
+		return l.ServeSocks5TCP(app, dst)
 	case 0x02:
 		log.Panicln("unreachable")
 	case 0x03:
 		return l.ServeSocks5UDP(app)
 	}
 	return nil
+}
+
+func (l *Locale) ServeSocks5TCP(app io.ReadWriteCloser, dst string) error {
+	log.Println("connect[socks5]", dst)
+	srv, err := l.Dialer.Dial("tcp", dst)
+	if err != nil {
+		app.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		return err
+	} else {
+		defer srv.Close()
+		app.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		Link(app, srv)
+		return nil
+	}
 }
 
 func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
@@ -416,18 +419,20 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 	binary.BigEndian.PutUint16(r[8:10], bndPort)
 	app.Write(r)
 
+	var (
+		buf = make([]byte, 65536)
+		srv = map[string]*net.UDPConn{}
+	)
+
 	go func() {
 		io.Copy(ioutil.Discard, app)
+		app.Close()
 		bnd.Close()
+		for _, v := range srv {
+			v.Close()
+		}
 	}()
 
-	var (
-		buf     = make([]byte, 65536)
-		dstHost string
-		dstPort uint16
-		dst     = ""
-		srv     = map[string]*net.UDPConn{}
-	)
 	for {
 		n, appAddr, err := bnd.ReadFromUDP(buf)
 		if err != nil {
@@ -444,25 +449,26 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 			l = 22
 		}
 
-		head := make([]byte, l)
-		copy(head, buf[0:l])
-		data := make([]byte, n-l)
-		copy(data, buf[l:n])
+		appHead := make([]byte, l)
+		copy(appHead, buf[0:l])
+		appData := make([]byte, n-l)
+		copy(appData, buf[l:n])
 
-		switch head[3] {
+		dstHost := ""
+		dstPort := uint16(0)
+		switch appHead[3] {
 		case 0x01:
-			dstHost = net.IP(head[4:8]).String()
-			dstPort = binary.BigEndian.Uint16(head[8:10])
+			dstHost = net.IP(appHead[4:8]).String()
+			dstPort = binary.BigEndian.Uint16(appHead[8:10])
 		case 0x03:
-			l := head[4]
-			dstHost = string(head[5 : 5+l])
-			dstPort = binary.BigEndian.Uint16(head[5+l : 7+l])
+			l := appHead[4]
+			dstHost = string(appHead[5 : 5+l])
+			dstPort = binary.BigEndian.Uint16(appHead[5+l : 7+l])
 		case 0x04:
-			dstHost = net.IP(buf[4:20]).String()
-			dstPort = binary.BigEndian.Uint16(buf[20:22])
+			dstHost = net.IP(appHead[4:20]).String()
+			dstPort = binary.BigEndian.Uint16(appHead[20:22])
 		}
-		dst = dstHost + ":" + strconv.Itoa(int(dstPort))
-		log.Println(dst, head, data)
+		dst := dstHost + ":" + strconv.Itoa(int(dstPort))
 
 		ep, b := srv[dst]
 		if !b {
@@ -470,6 +476,7 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 			if err != nil {
 				break
 			}
+			log.Println("connect[socks5]", dst)
 			c, err := net.DialUDP("udp", nil, a)
 			if err != nil {
 				break
@@ -477,25 +484,20 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 			srv[dst] = c
 			ep = c
 
-			go func(c *net.UDPConn, head []byte, appAddr *net.UDPAddr) {
+			go func(srv net.Conn, appHead []byte, appAddr *net.UDPAddr) {
 				buf := make([]byte, 65536)
+				copy(buf, appHead)
+				l := len(appHead)
 				for {
-					n, _, err := c.ReadFromUDP(buf)
+					n, _, err := c.ReadFromUDP(buf[l:])
 					if err != nil {
 						break
 					}
-
-					tbuf := make([]byte, len(head)+n)
-					copy(tbuf, head)
-					copy(tbuf[len(head):], buf[:n])
-					bnd.WriteToUDP(tbuf, appAddr)
+					bnd.WriteToUDP(buf[:l+n], appAddr)
 				}
-			}(c, head, appAddr)
+			}(c, appHead, appAddr)
 		}
-		ep.Write(data)
-	}
-	for _, v := range srv {
-		v.Close()
+		ep.Write(appData)
 	}
 	return nil
 }
