@@ -395,7 +395,96 @@ func (l *Locale) ServeSocks5(conn io.ReadWriteCloser) error {
 		Link(conn, serv)
 		return nil
 	case 0x02:
+		log.Fatalln("")
 	case 0x03:
+		l.ServeSocks5UDP(conn)
+	}
+	return nil
+}
+
+func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
+	bndAddr, _ := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+	bnd, _ := net.ListenUDP("udp", bndAddr)
+	defer bnd.Close()
+	bndPort := uint16(bnd.LocalAddr().(*net.UDPAddr).Port)
+	r := []byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+	binary.BigEndian.PutUint16(r[8:10], bndPort)
+	app.Write(r)
+
+	var (
+		buf      = make([]byte, 65536)
+		fDstAddr []byte
+		fDstPort []byte
+		fHead    []byte
+		fData    []byte
+		dstHost  string
+		dstPort  uint16
+		dst      string
+		pool     map[string]*net.UDPConn
+	)
+
+	for {
+		n, _, err := bnd.ReadFromUDP(buf)
+		if err != nil {
+			break
+		}
+		switch buf[3] {
+		case 0x01:
+			fDstAddr = buf[4:8]
+			fDstPort = buf[8:10]
+			fHead = buf[:10]
+			fData = buf[10:n]
+			dstHost = net.IP(fDstAddr).String()
+		case 0x03:
+			m := buf[4]
+			fDstAddr = buf[5 : 5+m]
+			fDstPort = buf[5+m : 7+m]
+			fHead = buf[:7+m]
+			fData = buf[7+m : n]
+			dstHost = string(fDstAddr)
+		case 0x04:
+			fDstAddr = buf[4:20]
+			fDstPort = buf[20:22]
+			fHead = buf[:22]
+			fData = buf[22:n]
+			dstHost = net.IP(fDstAddr).String()
+		}
+		dstPort = binary.BigEndian.Uint16(fDstPort)
+		dst = dstHost + ":" + strconv.Itoa(int(dstPort))
+		log.Println(dst, fHead, fData)
+
+		udpc, ok := pool[dst]
+		if !ok {
+			addr, err := net.ResolveUDPAddr("udp", dst)
+			if err != nil {
+				log.Println(err)
+				break
+			}
+			udpc, err = net.DialUDP("udp", nil, addr)
+			if err != nil {
+				log.Println(err)
+				break
+			}
+
+			header := make([]byte, len(fHead))
+			copy(header, fHead)
+			go func(header []byte) {
+				buf := make([]byte, 65536)
+				for {
+					n, _, err := udpc.ReadFromUDP(buf)
+					if err != nil {
+						log.Println(err)
+						break
+					}
+
+					tbuf := make([]byte, len(header)+n)
+					copy(tbuf, header)
+					copy(tbuf[len(header):], buf[:n])
+					app.Write(tbuf)
+				}
+			}(header)
+		}
+		udpc.Write(fData)
 	}
 	return nil
 }
