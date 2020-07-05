@@ -423,7 +423,7 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 
 	var (
 		buf = make([]byte, 65536)
-		srv = map[string]io.ReadWriteCloser{}
+		srv = map[string]*net.UDPConn{}
 	)
 
 	go func() {
@@ -441,20 +441,20 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 			break
 		}
 
-		m := 0
+		l := 0
 		switch buf[3] {
 		case 0x01:
-			m = 10
+			l = 10
 		case 0x03:
-			m = int(buf[4]) + 7
+			l = int(buf[4]) + 7
 		case 0x04:
-			m = 22
+			l = 22
 		}
 
-		appHead := make([]byte, m)
-		copy(appHead, buf[0:m])
-		appData := make([]byte, n-m)
-		copy(appData, buf[m:n])
+		appHead := make([]byte, l)
+		copy(appHead, buf[0:l])
+		appData := make([]byte, n-l)
+		copy(appData, buf[l:n])
 
 		dstHost := ""
 		dstPort := uint16(0)
@@ -474,20 +474,24 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 
 		ep, b := srv[dst]
 		if !b {
+			a, err := net.ResolveUDPAddr("udp", dst)
+			if err != nil {
+				break
+			}
 			log.Println("connect[socks5]", dst)
-			c, err := l.Dialer.Dial("udp", dst)
+			c, err := net.DialUDP("udp", nil, a)
 			if err != nil {
 				break
 			}
 			srv[dst] = c
 			ep = c
 
-			go func(srv io.ReadWriteCloser, appHead []byte, appAddr *net.UDPAddr) {
+			go func(srv net.Conn, appHead []byte, appAddr *net.UDPAddr) {
 				buf := make([]byte, 65536)
 				copy(buf, appHead)
 				l := len(appHead)
 				for {
-					n, err := c.Read(buf[l:])
+					n, _, err := c.ReadFromUDP(buf[l:])
 					if err != nil {
 						break
 					}
