@@ -74,7 +74,14 @@ func (s *Server) Serve(conn io.ReadWriteCloser) error {
 	}
 	dst = string(buf[12 : 12+buf[11]])
 	log.Println("connect[ashe]", dst)
-	serv, err = net.DialTimeout("tcp", dst, time.Second*4)
+	switch buf[10] {
+	case 0x01:
+		serv, err = net.DialTimeout("tcp", dst, time.Second*4)
+	case 0x04:
+		serv, err = net.DialTimeout("udp", dst, time.Second*4)
+	default:
+		log.Panicln("unreachable")
+	}
 	if err != nil {
 		return err
 	}
@@ -137,7 +144,14 @@ func (c *Client) DialConn(conn io.ReadWriteCloser, network string, address strin
 	buf[0x00] = 0xff
 	buf[0x01] = 0xff
 	binary.BigEndian.PutUint64(buf[2:10], uint64(time.Now().Unix()))
-	buf[0x0a] = 0x01
+	switch network {
+	case "tcp":
+		buf[0x0a] = 0x01
+	case "udp":
+		buf[0x0a] = 0x04
+	default:
+		log.Panicln("unreachable")
+	}
 	buf[0x0b] = uint8(n)
 	copy(buf[12:], []byte(address))
 	_, err = conn.Write(buf[:12+n])

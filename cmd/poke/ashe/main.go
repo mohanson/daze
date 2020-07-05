@@ -50,5 +50,7 @@ func main() {
 	server := ashe.NewServer(asheSrvListen, cipher)
 	go server.Run()
 	time.Sleep(time.Second)
-	mainUDP()
+	go mainUDP()
+	go mainTCP()
+	select {}
 }
