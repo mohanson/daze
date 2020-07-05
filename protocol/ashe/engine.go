@@ -77,7 +77,7 @@ func (s *Server) Serve(conn io.ReadWriteCloser) error {
 	switch buf[10] {
 	case 0x01:
 		serv, err = net.DialTimeout("tcp", dst, time.Second*4)
-	case 0x04:
+	case 0x03:
 		serv, err = net.DialTimeout("udp", dst, time.Second*4)
 	default:
 		log.Panicln("unreachable")
@@ -148,7 +148,7 @@ func (c *Client) DialConn(conn io.ReadWriteCloser, network string, address strin
 	case "tcp":
 		buf[0x0a] = 0x01
 	case "udp":
-		buf[0x0a] = 0x04
+		buf[0x0a] = 0x03
 	default:
 		log.Panicln("unreachable")
 	}
