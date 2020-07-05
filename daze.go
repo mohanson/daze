@@ -422,7 +422,7 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 	app.Write(r)
 
 	var (
-		buf = make([]byte, 65536)
+		buf = make([]byte, 2048)
 		srv = map[string]*net.UDPConn{}
 	)
 
@@ -439,6 +439,9 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 		n, appAddr, err := bnd.ReadFromUDP(buf)
 		if err != nil {
 			break
+		}
+		if n >= 2048 {
+			log.Panicln("unreachable")
 		}
 
 		l := 0
@@ -487,13 +490,16 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 			ep = c
 
 			go func(srv net.Conn, appHead []byte, appAddr *net.UDPAddr) {
-				buf := make([]byte, 65536)
+				buf := make([]byte, 2048)
 				copy(buf, appHead)
 				l := len(appHead)
 				for {
 					n, _, err := c.ReadFromUDP(buf[l:])
 					if err != nil {
 						break
+					}
+					if n >= 2048-l {
+						log.Panicln("unreachable")
 					}
 					bnd.WriteToUDP(buf[:l+n], appAddr)
 				}
