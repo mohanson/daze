@@ -45,8 +45,7 @@ func mainTCPClient() {
 	go io.Copy(os.Stdout, c)
 	for range time.NewTicker(time.Second).C {
 		m := time.Now().Format(time.RFC1123)
-		c.Write([]byte(m))
-		c.Write([]byte("\n"))
+		c.Write([]byte(m + "\n"))
 	}
 }
 
@@ -82,8 +81,7 @@ func mainUDPClient() {
 	go io.Copy(os.Stdout, c)
 	for range time.NewTicker(time.Second).C {
 		m := time.Now().Format(time.RFC1123)
-		c.Write([]byte(m))
-		c.Write([]byte("\n"))
+		c.Write([]byte(m + "\n"))
 	}
 }
 
