@@ -73,6 +73,7 @@ func main() {
 			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
 			flRulels = flag.String("r", ddir.Join("rule.ls"), "rule path")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
+			flFilter = flag.String("f", "ipcn", "filter {ipcn, none}")
 		)
 		flag.Parse()
 		if _, err := os.Stat(ddir.Join("rule.ls")); err != nil {
@@ -105,10 +106,12 @@ func main() {
 		log.Println("load rule reserved IPv4/6 CIDRs")
 		squire.IPNets = append(squire.IPNets, daze.IPv4ReservedIPNet()...)
 		squire.IPNets = append(squire.IPNets, daze.IPv6ReservedIPNet()...)
-		log.Println("load rule CN(China PR) CIDRs")
-		ipnets := daze.CNIPNet()
-		log.Println("find", len(ipnets), "IP nets")
-		squire.IPNets = append(squire.IPNets, ipnets...)
+		if *flFilter == "ipcn" {
+			log.Println("load rule CN(China PR) CIDRs")
+			ipnets := daze.CNIPNet()
+			log.Println("find", len(ipnets), "IP nets")
+			squire.IPNets = append(squire.IPNets, ipnets...)
+		}
 		locale := daze.NewLocale(*flListen, squire)
 		if err := locale.Run(); err != nil {
 			log.Panicln(err)

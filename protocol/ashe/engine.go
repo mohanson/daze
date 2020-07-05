@@ -44,20 +44,20 @@ type Server struct {
 }
 
 // Serve.
-func (s *Server) Serve(conn io.ReadWriteCloser) error {
+func (s *Server) Serve(cli io.ReadWriteCloser) error {
 	var (
-		buf  = make([]byte, 1024)
-		dst  string
-		serv io.ReadWriteCloser
-		err  error
+		buf = make([]byte, 1024)
+		dst string
+		srv io.ReadWriteCloser
+		err error
 	)
-	_, err = io.ReadFull(conn, buf[:128])
+	_, err = io.ReadFull(cli, buf[:128])
 	if err != nil {
 		return err
 	}
-	conn = daze.Gravity(conn, append(buf[:128], s.Cipher[:]...))
+	cli = daze.Gravity(cli, append(buf[:128], s.Cipher[:]...))
 
-	_, err = io.ReadFull(conn, buf[:12])
+	_, err = io.ReadFull(cli, buf[:12])
 	if err != nil {
 		return err
 	}
@@ -68,18 +68,25 @@ func (s *Server) Serve(conn io.ReadWriteCloser) error {
 	if math.Abs(float64(time.Now().Unix()-d)) > 120 {
 		return fmt.Errorf("daze: expired: %v", time.Unix(d, 0))
 	}
-	_, err = io.ReadFull(conn, buf[12:12+buf[11]])
+	_, err = io.ReadFull(cli, buf[12:12+buf[11]])
 	if err != nil {
 		return err
 	}
 	dst = string(buf[12 : 12+buf[11]])
 	log.Println("connect[ashe]", dst)
-	serv, err = net.DialTimeout("tcp", dst, time.Second*4)
+	switch buf[10] {
+	case 0x01:
+		srv, err = net.DialTimeout("tcp", dst, time.Second*4)
+	case 0x03:
+		srv, err = net.DialTimeout("udp", dst, time.Second*4)
+	default:
+		return fmt.Errorf("daze: the network must be tcp or udp")
+	}
 	if err != nil {
 		return err
 	}
-	defer serv.Close()
-	daze.Link(conn, serv)
+	defer srv.Close()
+	daze.Link(cli, srv)
 	return nil
 }
 
@@ -93,14 +100,14 @@ func (s *Server) Run() error {
 	log.Println("listen and serve on", s.Listen)
 
 	for {
-		conn, err := ln.Accept()
+		cli, err := ln.Accept()
 		if err != nil {
 			log.Println(err)
 			continue
 		}
 		go func() {
-			defer conn.Close()
-			if err := s.Serve(conn); err != nil {
+			defer cli.Close()
+			if err := s.Serve(cli); err != nil {
 				log.Println(err)
 			}
 		}()
@@ -122,7 +129,7 @@ type Client struct {
 	Cipher [16]byte
 }
 
-func (c *Client) DialConn(conn io.ReadWriteCloser, network string, address string) (io.ReadWriteCloser, error) {
+func (c *Client) DialConn(srv io.ReadWriteCloser, network string, address string) (io.ReadWriteCloser, error) {
 	var (
 		buf = make([]byte, 512)
 		n   = len(address)
@@ -132,19 +139,26 @@ func (c *Client) DialConn(conn io.ReadWriteCloser, network string, address strin
 		return nil, fmt.Errorf("daze: destination address too long: %s", address)
 	}
 	rand.Read(buf[:128])
-	conn.Write(buf[:128])
-	conn = daze.Gravity(conn, append(buf[:128], c.Cipher[:]...))
+	srv.Write(buf[:128])
+	srv = daze.Gravity(srv, append(buf[:128], c.Cipher[:]...))
 	buf[0x00] = 0xff
 	buf[0x01] = 0xff
 	binary.BigEndian.PutUint64(buf[2:10], uint64(time.Now().Unix()))
-	buf[0x0a] = 0x01
+	switch network {
+	case "tcp":
+		buf[0x0a] = 0x01
+	case "udp":
+		buf[0x0a] = 0x03
+	default:
+		return nil, fmt.Errorf("daze: the network must be tcp or udp")
+	}
 	buf[0x0b] = uint8(n)
 	copy(buf[12:], []byte(address))
-	_, err = conn.Write(buf[:12+n])
+	_, err = srv.Write(buf[:12+n])
 	if err != nil {
 		return nil, err
 	}
-	return conn, nil
+	return srv, nil
 }
 
 // Dial. It is similar to the server, the only difference is that it constructs
@@ -152,11 +166,11 @@ func (c *Client) DialConn(conn io.ReadWriteCloser, network string, address strin
 // socks5 official library. That is a good code which is opened with
 // expectation, and closed with delight and profit.
 func (c *Client) Dial(network string, address string) (io.ReadWriteCloser, error) {
-	conn, err := net.DialTimeout("tcp", c.Server, time.Second*4)
+	srv, err := net.DialTimeout("tcp", c.Server, time.Second*4)
 	if err != nil {
 		return nil, err
 	}
-	return c.DialConn(conn, network, address)
+	return c.DialConn(srv, network, address)
 }
 
 // NewClient returns a new Client. A secret data needs to be passed in Cipher,
