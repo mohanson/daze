@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	tcpListen = "127.0.0.1:2083"
-	udpListen = "127.0.0.1:2084"
+	tcpListen = ":2083"
+	udpListen = ":2084"
 )
 
 func mainTCPServer() {
