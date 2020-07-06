@@ -2,7 +2,6 @@ package main
 
 import (
 	"io"
-	"log"
 	"os"
 	"time"
 
@@ -20,7 +19,7 @@ func mainTCP() {
 	client := ashe.NewClient(asheSrvListen, cipher)
 	c, err := client.Dial("tcp", pokeTCPServer)
 	if err != nil {
-		log.Panicln(err)
+		panic(err)
 	}
 	defer c.Close()
 	go io.Copy(os.Stdout, c)
@@ -34,7 +33,7 @@ func mainUDP() {
 	client := ashe.NewClient(asheSrvListen, cipher)
 	c, err := client.Dial("udp", pokeUDPServer)
 	if err != nil {
-		log.Panicln(err)
+		panic(err)
 	}
 	defer c.Close()
 	go io.Copy(os.Stdout, c)

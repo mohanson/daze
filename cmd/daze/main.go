@@ -10,7 +10,6 @@ import (
 
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/protocol/ashe"
-	"github.com/mohanson/daze/protocol/asheshadow"
 	"github.com/mohanson/ddir"
 )
 
@@ -30,7 +29,7 @@ func main() {
 	}
 	p, err := os.Executable()
 	if err != nil {
-		log.Panicln(err)
+		panic(err)
 	}
 	ddir.Base(filepath.Dir(p))
 	subCommand := os.Args[1]
@@ -40,8 +39,6 @@ func main() {
 		var (
 			flListen = flag.String("l", "0.0.0.0:1081", "listen address")
 			flCipher = flag.String("k", "daze", "cipher, for encryption")
-			flMasker = flag.String("m", "http://httpbin.org", "masker, for confusion")
-			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
@@ -50,27 +47,15 @@ func main() {
 			daze.Resolve(*flDnserv)
 			log.Println("domain server is", *flDnserv)
 		}
-		switch *flEngine {
-		case "ashe":
-			server := ashe.NewServer(*flListen, *flCipher)
-			if err := server.Run(); err != nil {
-				log.Panicln(err)
-			}
-		case "asheshadow":
-			server := asheshadow.NewServer(*flListen, *flCipher)
-			server.Masker = *flMasker
-			if err := server.Run(); err != nil {
-				log.Panicln(err)
-			}
-		default:
-			log.Panicln(*flEngine, "is not an engine")
+		server := ashe.NewServer(*flListen, *flCipher)
+		if err := server.Run(); err != nil {
+			panic(err)
 		}
 	case "client":
 		var (
 			flListen = flag.String("l", "127.0.0.1:1080", "listen address")
 			flServer = flag.String("s", "127.0.0.1:1081", "server address")
 			flCipher = flag.String("k", "daze", "cipher, for encryption")
-			flEngine = flag.String("e", "ashe", "engine {ashe, asheshadow}")
 			flRulels = flag.String("r", ddir.Join("rule.ls"), "rule path")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 			flFilter = flag.String("f", "ipcn", "filter {ipcn, none}")
@@ -79,7 +64,7 @@ func main() {
 		if _, err := os.Stat(ddir.Join("rule.ls")); err != nil {
 			f, er := os.Create(ddir.Join("rule.ls"))
 			if er != nil {
-				log.Panicln(er)
+				panic(er)
 			}
 			f.Close()
 		}
@@ -89,19 +74,11 @@ func main() {
 			daze.Resolve(*flDnserv)
 			log.Println("domain server is", *flDnserv)
 		}
-		var client daze.Dialer
-		switch *flEngine {
-		case "ashe":
-			client = ashe.NewClient(*flServer, *flCipher)
-		case "asheshadow":
-			client = asheshadow.NewClient(*flServer, *flCipher)
-		default:
-			log.Panicln("daze: unknown engine", *flEngine)
-		}
+		client := ashe.NewClient(*flServer, *flCipher)
 		squire := daze.NewSquire(client)
 		log.Println("load rule", *flRulels)
 		if err := squire.Rulels.Load(*flRulels); err != nil {
-			log.Panicln(err)
+			panic(err)
 		}
 		log.Println("load rule reserved IPv4/6 CIDRs")
 		squire.IPNets = append(squire.IPNets, daze.IPv4ReservedIPNet()...)
@@ -114,7 +91,7 @@ func main() {
 		}
 		locale := daze.NewLocale(*flListen, squire)
 		if err := locale.Run(); err != nil {
-			log.Panicln(err)
+			panic(err)
 		}
 	case "cmd":
 		var (
@@ -131,7 +108,7 @@ func main() {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			log.Panicln(err)
+			panic(err)
 		}
 	default:
 		fmt.Println(help)

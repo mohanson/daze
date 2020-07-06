@@ -149,7 +149,7 @@ func CNIPNet() []*net.IPNet {
 	name := ddir.Join("delegated-apnic-latest")
 	f, err := aget.Open(name)
 	if err != nil {
-		log.Panicln(err)
+		panic(err)
 	}
 	defer f.Close()
 	r := []*net.IPNet{}
@@ -164,12 +164,12 @@ func CNIPNet() []*net.IPNet {
 			seps := strings.Split(line, "|")
 			sep4, err := strconv.Atoi(seps[4])
 			if err != nil {
-				log.Panicln(err)
+				panic(err)
 			}
 			mask := 32 - int(math.Log2(float64(sep4)))
 			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%d", seps[3], mask))
 			if err != nil {
-				log.Panicln(err)
+				panic(err)
 			}
 			r = append(r, cidr)
 		case strings.HasPrefix(line, "apnic|CN|ipv6"):
@@ -177,7 +177,7 @@ func CNIPNet() []*net.IPNet {
 			sep4 := seps[4]
 			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%s", seps[3], sep4))
 			if err != nil {
-				log.Panicln(err)
+				panic(err)
 			}
 			r = append(r, cidr)
 		}
@@ -328,7 +328,7 @@ func (l *Locale) ServeSocks4(app io.ReadWriteCloser) error {
 			return nil
 		}
 	case 0x02:
-		log.Panicln("unreachable")
+		panic("unreachable")
 	}
 	return nil
 }
@@ -388,7 +388,7 @@ func (l *Locale) ServeSocks5(app io.ReadWriteCloser) error {
 	case 0x01:
 		return l.ServeSocks5TCP(app, dst)
 	case 0x02:
-		log.Panicln("unreachable")
+		panic("unreachable")
 	case 0x03:
 		return l.ServeSocks5UDP(app)
 	}
@@ -607,7 +607,7 @@ func (r *Rulels) Road(host string) RoadMode {
 	for p, i := range r.Dict {
 		b, err := filepath.Match(p, host)
 		if err != nil {
-			log.Panicln(err)
+			panic(err)
 		}
 		if !b {
 			continue
@@ -675,7 +675,7 @@ func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error
 		case MRemote:
 			return s.Dialer.Dial(network, address)
 		}
-		log.Panicln("unreachable")
+		panic("unreachable")
 	}
 	switch s.Rulels.Road(host) {
 	case MLocale:

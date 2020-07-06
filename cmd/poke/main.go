@@ -20,7 +20,7 @@ func mainTCPServer() {
 	log.Println("listen and server on", tcpListen)
 	l, err := net.Listen("tcp", tcpListen)
 	if err != nil {
-		log.Panicln(err)
+		panic(err)
 	}
 	defer l.Close()
 	for {
@@ -42,7 +42,7 @@ func mainTCPClient() {
 	tcpServer := fmt.Sprintf("127.0.0.1:%d", tcpListenPort)
 	c, err := net.Dial("tcp", tcpServer)
 	if err != nil {
-		log.Panicln(err)
+		panic(err)
 	}
 	defer c.Close()
 	go io.Copy(os.Stdout, c)
@@ -57,11 +57,11 @@ func mainUDPServer() {
 	log.Println("listen and server on", udpListen)
 	a, err := net.ResolveUDPAddr("udp", udpListen)
 	if err != nil {
-		log.Panicln(err)
+		panic(err)
 	}
 	c, err := net.ListenUDP("udp", a)
 	if err != nil {
-		log.Panicln(err)
+		panic(err)
 	}
 	defer c.Close()
 
@@ -80,7 +80,7 @@ func mainUDPClient() {
 	udpServer := fmt.Sprintf(":%d", udpListenPort)
 	c, err := net.Dial("udp", udpServer)
 	if err != nil {
-		log.Panicln(err)
+		panic(err)
 	}
 	defer c.Close()
 	go io.Copy(os.Stdout, c)

@@ -35,6 +35,37 @@ import (
 // - DST.Len: len of DST. If DST is https://google.com, DST.Len is 0x12
 // - DST: desired destination address
 
+type TCPConn struct {
+	io.ReadWriteCloser
+}
+
+type UDPConn struct {
+	io.ReadWriteCloser
+}
+
+func (c *UDPConn) Close() error {
+	return c.Close()
+}
+
+func (c *UDPConn) Read(p []byte) (int, error) {
+	_, err := c.ReadWriteCloser.Read(p[:4])
+	if err != nil {
+		return 0, err
+	}
+	n := binary.BigEndian.Uint32(p[:4])
+	return io.ReadFull(c.ReadWriteCloser, p[:n])
+}
+
+func (c *UDPConn) Write(p []byte) (int, error) {
+	if len(p) > math.MaxUint32 {
+		panic("unreachable")
+	}
+	b := make([]byte, 4)
+	binary.BigEndian.PutUint32(b, uint32(len(p)))
+	c.ReadWriteCloser.Write(b)
+	return c.ReadWriteCloser.Write(p)
+}
+
 // Server implemented the ashe protocol. The ASHE server will typically
 // evaluate the request based on source and destination addresses, and return
 // one or more reply messages, as appropriate for the request type.
@@ -77,10 +108,11 @@ func (s *Server) Serve(cli io.ReadWriteCloser) error {
 	switch buf[10] {
 	case 0x01:
 		srv, err = net.DialTimeout("tcp", dst, time.Second*4)
+		srv = &TCPConn{srv}
 	case 0x03:
 		srv, err = net.DialTimeout("udp", dst, time.Second*4)
-	default:
-		return fmt.Errorf("daze: the network must be tcp or udp")
+		cli = &UDPConn{cli}
+		srv = &UDPConn{srv}
 	}
 	if err != nil {
 		return err
@@ -129,14 +161,26 @@ type Client struct {
 	Cipher [16]byte
 }
 
-func (c *Client) DialConn(srv io.ReadWriteCloser, network string, address string) (io.ReadWriteCloser, error) {
+// Dial. It is similar to the server, the only difference is that it constructs
+// the data and the server parses the data. This code I refer to the golang
+// socks5 official library. That is a good code which is opened with
+// expectation, and closed with delight and profit.
+func (c *Client) Dial(network string, address string) (io.ReadWriteCloser, error) {
 	var (
-		buf = make([]byte, 512)
+		srv io.ReadWriteCloser
 		n   = len(address)
+		buf = make([]byte, 512)
 		err error
 	)
 	if n > 256 {
 		return nil, fmt.Errorf("daze: destination address too long: %s", address)
+	}
+	if network != "tcp" && network != "udp" {
+		return nil, fmt.Errorf("daze: network must be tcp or udp, but get %s", network)
+	}
+	srv, err = net.DialTimeout("tcp", c.Server, time.Second*4)
+	if err != nil {
+		return nil, err
 	}
 	rand.Read(buf[:128])
 	srv.Write(buf[:128])
@@ -149,8 +193,6 @@ func (c *Client) DialConn(srv io.ReadWriteCloser, network string, address string
 		buf[0x0a] = 0x01
 	case "udp":
 		buf[0x0a] = 0x03
-	default:
-		return nil, fmt.Errorf("daze: the network must be tcp or udp")
 	}
 	buf[0x0b] = uint8(n)
 	copy(buf[12:], []byte(address))
@@ -158,19 +200,13 @@ func (c *Client) DialConn(srv io.ReadWriteCloser, network string, address string
 	if err != nil {
 		return nil, err
 	}
-	return srv, nil
-}
-
-// Dial. It is similar to the server, the only difference is that it constructs
-// the data and the server parses the data. This code I refer to the golang
-// socks5 official library. That is a good code which is opened with
-// expectation, and closed with delight and profit.
-func (c *Client) Dial(network string, address string) (io.ReadWriteCloser, error) {
-	srv, err := net.DialTimeout("tcp", c.Server, time.Second*4)
-	if err != nil {
-		return nil, err
+	switch network {
+	case "tcp":
+		return &TCPConn{srv}, nil
+	case "udp":
+		return &UDPConn{srv}, nil
 	}
-	return c.DialConn(srv, network, address)
+	return nil, nil
 }
 
 // NewClient returns a new Client. A secret data needs to be passed in Cipher,

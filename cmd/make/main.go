@@ -20,7 +20,7 @@ func call(name string, arg ...string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		log.Panicln(err)
+		panic(err)
 	}
 }
 
@@ -32,12 +32,12 @@ func wget(furl string, name string) {
 	log.Println("wget", furl)
 	f, err := os.OpenFile(name, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
-		log.Panicln(err)
+		panic(err)
 	}
 	defer f.Close()
 	r, err := http.Get(furl)
 	if err != nil {
-		log.Panicln(err)
+		panic(err)
 	}
 	defer r.Body.Close()
 	io.Copy(f, r.Body)
@@ -47,12 +47,12 @@ func cp(src string, dst string) {
 	log.Println("copy", src, dst)
 	a, err := os.Open(src)
 	if err != nil {
-		log.Panicln(err)
+		panic(err)
 	}
 	defer a.Close()
 	b, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
-		log.Panicln(err)
+		panic(err)
 	}
 	defer b.Close()
 	io.Copy(b, a)
