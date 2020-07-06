@@ -14,13 +14,11 @@ import (
 	"github.com/mohanson/daze"
 )
 
-// This document specifies an Internet protocol for the Internet community.
-// For traverse a firewall transparently and securely, ASHE used
-// rc4 encryption with one-time password. In order to fight replay attacks,
-// ASHE get inspiration from cookie, added a timestamp inside the frame.
+// This document specifies an Internet protocol for the Internet community. For traverse a firewall transparently and
+// securely, ASHE used rc4 encryption with one-time password. In order to fight replay attacks, ASHE get inspiration
+// from cookie, added a timestamp inside the frame.
 //
-// The client connects to the server, and sends a version identifier/method
-// selection message:
+// The client connects to the server, and sends a version identifier/method selection message:
 //
 // +-----+-----------+------+-----+---------+---------+
 // | OTA | Handshake | Time | RSV | DST.Len | DST     |
@@ -35,14 +33,12 @@ import (
 // - DST.Len: len of DST. If DST is https://google.com, DST.Len is 0x12
 // - DST: desired destination address
 
-// TCPConn is an implementation of the Conn interface for TCP network
-// connections.
+// TCPConn is an implementation of the Conn interface for TCP network connections.
 type TCPConn struct {
 	io.ReadWriteCloser
 }
 
-// UDPConn is the implementation of the Conn and PacketConn interfaces
-// for UDP network connections.
+// UDPConn is the implementation of the Conn and PacketConn interfaces for UDP network connections.
 type UDPConn struct {
 	io.ReadWriteCloser
 }
@@ -70,9 +66,8 @@ func (c *UDPConn) Write(p []byte) (int, error) {
 	return c.ReadWriteCloser.Write(p)
 }
 
-// Server implemented the ashe protocol. The ASHE server will typically
-// evaluate the request based on source and destination addresses, and return
-// one or more reply messages, as appropriate for the request type.
+// Server implemented the ashe protocol. The ASHE server will typically evaluate the request based on source and
+// destination addresses, and return one or more reply messages, as appropriate for the request type.
 type Server struct {
 	Listen string
 	Cipher [16]byte
@@ -112,11 +107,10 @@ func (s *Server) Serve(cli io.ReadWriteCloser) error {
 	switch buf[10] {
 	case 0x01:
 		srv, err = net.DialTimeout("tcp", dst, time.Second*4)
-		srv = &TCPConn{srv}
+		cli = &TCPConn{cli}
 	case 0x03:
 		srv, err = net.DialTimeout("udp", dst, time.Second*4)
 		cli = &UDPConn{cli}
-		srv = &UDPConn{srv}
 	}
 	if err != nil {
 		return err
@@ -150,8 +144,7 @@ func (s *Server) Run() error {
 	}
 }
 
-// NewServer returns a new Server. A secret data needs to be passed in Cipher,
-// as a sign to interface with the Client.
+// NewServer returns a new Server. A secret data needs to be passed in Cipher, as a sign to interface with the Client.
 func NewServer(listen string, cipher string) *Server {
 	return &Server{
 		Listen: listen,
@@ -165,10 +158,9 @@ type Client struct {
 	Cipher [16]byte
 }
 
-// Dial. It is similar to the server, the only difference is that it constructs
-// the data and the server parses the data. This code I refer to the golang
-// socks5 official library. That is a good code which is opened with
-// expectation, and closed with delight and profit.
+// Dial. It is similar to the server, the only difference is that it constructs the data and the server parses the
+// data. This code I refer to the golang socks5 official library. That is a good code which is opened with expectation,
+// and closed with delight and profit.
 func (c *Client) Dial(network string, address string) (io.ReadWriteCloser, error) {
 	var (
 		srv io.ReadWriteCloser
@@ -213,8 +205,7 @@ func (c *Client) Dial(network string, address string) (io.ReadWriteCloser, error
 	return nil, nil
 }
 
-// NewClient returns a new Client. A secret data needs to be passed in Cipher,
-// as a sign to interface with the Server.
+// NewClient returns a new Client. A secret data needs to be passed in Cipher, as a sign to interface with the Server.
 func NewClient(server, cipher string) *Client {
 	return &Client{
 		Server: server,
