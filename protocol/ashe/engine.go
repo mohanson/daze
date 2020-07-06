@@ -60,6 +60,9 @@ func (c *UDPConn) Read(p []byte) (int, error) {
 
 // Write implements the Conn Write method.
 func (c *UDPConn) Write(p []byte) (int, error) {
+	if len(p) > math.MaxUint32 {
+		panic("unreachable")
+	}
 	b := make([]byte, 4)
 	binary.BigEndian.PutUint32(b, uint32(len(p)))
 	c.ReadWriteCloser.Write(b)
