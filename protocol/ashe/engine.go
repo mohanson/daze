@@ -35,20 +35,26 @@ import (
 // - DST.Len: len of DST. If DST is https://google.com, DST.Len is 0x12
 // - DST: desired destination address
 
+// TCPConn is an implementation of the Conn interface for TCP network
+// connections.
 type TCPConn struct {
 	io.ReadWriteCloser
 }
 
+// UDPConn is the implementation of the Conn and PacketConn interfaces
+// for UDP network connections.
 type UDPConn struct {
 	io.ReadWriteCloser
 }
 
+// Close closes the connection.
 func (c *UDPConn) Close() error {
 	return c.Close()
 }
 
+// Read implements the Conn Read method.
 func (c *UDPConn) Read(p []byte) (int, error) {
-	_, err := c.ReadWriteCloser.Read(p[:4])
+	_, err := io.ReadFull(c.ReadWriteCloser, p[:4])
 	if err != nil {
 		return 0, err
 	}
@@ -56,10 +62,8 @@ func (c *UDPConn) Read(p []byte) (int, error) {
 	return io.ReadFull(c.ReadWriteCloser, p[:n])
 }
 
+// Write implements the Conn Write method.
 func (c *UDPConn) Write(p []byte) (int, error) {
-	if len(p) > math.MaxUint32 {
-		panic("unreachable")
-	}
 	b := make([]byte, 4)
 	binary.BigEndian.PutUint32(b, uint32(len(p)))
 	c.ReadWriteCloser.Write(b)
