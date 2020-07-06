@@ -440,9 +440,6 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 		if err != nil {
 			break
 		}
-		if n >= 2048 {
-			log.Panicln("unreachable")
-		}
 
 		l := 0
 		switch buf[3] {
@@ -497,9 +494,6 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 					n, _, err := c.ReadFromUDP(buf[l:])
 					if err != nil {
 						break
-					}
-					if n >= 2048-l {
-						log.Panicln("unreachable")
 					}
 					bnd.WriteToUDP(buf[:l+n], appAddr)
 				}

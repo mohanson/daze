@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -10,11 +11,12 @@ import (
 )
 
 const (
-	tcpListen = "127.0.0.1:2083"
-	udpListen = "127.0.0.1:2084"
+	tcpListenPort = 2083
+	udpListenPort = 2084
 )
 
 func mainTCPServer() {
+	tcpListen := fmt.Sprintf(":%d", tcpListenPort)
 	log.Println("listen and server on", tcpListen)
 	l, err := net.Listen("tcp", tcpListen)
 	if err != nil {
@@ -37,7 +39,8 @@ func mainTCPServer() {
 }
 
 func mainTCPClient() {
-	c, err := net.Dial("tcp", tcpListen)
+	tcpServer := fmt.Sprintf("127.0.0.1:%d", tcpListenPort)
+	c, err := net.Dial("tcp", tcpServer)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -50,6 +53,7 @@ func mainTCPClient() {
 }
 
 func mainUDPServer() {
+	udpListen := fmt.Sprintf(":%d", udpListenPort)
 	log.Println("listen and server on", udpListen)
 	a, err := net.ResolveUDPAddr("udp", udpListen)
 	if err != nil {
@@ -73,7 +77,8 @@ func mainUDPServer() {
 }
 
 func mainUDPClient() {
-	c, err := net.Dial("udp", udpListen)
+	udpServer := fmt.Sprintf(":%d", udpListenPort)
+	c, err := net.Dial("udp", udpServer)
 	if err != nil {
 		log.Panicln(err)
 	}
