@@ -45,7 +45,7 @@ type UDPConn struct {
 
 // Close closes the connection.
 func (c *UDPConn) Close() error {
-	return c.Close()
+	return c.ReadWriteCloser.Close()
 }
 
 // Read implements the Conn Read method.
