@@ -520,6 +520,9 @@ func (l *Locale) Serve(app io.ReadWriteCloser) error {
 	)
 	_, err = io.ReadFull(app, buf)
 	if err != nil {
+		if err == io.EOF {
+			return nil
+		}
 		return err
 	}
 	app = ReadWriteCloser{
