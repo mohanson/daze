@@ -118,7 +118,19 @@ func mainUDPDaze() {
 		panic(err)
 	}
 	defer c.Close()
-	go io.Copy(os.Stdout, c)
+	b := make([]byte, 2048)
+	go func() {
+		for {
+			n, err := c.Read(b)
+			if err != nil {
+				break
+			}
+			if n != 30 {
+				panic("unreachable")
+			}
+			os.Stdout.Write(b[:n])
+		}
+	}()
 	for range time.NewTicker(time.Second).C {
 		m := time.Now().Format(time.RFC1123)
 		c.Write([]byte(m + "\n"))
