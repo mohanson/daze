@@ -67,8 +67,8 @@ func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
 	}
 }
 
-// Resolve modifies the net.DefaultResolver(which is the resolver used by the
-// package-level Lookup functions and by Dialers without a specified Resolver).
+// Resolve modifies the net.DefaultResolver(which is the resolver used by the package-level Lookup functions and by
+// Dialers without a specified Resolver).
 //
 // Examples:
 //   Resolve("8.8.8.8:53")
@@ -194,8 +194,7 @@ func IPNetContains(l []*net.IPNet, ip net.IP) bool {
 	return false
 }
 
-// Locale is the main process of daze. In most cases, it is usually deployed
-// as a daemon on a local machine.
+// Locale is the main process of daze. In most cases, it is usually deployed as a daemon on a local machine.
 type Locale struct {
 	Listen string
 	Dialer Dialer
@@ -207,12 +206,11 @@ type Locale struct {
 //   See https://en.wikipedia.org/wiki/Proxy_server
 //   See https://en.wikipedia.org/wiki/HTTP_tunnel
 //
-// Warning: The performance of HTTP Proxy is very poor, unless you have a good
-// reason, please use ServeSocks4 or ServeSocks5 instead. Why the poor
-// performance is that I did not implement http persistent connection(a
-// well-known name is KeepAlive) because It will trigger some bugs on Firefox.
-// Firefox always sends traffic from different sites to the one persistent
-// connection. I have been debugging for a long time.
+// Warning: The performance of HTTP Proxy is very poor, unless you have a good reason, please use ServeSocks4 or
+// ServeSocks5 instead. Why the poor performance is that I did not implement http persistent connection(a well-known
+// name is KeepAlive) because It will trigger some bugs on Firefox. Firefox always sends traffic from different sites
+// to the one persistent connection. I have been debugging for a long time.
+//
 // Fuck.
 func (l *Locale) ServeProxy(app io.ReadWriteCloser) error {
 	reader := bufio.NewReader(app)
@@ -511,8 +509,8 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 	return nil
 }
 
-// We should be very clear about what it does. It judges the traffic type and
-// processes it with a different handler(ServeProxy/ServeSocks4/ServeSocks5).
+// We should be very clear about what it does. It judges the traffic type and processes it with a different
+// handler(ServeProxy/ServeSocks4/ServeSocks5).
 func (l *Locale) Serve(app io.ReadWriteCloser) error {
 	var (
 		buf = make([]byte, 1)
@@ -520,6 +518,9 @@ func (l *Locale) Serve(app io.ReadWriteCloser) error {
 	)
 	_, err = io.ReadFull(app, buf)
 	if err != nil {
+		// There are some clients that will establish a link in advance without sending any messages so that they can
+		// immediately get the connected conn when they really need it. When they leave, it makes no sense to report a
+		// EOF error.
 		if err == io.EOF {
 			return nil
 		}
@@ -589,12 +590,10 @@ const (
 	MPuzzle
 )
 
-// RULE file aims to be a minimal configuration file format that's easy to
-// read due to obvious semantics.
-// There are two parts per line on RULE file: mode and glob. mode are on the
-// left of the space sign and glob are on the right. mode is an char and
-// describes whether the host should go proxy, glob supported glob-style
-// patterns:
+// RULE file aims to be a minimal configuration file format that's easy to read due to obvious semantics.
+// There are two parts per line on RULE file: mode and glob. mode are on the left of the space sign and glob are on the
+// right. mode is an char and describes whether the host should go proxy, glob supported glob-style patterns:
+//
 //   h?llo matches hello, hallo and hxllo
 //   h*llo matches hllo and heeeello
 //   h[ae]llo matches hello and hallo, but not hillo
@@ -667,6 +666,7 @@ func NewRulels() *Rulels {
 	}
 }
 
+// Squire is a bit smart guy, it can automatically distinguish whether to use a proxy or a local network.
 type Squire struct {
 	Dialer Dialer
 	Direct Dialer
@@ -675,6 +675,7 @@ type Squire struct {
 	IPNets []*net.IPNet
 }
 
+// Dialer contains options for connecting to an address.
 func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error) {
 	host, _, err := net.SplitHostPort(address)
 	mode := MPuzzle
