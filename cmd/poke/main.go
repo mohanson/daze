@@ -2,22 +2,24 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"io"
 	"log"
 	"net"
 	"os"
 	"time"
+
+	"github.com/mohanson/daze/protocol/ashe"
 )
 
 const (
-	tcpListenPort = 2083
-	udpListenPort = 2084
+	srvListen = "127.0.0.1:2081"
+	tcpListen = "127.0.0.1:2083"
+	udpListen = "127.0.0.1:2084"
+	cipher    = "daze"
 )
 
 func mainTCPServer() {
-	tcpListen := fmt.Sprintf(":%d", tcpListenPort)
-	log.Println("listen and server on", tcpListen)
+	log.Println("listen and serve on", tcpListen)
 	l, err := net.Listen("tcp", tcpListen)
 	if err != nil {
 		panic(err)
@@ -39,8 +41,25 @@ func mainTCPServer() {
 }
 
 func mainTCPClient() {
-	tcpServer := fmt.Sprintf("127.0.0.1:%d", tcpListenPort)
-	c, err := net.Dial("tcp", tcpServer)
+	c, err := net.Dial("tcp", tcpListen)
+	if err != nil {
+		panic(err)
+	}
+	defer c.Close()
+	go io.Copy(os.Stdout, c)
+	for range time.NewTicker(time.Second).C {
+		m := time.Now().Format(time.RFC1123)
+		c.Write([]byte(m + "\n"))
+	}
+}
+
+func mainTCPDaze() {
+	server := ashe.NewServer(srvListen, cipher)
+	go server.Run()
+	go mainTCPServer()
+	time.Sleep(time.Second)
+	client := ashe.NewClient(srvListen, cipher)
+	c, err := client.Dial("tcp", tcpListen)
 	if err != nil {
 		panic(err)
 	}
@@ -53,8 +72,7 @@ func mainTCPClient() {
 }
 
 func mainUDPServer() {
-	udpListen := fmt.Sprintf(":%d", udpListenPort)
-	log.Println("listen and server on", udpListen)
+	log.Println("listen and serve on", udpListen)
 	a, err := net.ResolveUDPAddr("udp", udpListen)
 	if err != nil {
 		panic(err)
@@ -77,8 +95,25 @@ func mainUDPServer() {
 }
 
 func mainUDPClient() {
-	udpServer := fmt.Sprintf(":%d", udpListenPort)
-	c, err := net.Dial("udp", udpServer)
+	c, err := net.Dial("udp", udpListen)
+	if err != nil {
+		panic(err)
+	}
+	defer c.Close()
+	go io.Copy(os.Stdout, c)
+	for range time.NewTicker(time.Second).C {
+		m := time.Now().Format(time.RFC1123)
+		c.Write([]byte(m + "\n"))
+	}
+}
+
+func mainUDPDaze() {
+	server := ashe.NewServer(srvListen, cipher)
+	go server.Run()
+	go mainUDPServer()
+	time.Sleep(time.Second)
+	client := ashe.NewClient(srvListen, cipher)
+	c, err := client.Dial("udp", udpListen)
 	if err != nil {
 		panic(err)
 	}
@@ -99,6 +134,8 @@ func main() {
 			mainTCPServer()
 		case "client":
 			mainTCPClient()
+		case "daze":
+			mainTCPDaze()
 		}
 	case "udp":
 		switch flag.Arg(1) {
@@ -106,6 +143,8 @@ func main() {
 			mainUDPServer()
 		case "client":
 			mainUDPClient()
+		case "daze":
+			mainUDPDaze()
 		}
 	}
 }
