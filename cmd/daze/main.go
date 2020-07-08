@@ -4,8 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"net/http"
-	"net/http/pprof"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,7 +23,6 @@ The most commonly used daze commands are:
 Run 'daze <command> -h' for more information on a command.`
 
 func main() {
-	_ = pprof.Handler
 	if len(os.Args) <= 1 {
 		fmt.Println(help)
 		os.Exit(0)
@@ -43,12 +40,8 @@ func main() {
 			flListen = flag.String("l", "0.0.0.0:1081", "listen address")
 			flCipher = flag.String("k", "daze", "cipher, for encryption")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
-			flPProf  = flag.String("p", "", "pprof address")
 		)
 		flag.Parse()
-		if *flPProf != "" {
-			go http.ListenAndServe(*flPProf, nil)
-		}
 		log.Println("server cipher is", *flCipher)
 		if *flDnserv != "" {
 			daze.Resolve(*flDnserv)
@@ -66,12 +59,8 @@ func main() {
 			flRulels = flag.String("r", ddir.Join("rule.ls"), "rule path")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 			flFilter = flag.String("f", "ipcn", "filter {ipcn, none}")
-			flPProf  = flag.String("p", "", "pprof address")
 		)
 		flag.Parse()
-		if *flPProf != "" {
-			go http.ListenAndServe(*flPProf, nil)
-		}
 		if _, err := os.Stat(ddir.Join("rule.ls")); err != nil {
 			f, er := os.Create(ddir.Join("rule.ls"))
 			if er != nil {
