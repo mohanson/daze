@@ -14,13 +14,11 @@ import (
 	"github.com/mohanson/daze"
 )
 
-// This document specifies an Internet protocol for the Internet community.
-// For traverse a firewall transparently and securely, ASHE used
-// rc4 encryption with one-time password. In order to fight replay attacks,
-// ASHE get inspiration from cookie, added a timestamp inside the frame.
+// This document specifies an Internet protocol for the Internet community. For traverse a firewall transparently and
+// securely, ASHE used rc4 encryption with one-time password. In order to fight replay attacks, ASHE get inspiration
+// from cookie, added a timestamp inside the frame.
 //
-// The client connects to the server, and sends a version identifier/method
-// selection message:
+// The client connects to the server, and sends a version identifier/method selection message:
 //
 // +-----+-----------+------+-----+---------+---------+
 // | OTA | Handshake | Time | RSV | DST.Len | DST     |
@@ -35,9 +33,44 @@ import (
 // - DST.Len: len of DST. If DST is https://google.com, DST.Len is 0x12
 // - DST: desired destination address
 
-// Server implemented the ashe protocol. The ASHE server will typically
-// evaluate the request based on source and destination addresses, and return
-// one or more reply messages, as appropriate for the request type.
+// TCPConn is an implementation of the Conn interface for TCP network connections.
+type TCPConn struct {
+	io.ReadWriteCloser
+}
+
+// UDPConn is the implementation of the Conn and PacketConn interfaces for UDP network connections.
+type UDPConn struct {
+	io.ReadWriteCloser
+}
+
+// Close closes the connection.
+func (c *UDPConn) Close() error {
+	return c.ReadWriteCloser.Close()
+}
+
+// Read implements the Conn Read method.
+func (c *UDPConn) Read(p []byte) (int, error) {
+	_, err := io.ReadFull(c.ReadWriteCloser, p[:4])
+	if err != nil {
+		return 0, err
+	}
+	n := binary.BigEndian.Uint32(p[:4])
+	return io.ReadFull(c.ReadWriteCloser, p[:n])
+}
+
+// Write implements the Conn Write method.
+func (c *UDPConn) Write(p []byte) (int, error) {
+	if len(p) > math.MaxUint32 {
+		panic("unreachable")
+	}
+	b := make([]byte, 4)
+	binary.BigEndian.PutUint32(b, uint32(len(p)))
+	c.ReadWriteCloser.Write(b)
+	return c.ReadWriteCloser.Write(p)
+}
+
+// Server implemented the ashe protocol. The ASHE server will typically evaluate the request based on source and
+// destination addresses, and return one or more reply messages, as appropriate for the request type.
 type Server struct {
 	Listen string
 	Cipher [16]byte
@@ -77,10 +110,10 @@ func (s *Server) Serve(cli io.ReadWriteCloser) error {
 	switch buf[10] {
 	case 0x01:
 		srv, err = net.DialTimeout("tcp", dst, time.Second*4)
+		cli = &TCPConn{cli}
 	case 0x03:
 		srv, err = net.DialTimeout("udp", dst, time.Second*4)
-	default:
-		return fmt.Errorf("daze: the network must be tcp or udp")
+		cli = &UDPConn{cli}
 	}
 	if err != nil {
 		return err
@@ -114,8 +147,7 @@ func (s *Server) Run() error {
 	}
 }
 
-// NewServer returns a new Server. A secret data needs to be passed in Cipher,
-// as a sign to interface with the Client.
+// NewServer returns a new Server. A secret data needs to be passed in Cipher, as a sign to interface with the Client.
 func NewServer(listen string, cipher string) *Server {
 	return &Server{
 		Listen: listen,
@@ -129,14 +161,25 @@ type Client struct {
 	Cipher [16]byte
 }
 
-func (c *Client) DialConn(srv io.ReadWriteCloser, network string, address string) (io.ReadWriteCloser, error) {
+// Dial. It is similar to the server, the only difference is that it constructs the data and the server parses the
+// data. This code I refer to the golang socks5 official library. That is a good code which is opened with expectation,
+// and closed with delight and profit.
+func (c *Client) Dial(network string, address string) (io.ReadWriteCloser, error) {
 	var (
-		buf = make([]byte, 512)
+		srv io.ReadWriteCloser
 		n   = len(address)
+		buf = make([]byte, 512)
 		err error
 	)
 	if n > 256 {
 		return nil, fmt.Errorf("daze: destination address too long: %s", address)
+	}
+	if network != "tcp" && network != "udp" {
+		return nil, fmt.Errorf("daze: network must be tcp or udp, but get %s", network)
+	}
+	srv, err = net.DialTimeout("tcp", c.Server, time.Second*4)
+	if err != nil {
+		return nil, err
 	}
 	rand.Read(buf[:128])
 	srv.Write(buf[:128])
@@ -149,8 +192,6 @@ func (c *Client) DialConn(srv io.ReadWriteCloser, network string, address string
 		buf[0x0a] = 0x01
 	case "udp":
 		buf[0x0a] = 0x03
-	default:
-		return nil, fmt.Errorf("daze: the network must be tcp or udp")
 	}
 	buf[0x0b] = uint8(n)
 	copy(buf[12:], []byte(address))
@@ -158,23 +199,16 @@ func (c *Client) DialConn(srv io.ReadWriteCloser, network string, address string
 	if err != nil {
 		return nil, err
 	}
-	return srv, nil
-}
-
-// Dial. It is similar to the server, the only difference is that it constructs
-// the data and the server parses the data. This code I refer to the golang
-// socks5 official library. That is a good code which is opened with
-// expectation, and closed with delight and profit.
-func (c *Client) Dial(network string, address string) (io.ReadWriteCloser, error) {
-	srv, err := net.DialTimeout("tcp", c.Server, time.Second*4)
-	if err != nil {
-		return nil, err
+	switch network {
+	case "tcp":
+		return &TCPConn{srv}, nil
+	case "udp":
+		return &UDPConn{srv}, nil
 	}
-	return c.DialConn(srv, network, address)
+	return nil, nil
 }
 
-// NewClient returns a new Client. A secret data needs to be passed in Cipher,
-// as a sign to interface with the Server.
+// NewClient returns a new Client. A secret data needs to be passed in Cipher, as a sign to interface with the Server.
 func NewClient(server, cipher string) *Client {
 	return &Client{
 		Server: server,

@@ -67,8 +67,8 @@ func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
 	}
 }
 
-// Resolve modifies the net.DefaultResolver(which is the resolver used by the
-// package-level Lookup functions and by Dialers without a specified Resolver).
+// Resolve modifies the net.DefaultResolver(which is the resolver used by the package-level Lookup functions and by
+// Dialers without a specified Resolver).
 //
 // Examples:
 //   Resolve("8.8.8.8:53")
@@ -149,7 +149,7 @@ func CNIPNet() []*net.IPNet {
 	name := ddir.Join("delegated-apnic-latest")
 	f, err := aget.Open(name)
 	if err != nil {
-		log.Panicln(err)
+		panic(err)
 	}
 	defer f.Close()
 	r := []*net.IPNet{}
@@ -164,12 +164,12 @@ func CNIPNet() []*net.IPNet {
 			seps := strings.Split(line, "|")
 			sep4, err := strconv.Atoi(seps[4])
 			if err != nil {
-				log.Panicln(err)
+				panic(err)
 			}
 			mask := 32 - int(math.Log2(float64(sep4)))
 			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%d", seps[3], mask))
 			if err != nil {
-				log.Panicln(err)
+				panic(err)
 			}
 			r = append(r, cidr)
 		case strings.HasPrefix(line, "apnic|CN|ipv6"):
@@ -177,7 +177,7 @@ func CNIPNet() []*net.IPNet {
 			sep4 := seps[4]
 			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%s", seps[3], sep4))
 			if err != nil {
-				log.Panicln(err)
+				panic(err)
 			}
 			r = append(r, cidr)
 		}
@@ -194,8 +194,7 @@ func IPNetContains(l []*net.IPNet, ip net.IP) bool {
 	return false
 }
 
-// Locale is the main process of daze. In most cases, it is usually deployed
-// as a daemon on a local machine.
+// Locale is the main process of daze. In most cases, it is usually deployed as a daemon on a local machine.
 type Locale struct {
 	Listen string
 	Dialer Dialer
@@ -207,12 +206,11 @@ type Locale struct {
 //   See https://en.wikipedia.org/wiki/Proxy_server
 //   See https://en.wikipedia.org/wiki/HTTP_tunnel
 //
-// Warning: The performance of HTTP Proxy is very poor, unless you have a good
-// reason, please use ServeSocks4 or ServeSocks5 instead. Why the poor
-// performance is that I did not implement http persistent connection(a
-// well-known name is KeepAlive) because It will trigger some bugs on Firefox.
-// Firefox always sends traffic from different sites to the one persistent
-// connection. I have been debugging for a long time.
+// Warning: The performance of HTTP Proxy is very poor, unless you have a good reason, please use ServeSocks4 or
+// ServeSocks5 instead. Why the poor performance is that I did not implement http persistent connection(a well-known
+// name is KeepAlive) because It will trigger some bugs on Firefox. Firefox always sends traffic from different sites
+// to the one persistent connection. I have been debugging for a long time.
+//
 // Fuck.
 func (l *Locale) ServeProxy(app io.ReadWriteCloser) error {
 	reader := bufio.NewReader(app)
@@ -328,7 +326,7 @@ func (l *Locale) ServeSocks4(app io.ReadWriteCloser) error {
 			return nil
 		}
 	case 0x02:
-		log.Panicln("unreachable")
+		panic("unreachable")
 	}
 	return nil
 }
@@ -388,7 +386,7 @@ func (l *Locale) ServeSocks5(app io.ReadWriteCloser) error {
 	case 0x01:
 		return l.ServeSocks5TCP(app, dst)
 	case 0x02:
-		log.Panicln("unreachable")
+		panic("unreachable")
 	case 0x03:
 		return l.ServeSocks5UDP(app)
 	}
@@ -423,14 +421,14 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 
 	var (
 		buf = make([]byte, 2048)
-		srv = map[string]*net.UDPConn{}
+		cpl = map[string]io.ReadWriteCloser{}
 	)
 
 	go func() {
 		io.Copy(ioutil.Discard, app)
 		app.Close()
 		bnd.Close()
-		for _, v := range srv {
+		for _, v := range cpl {
 			v.Close()
 		}
 	}()
@@ -441,20 +439,20 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 			break
 		}
 
-		l := 0
+		j := 0
 		switch buf[3] {
 		case 0x01:
-			l = 10
+			j = 10
 		case 0x03:
-			l = int(buf[4]) + 7
+			j = int(buf[4]) + 7
 		case 0x04:
-			l = 22
+			j = 22
 		}
 
-		appHead := make([]byte, l)
-		copy(appHead, buf[0:l])
-		appData := make([]byte, n-l)
-		copy(appData, buf[l:n])
+		appHead := make([]byte, j)
+		copy(appHead, buf[0:j])
+		appData := make([]byte, n-j)
+		copy(appData, buf[j:n])
 
 		dstHost := ""
 		dstPort := uint16(0)
@@ -472,40 +470,47 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 		}
 		dst := dstHost + ":" + strconv.Itoa(int(dstPort))
 
-		ep, b := srv[dst]
+		srv, b := cpl[dst]
 		if !b {
-			a, err := net.ResolveUDPAddr("udp", dst)
-			if err != nil {
-				break
-			}
 			log.Println("connect[socks5]", dst)
-			c, err := net.DialUDP("udp", nil, a)
+			c, err := l.Dialer.Dial("udp", dst)
 			if err != nil {
 				break
 			}
-			srv[dst] = c
-			ep = c
-
-			go func(srv net.Conn, appHead []byte, appAddr *net.UDPAddr) {
-				buf := make([]byte, 2048)
+			cpl[dst] = c
+			srv = c
+			go func(srv io.ReadWriteCloser, appHead []byte, appAddr *net.UDPAddr) {
+				var (
+					buf = make([]byte, 2048)
+					l   = len(appHead)
+					n   int
+					err error
+				)
 				copy(buf, appHead)
-				l := len(appHead)
 				for {
-					n, _, err := c.ReadFromUDP(buf[l:])
+					n, err = c.Read(buf[l:])
 					if err != nil {
 						break
 					}
-					bnd.WriteToUDP(buf[:l+n], appAddr)
+					_, err = bnd.WriteToUDP(buf[:l+n], appAddr)
+					if err != nil {
+						break
+					}
 				}
+				srv.Close()
+				bnd.Close()
 			}(c, appHead, appAddr)
 		}
-		ep.Write(appData)
+		_, err = srv.Write(appData)
+		if err != nil {
+			break
+		}
 	}
 	return nil
 }
 
-// We should be very clear about what it does. It judges the traffic type and
-// processes it with a different handler(ServeProxy/ServeSocks4/ServeSocks5).
+// We should be very clear about what it does. It judges the traffic type and processes it with a different
+// handler(ServeProxy/ServeSocks4/ServeSocks5).
 func (l *Locale) Serve(app io.ReadWriteCloser) error {
 	var (
 		buf = make([]byte, 1)
@@ -513,6 +518,12 @@ func (l *Locale) Serve(app io.ReadWriteCloser) error {
 	)
 	_, err = io.ReadFull(app, buf)
 	if err != nil {
+		// There are some clients that will establish a link in advance without sending any messages so that they can
+		// immediately get the connected conn when they really need it. When they leave, it makes no sense to report a
+		// EOF error.
+		if err == io.EOF {
+			return nil
+		}
 		return err
 	}
 	app = ReadWriteCloser{
@@ -579,12 +590,10 @@ const (
 	MPuzzle
 )
 
-// RULE file aims to be a minimal configuration file format that's easy to
-// read due to obvious semantics.
-// There are two parts per line on RULE file: mode and glob. mode are on the
-// left of the space sign and glob are on the right. mode is an char and
-// describes whether the host should go proxy, glob supported glob-style
-// patterns:
+// RULE file aims to be a minimal configuration file format that's easy to read due to obvious semantics.
+// There are two parts per line on RULE file: mode and glob. mode are on the left of the space sign and glob are on the
+// right. mode is an char and describes whether the host should go proxy, glob supported glob-style patterns:
+//
 //   h?llo matches hello, hallo and hxllo
 //   h*llo matches hllo and heeeello
 //   h[ae]llo matches hello and hallo, but not hillo
@@ -607,7 +616,7 @@ func (r *Rulels) Road(host string) RoadMode {
 	for p, i := range r.Dict {
 		b, err := filepath.Match(p, host)
 		if err != nil {
-			log.Panicln(err)
+			panic(err)
 		}
 		if !b {
 			continue
@@ -657,6 +666,7 @@ func NewRulels() *Rulels {
 	}
 }
 
+// Squire is a bit smart guy, it can automatically distinguish whether to use a proxy or a local network.
 type Squire struct {
 	Dialer Dialer
 	Direct Dialer
@@ -665,6 +675,7 @@ type Squire struct {
 	IPNets []*net.IPNet
 }
 
+// Dialer contains options for connecting to an address.
 func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error) {
 	host, _, err := net.SplitHostPort(address)
 	mode := MPuzzle
@@ -675,7 +686,7 @@ func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error
 		case MRemote:
 			return s.Dialer.Dial(network, address)
 		}
-		log.Panicln("unreachable")
+		panic("unreachable")
 	}
 	switch s.Rulels.Road(host) {
 	case MLocale:
