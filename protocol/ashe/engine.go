@@ -60,7 +60,7 @@ func (c *UDPConn) Read(p []byte) (int, error) {
 
 // Write implements the Conn Write method.
 func (c *UDPConn) Write(p []byte) (int, error) {
-	if len(p) > math.MaxUint32 {
+	if len(p) > math.MaxUint16 {
 		panic("unreachable")
 	}
 	b := make([]byte, 4)
