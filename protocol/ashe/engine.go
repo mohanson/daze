@@ -21,15 +21,15 @@ import (
 // The client connects to the server, and sends a version identifier/method selection message:
 //
 // +-----+-----------+------+-----+---------+---------+
-// | OTA | Handshake | Time | RSV | DST.Len | DST     |
+// | OTA | Handshake | Time | Net | DST.Len | DST     |
 // +-----+-----------+------+-----+---------+---------+
 // | 128 | 2         | 8    |  1  | 1       | 0 - 255 |
-// +-----+-----------+------+-----+---------+---------|
+// +-----+-----------+------+-----+---------+---------+
 //
 // - OTA: random 128 bytes for rc4 key
 // - Handshake: must be 0xFF, 0xFF
 // - Time: timestamp of request
-// - RSV: reserved
+// - Net: tcp(0x01), udp(0x03)
 // - DST.Len: len of DST. If DST is https://google.com, DST.Len is 0x12
 // - DST: desired destination address
 
