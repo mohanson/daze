@@ -89,6 +89,9 @@ func mainUDPServer() {
 		if err != nil {
 			break
 		}
+		if n != 30 {
+			panic("unreachable")
+		}
 		os.Stdout.Write(b[:n])
 		c.WriteToUDP(b[:n], a)
 	}
