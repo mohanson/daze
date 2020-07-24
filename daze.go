@@ -419,19 +419,16 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 	binary.BigEndian.PutUint16(r[8:10], bndPort)
 	app.Write(r)
 
-	var (
-		buf = make([]byte, 2048)
-		cpl = map[string]io.ReadWriteCloser{}
-	)
-
 	go func() {
 		io.Copy(ioutil.Discard, app)
 		app.Close()
 		bnd.Close()
-		for _, v := range cpl {
-			v.Close()
-		}
 	}()
+
+	var (
+		buf = make([]byte, 2048)
+		cpl = map[string]io.ReadWriteCloser{}
+	)
 
 	for {
 		n, appAddr, err := bnd.ReadFromUDP(buf)
@@ -477,6 +474,7 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 			if err != nil {
 				break
 			}
+			defer c.Close()
 			cpl[dst] = c
 			srv = c
 			go func(srv io.ReadWriteCloser, appHead []byte, appAddr *net.UDPAddr) {
