@@ -185,6 +185,7 @@ func CNIPNet() []*net.IPNet {
 	return r
 }
 
+// IPNetContains.
 func IPNetContains(l []*net.IPNet, ip net.IP) bool {
 	for _, e := range l {
 		if e.Contains(ip) {
