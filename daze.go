@@ -488,7 +488,7 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 				)
 				copy(buf, appHead)
 				for {
-					n, err = c.Read(buf[l:])
+					n, err = srv.Read(buf[l:])
 					if err != nil {
 						break
 					}
@@ -498,7 +498,7 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 					}
 				}
 				srv.Close()
-				bnd.Close()
+				delete(cpl, dst)
 			}(c, appHead, appAddr)
 		}
 		_, err = srv.Write(appData)
