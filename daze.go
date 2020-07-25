@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/mohanson/acdb"
 	"github.com/mohanson/aget"
@@ -428,7 +429,7 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 
 	var (
 		buf = make([]byte, 2048)
-		cpl = map[string]io.ReadWriteCloser{}
+		cpl = sync.Map{}
 	)
 
 	for {
@@ -468,7 +469,7 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 		}
 		dst := dstHost + ":" + strconv.Itoa(int(dstPort))
 
-		srv, b := cpl[dst]
+		srv, b := cpl.Load(dst)
 		if !b {
 			log.Println("connect[socks5]", dst)
 			c, err := l.Dialer.Dial("udp", dst)
@@ -476,8 +477,9 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 				break
 			}
 			defer c.Close()
-			cpl[dst] = c
+			cpl.Store(dst, c)
 			srv = c
+
 			go func(srv io.ReadWriteCloser, appHead []byte, appAddr *net.UDPAddr) {
 				var (
 					buf = make([]byte, 2048)
@@ -497,10 +499,9 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 					}
 				}
 				srv.Close()
-				delete(cpl, dst)
 			}(c, appHead, appAddr)
 		}
-		_, err = srv.Write(appData)
+		_, err = srv.(io.ReadWriteCloser).Write(appData)
 		if err != nil {
 			break
 		}
