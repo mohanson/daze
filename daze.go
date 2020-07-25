@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/mohanson/acdb"
 	"github.com/mohanson/aget"
@@ -185,6 +186,7 @@ func CNIPNet() []*net.IPNet {
 	return r
 }
 
+// IPNetContains.
 func IPNetContains(l []*net.IPNet, ip net.IP) bool {
 	for _, e := range l {
 		if e.Contains(ip) {
@@ -419,19 +421,16 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 	binary.BigEndian.PutUint16(r[8:10], bndPort)
 	app.Write(r)
 
-	var (
-		buf = make([]byte, 2048)
-		cpl = map[string]io.ReadWriteCloser{}
-	)
-
 	go func() {
 		io.Copy(ioutil.Discard, app)
 		app.Close()
 		bnd.Close()
-		for _, v := range cpl {
-			v.Close()
-		}
 	}()
+
+	var (
+		buf = make([]byte, 2048)
+		cpl = sync.Map{}
+	)
 
 	for {
 		n, appAddr, err := bnd.ReadFromUDP(buf)
@@ -470,15 +469,17 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 		}
 		dst := dstHost + ":" + strconv.Itoa(int(dstPort))
 
-		srv, b := cpl[dst]
+		srv, b := cpl.Load(dst)
 		if !b {
 			log.Println("connect[socks5]", dst)
 			c, err := l.Dialer.Dial("udp", dst)
 			if err != nil {
 				break
 			}
-			cpl[dst] = c
+			defer c.Close()
+			cpl.Store(dst, c)
 			srv = c
+
 			go func(srv io.ReadWriteCloser, appHead []byte, appAddr *net.UDPAddr) {
 				var (
 					buf = make([]byte, 2048)
@@ -488,7 +489,7 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 				)
 				copy(buf, appHead)
 				for {
-					n, err = c.Read(buf[l:])
+					n, err = srv.Read(buf[l:])
 					if err != nil {
 						break
 					}
@@ -498,10 +499,9 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 					}
 				}
 				srv.Close()
-				bnd.Close()
 			}(c, appHead, appAddr)
 		}
-		_, err = srv.Write(appData)
+		_, err = srv.(io.ReadWriteCloser).Write(appData)
 		if err != nil {
 			break
 		}
