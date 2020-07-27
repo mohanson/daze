@@ -18,7 +18,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/mohanson/acdb"
 	"github.com/mohanson/aget"
@@ -412,14 +411,32 @@ func (l *Locale) ServeSocks5TCP(app io.ReadWriteCloser, dst string) error {
 
 // Socks5 UDP protocol.
 func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
+	var (
+		bndAddr     *net.UDPAddr
+		bndPort     uint16
+		bnd         *net.UDPConn
+		appAddr     *net.UDPAddr
+		appSize     int
+		appHeadSize int
+		appHead     []byte
+		dstHost     string
+		dstPort     uint16
+		dst         string
+		srv         io.ReadWriteCloser
+		b           bool
+		cpl         = map[string]io.ReadWriteCloser{}
+		buf         = make([]byte, 2048)
+		err         error
+	)
+
 	defer app.Close()
-	bndAddr, _ := net.ResolveUDPAddr("udp", "127.0.0.1:0")
-	bnd, _ := net.ListenUDP("udp", bndAddr)
+	bndAddr, _ = net.ResolveUDPAddr("udp", "127.0.0.1:0")
+	bnd, _ = net.ListenUDP("udp", bndAddr)
 	defer bnd.Close()
-	bndPort := uint16(bnd.LocalAddr().(*net.UDPAddr).Port)
-	r := []byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
-	binary.BigEndian.PutUint16(r[8:10], bndPort)
-	app.Write(r)
+	bndPort = uint16(bnd.LocalAddr().(*net.UDPAddr).Port)
+	copy(buf, []byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+	binary.BigEndian.PutUint16(buf[8:10], bndPort)
+	app.Write(buf[:10])
 
 	go func() {
 		io.Copy(ioutil.Discard, app)
@@ -427,34 +444,24 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 		bnd.Close()
 	}()
 
-	var (
-		buf = make([]byte, 2048)
-		cpl = sync.Map{}
-	)
-
 	for {
-		n, appAddr, err := bnd.ReadFromUDP(buf)
+		appSize, appAddr, err = bnd.ReadFromUDP(buf)
 		if err != nil {
 			break
 		}
 
-		j := 0
 		switch buf[3] {
 		case 0x01:
-			j = 10
+			appHeadSize = 10
 		case 0x03:
-			j = int(buf[4]) + 7
+			appHeadSize = int(buf[4]) + 7
 		case 0x04:
-			j = 22
+			appHeadSize = 22
 		}
 
-		appHead := make([]byte, j)
-		copy(appHead, buf[0:j])
-		appData := make([]byte, n-j)
-		copy(appData, buf[j:n])
+		appHead = make([]byte, appHeadSize)
+		copy(appHead, buf[0:appHeadSize])
 
-		dstHost := ""
-		dstPort := uint16(0)
 		switch appHead[3] {
 		case 0x01:
 			dstHost = net.IP(appHead[4:8]).String()
@@ -467,44 +474,51 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 			dstHost = net.IP(appHead[4:20]).String()
 			dstPort = binary.BigEndian.Uint16(appHead[20:22])
 		}
-		dst := dstHost + ":" + strconv.Itoa(int(dstPort))
+		dst = dstHost + ":" + strconv.Itoa(int(dstPort))
 
-		srv, b := cpl.Load(dst)
-		if !b {
-			log.Println("connect[socks5]", dst)
-			c, err := l.Dialer.Dial("udp", dst)
-			if err != nil {
-				break
-			}
-			defer c.Close()
-			cpl.Store(dst, c)
-			srv = c
-
-			go func(srv io.ReadWriteCloser, appHead []byte, appAddr *net.UDPAddr) {
-				var (
-					buf = make([]byte, 2048)
-					l   = len(appHead)
-					n   int
-					err error
-				)
-				copy(buf, appHead)
-				for {
-					n, err = srv.Read(buf[l:])
-					if err != nil {
-						break
-					}
-					_, err = bnd.WriteToUDP(buf[:l+n], appAddr)
-					if err != nil {
-						break
-					}
-				}
-				srv.Close()
-			}(c, appHead, appAddr)
+		srv, b = cpl[dst]
+		if b {
+			goto send
 		}
-		_, err = srv.(io.ReadWriteCloser).Write(appData)
+	init:
+		log.Println("connect[socks5]", dst)
+		srv, err = l.Dialer.Dial("udp", dst)
 		if err != nil {
-			break
+			log.Println(err)
+			continue
 		}
+		cpl[dst] = srv
+
+		go func(srv io.ReadWriteCloser, appHead []byte, appAddr *net.UDPAddr) {
+			var (
+				buf = make([]byte, 2048)
+				l   = len(appHead)
+				n   int
+				err error
+			)
+			copy(buf, appHead)
+			for {
+				n, err = srv.Read(buf[l:])
+				if err != nil {
+					break
+				}
+				_, err = bnd.WriteToUDP(buf[:l+n], appAddr)
+				if err != nil {
+					break
+				}
+			}
+			srv.Close()
+		}(srv, appHead, appAddr)
+	send:
+		_, err = srv.(io.ReadWriteCloser).Write(buf[appHeadSize:appSize])
+		if err != nil {
+			log.Println(err)
+			srv.Close()
+			goto init
+		}
+	}
+	for _, e := range cpl {
+		e.Close()
 	}
 	return nil
 }
