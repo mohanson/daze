@@ -18,7 +18,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/mohanson/acdb"
 	"github.com/mohanson/aget"
@@ -429,7 +428,7 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 
 	var (
 		buf = make([]byte, 2048)
-		cpl = sync.Map{}
+		cpl = map[string]io.ReadWriteCloser{}
 	)
 
 	for {
@@ -469,41 +468,45 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 		}
 		dst := dstHost + ":" + strconv.Itoa(int(dstPort))
 
-		srv, b := cpl.Load(dst)
-		if !b {
-			log.Println("connect[socks5]", dst)
-			c, err := l.Dialer.Dial("udp", dst)
-			if err != nil {
-				break
-			}
-			defer c.Close()
-			cpl.Store(dst, c)
-			srv = c
-
-			go func(srv io.ReadWriteCloser, appHead []byte, appAddr *net.UDPAddr) {
-				var (
-					buf = make([]byte, 2048)
-					l   = len(appHead)
-					n   int
-					err error
-				)
-				copy(buf, appHead)
-				for {
-					n, err = srv.Read(buf[l:])
-					if err != nil {
-						break
-					}
-					_, err = bnd.WriteToUDP(buf[:l+n], appAddr)
-					if err != nil {
-						break
-					}
-				}
-				srv.Close()
-			}(c, appHead, appAddr)
+		srv, b := cpl[dst]
+		if b {
+			goto THEN
 		}
+	INIT:
+		log.Println("connect[socks5]", dst)
+		srv, err = l.Dialer.Dial("udp", dst)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		defer srv.Close()
+		cpl[dst] = srv
+
+		go func(srv io.ReadWriteCloser, appHead []byte, appAddr *net.UDPAddr) {
+			var (
+				buf = make([]byte, 2048)
+				l   = len(appHead)
+				n   int
+				err error
+			)
+			copy(buf, appHead)
+			for {
+				n, err = srv.Read(buf[l:])
+				if err != nil {
+					break
+				}
+				_, err = bnd.WriteToUDP(buf[:l+n], appAddr)
+				if err != nil {
+					break
+				}
+			}
+			srv.Close()
+		}(srv, appHead, appAddr)
+	THEN:
 		_, err = srv.(io.ReadWriteCloser).Write(appData)
 		if err != nil {
-			break
+			log.Println(err)
+			goto INIT
 		}
 	}
 	return nil
