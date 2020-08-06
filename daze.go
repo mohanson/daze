@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/cipher"
+	"crypto/rand"
 	"crypto/rc4"
 	"encoding/binary"
 	"encoding/hex"
@@ -525,7 +526,7 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 
 // We should be very clear about what it does. It judges the traffic type and processes it with a different
 // handler(ServeProxy/ServeSocks4/ServeSocks5).
-func (l *Locale) Serve(app io.ReadWriteCloser) error {
+func (l *Locale) Serve(ctx context.Context, app io.ReadWriteCloser) error {
 	var (
 		buf = make([]byte, 1)
 		err error
@@ -571,9 +572,15 @@ func (l *Locale) Run() error {
 		}
 		go func(c net.Conn) {
 			defer c.Close()
-			if err := l.Serve(c); err != nil {
+			buf := make([]byte, 4)
+			rand.Read(buf)
+			cid := hex.EncodeToString(buf)
+			ctx := context.WithValue(context.Background(), "cid", cid)
+			log.Println(cid, "accept", c.RemoteAddr())
+			if err := l.Serve(ctx, c); err != nil {
 				log.Println(err)
 			}
+			log.Println(cid, "closed")
 		}(c)
 	}
 }
