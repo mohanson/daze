@@ -5,11 +5,13 @@ import (
 	"crypto/md5"
 	"crypto/rand"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
 	"math"
 	"net"
+	"sync/atomic"
 	"time"
 
 	"github.com/mohanson/daze"
@@ -78,7 +80,7 @@ type Server struct {
 }
 
 // Serve.
-func (s *Server) Serve(cli io.ReadWriteCloser) error {
+func (s *Server) Serve(ctx context.Context, cli io.ReadWriteCloser) error {
 	var (
 		buf = make([]byte, 1024)
 		dst string
@@ -107,12 +109,13 @@ func (s *Server) Serve(cli io.ReadWriteCloser) error {
 		return err
 	}
 	dst = string(buf[12 : 12+buf[11]])
-	log.Println("connect[ashe]", dst)
 	switch buf[10] {
 	case 0x01:
+		log.Printf("%s   dial network=tcp address=%s", ctx.Value("cid"), dst)
 		srv, err = net.DialTimeout("tcp", dst, time.Second*4)
 		cli = &TCPConn{cli}
 	case 0x03:
+		log.Printf("%s   dial network=udp address=%s", ctx.Value("cid"), dst)
 		srv, err = net.DialTimeout("udp", dst, time.Second*4)
 		cli = &UDPConn{cli}
 	}
@@ -133,6 +136,7 @@ func (s *Server) Run() error {
 	defer ln.Close()
 	log.Println("listen and serve on", s.Listen)
 
+	i := uint32(math.MaxUint32)
 	for {
 		cli, err := ln.Accept()
 		if err != nil {
@@ -141,9 +145,15 @@ func (s *Server) Run() error {
 		}
 		go func(cli net.Conn) {
 			defer cli.Close()
-			if err := s.Serve(cli); err != nil {
+			buf := make([]byte, 4)
+			binary.BigEndian.PutUint32(buf, atomic.AddUint32(&i, 1))
+			cid := hex.EncodeToString(buf)
+			ctx := context.WithValue(context.Background(), "cid", cid)
+			log.Printf("%s accept remote=%s", cid, cli.RemoteAddr())
+			if err := s.Serve(ctx, cli); err != nil {
 				log.Println(err)
 			}
+			log.Println(cid, "closed")
 		}(cli)
 	}
 }
