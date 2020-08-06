@@ -576,11 +576,11 @@ func (l *Locale) Run() error {
 			rand.Read(buf)
 			cid := hex.EncodeToString(buf)
 			ctx := context.WithValue(context.Background(), "cid", cid)
-			log.Println(cid, "accept new request from", c.RemoteAddr())
+			log.Println(cid, "accept conn", c.RemoteAddr())
 			if err := l.Serve(ctx, c); err != nil {
 				log.Println(cid, err)
 			}
-			log.Println(cid, "closed")
+			log.Println(cid, "closed conn")
 		}(c)
 	}
 }
