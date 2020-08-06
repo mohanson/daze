@@ -214,7 +214,7 @@ type Locale struct {
 // to the one persistent connection. I have been debugging for a long time.
 //
 // Fuck.
-func (l *Locale) ServeProxy(app io.ReadWriteCloser) error {
+func (l *Locale) ServeProxy(ctx context.Context, app io.ReadWriteCloser) error {
 	reader := bufio.NewReader(app)
 
 	for {
@@ -239,7 +239,7 @@ func (l *Locale) ServeProxy(app io.ReadWriteCloser) error {
 			servReader := bufio.NewReader(srv)
 
 			if r.Method == "CONNECT" {
-				log.Println("connect[tunnel]", r.URL.Hostname()+":"+port)
+				log.Println(ctx.Value("cid"), "tunnel", r.URL.Hostname()+":"+port)
 				_, err := app.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
 				if err != nil {
 					return err
@@ -248,7 +248,7 @@ func (l *Locale) ServeProxy(app io.ReadWriteCloser) error {
 				return nil
 			}
 
-			log.Println("connect[hproxy]", r.URL.Hostname()+":"+port)
+			log.Println(ctx.Value("cid"), "hproxy", r.URL.Hostname()+":"+port)
 			if r.Method == "GET" && r.Header.Get("Upgrade") == "websocket" {
 				if err := r.Write(srv); err != nil {
 					return err
@@ -276,7 +276,7 @@ func (l *Locale) ServeProxy(app io.ReadWriteCloser) error {
 // Introduction:
 //   See https://en.wikipedia.org/wiki/SOCKS
 //   See http://ftp.icm.edu.pl/packages/socks/socks4/SOCKS4.protocol
-func (l *Locale) ServeSocks4(app io.ReadWriteCloser) error {
+func (l *Locale) ServeSocks4(ctx context.Context, app io.ReadWriteCloser) error {
 	var (
 		reader    = bufio.NewReader(app)
 		fCode     uint8
@@ -314,7 +314,7 @@ func (l *Locale) ServeSocks4(app io.ReadWriteCloser) error {
 		dstHost = net.IP(fDstIP).String()
 	}
 	dst = dstHost + ":" + strconv.Itoa(int(dstPort))
-	log.Println("connect[socks4]", dst)
+	log.Println(ctx.Value("cid"), "socks4", dst)
 	switch fCode {
 	case 0x01:
 		srv, err = l.Dialer.Dial("tcp", dst)
@@ -338,7 +338,7 @@ func (l *Locale) ServeSocks4(app io.ReadWriteCloser) error {
 // Introduction:
 //   See https://en.wikipedia.org/wiki/SOCKS
 //   See https://tools.ietf.org/html/rfc1928
-func (l *Locale) ServeSocks5(app io.ReadWriteCloser) error {
+func (l *Locale) ServeSocks5(ctx context.Context, app io.ReadWriteCloser) error {
 	var (
 		reader   = bufio.NewReader(app)
 		fN       uint8
@@ -386,18 +386,18 @@ func (l *Locale) ServeSocks5(app io.ReadWriteCloser) error {
 	dst = dstHost + ":" + strconv.Itoa(int(dstPort))
 	switch fCmd {
 	case 0x01:
-		return l.ServeSocks5TCP(app, dst)
+		return l.ServeSocks5TCP(ctx, app, dst)
 	case 0x02:
 		panic("unreachable")
 	case 0x03:
-		return l.ServeSocks5UDP(app)
+		return l.ServeSocks5UDP(ctx, app)
 	}
 	return nil
 }
 
 // Socks5 TCP protocol.
-func (l *Locale) ServeSocks5TCP(app io.ReadWriteCloser, dst string) error {
-	log.Println("connect[socks5]", dst)
+func (l *Locale) ServeSocks5TCP(ctx context.Context, app io.ReadWriteCloser, dst string) error {
+	log.Println(ctx.Value("cid"), "socks5", dst)
 	srv, err := l.Dialer.Dial("tcp", dst)
 	if err != nil {
 		app.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
@@ -411,7 +411,7 @@ func (l *Locale) ServeSocks5TCP(app io.ReadWriteCloser, dst string) error {
 }
 
 // Socks5 UDP protocol.
-func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
+func (l *Locale) ServeSocks5UDP(ctx context.Context, app io.ReadWriteCloser) error {
 	var (
 		bndAddr     *net.UDPAddr
 		bndPort     uint16
@@ -482,10 +482,10 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 			goto send
 		}
 	init:
-		log.Println("connect[socks5]", dst)
+		log.Println(ctx.Value("cid"), "socks5", dst)
 		srv, err = l.Dialer.Dial("udp", dst)
 		if err != nil {
-			log.Println(err)
+			log.Println(ctx.Value("cid"), err)
 			continue
 		}
 		cpl[dst] = srv
@@ -513,7 +513,7 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 	send:
 		_, err = srv.(io.ReadWriteCloser).Write(buf[appHeadSize:appSize])
 		if err != nil {
-			log.Println(err)
+			log.Println(ctx.Value("cid"), err)
 			srv.Close()
 			goto init
 		}
@@ -547,12 +547,12 @@ func (l *Locale) Serve(ctx context.Context, app io.ReadWriteCloser) error {
 		Closer: app,
 	}
 	if buf[0] == 0x05 {
-		return l.ServeSocks5(app)
+		return l.ServeSocks5(ctx, app)
 	}
 	if buf[0] == 0x04 {
-		return l.ServeSocks4(app)
+		return l.ServeSocks4(ctx, app)
 	}
-	return l.ServeProxy(app)
+	return l.ServeProxy(ctx, app)
 }
 
 // Run.
@@ -576,9 +576,9 @@ func (l *Locale) Run() error {
 			rand.Read(buf)
 			cid := hex.EncodeToString(buf)
 			ctx := context.WithValue(context.Background(), "cid", cid)
-			log.Println(cid, "accept", c.RemoteAddr())
+			log.Println(cid, "accept new request from", c.RemoteAddr())
 			if err := l.Serve(ctx, c); err != nil {
-				log.Println(err)
+				log.Println(cid, err)
 			}
 			log.Println(cid, "closed")
 		}(c)
