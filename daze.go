@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/cipher"
-	"crypto/rand"
 	"crypto/rc4"
 	"encoding/binary"
 	"encoding/hex"
@@ -19,6 +18,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/mohanson/acdb"
 	"github.com/mohanson/aget"
@@ -239,7 +239,7 @@ func (l *Locale) ServeProxy(ctx context.Context, app io.ReadWriteCloser) error {
 			servReader := bufio.NewReader(srv)
 
 			if r.Method == "CONNECT" {
-				log.Println(ctx.Value("cid"), "parser", "format=tunnel")
+				log.Println(ctx.Value("cid"), " proto", "format=tunnel")
 				_, err := app.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
 				if err != nil {
 					return err
@@ -248,7 +248,7 @@ func (l *Locale) ServeProxy(ctx context.Context, app io.ReadWriteCloser) error {
 				return nil
 			}
 
-			log.Println(ctx.Value("cid"), "parser", "format=hproxy")
+			log.Println(ctx.Value("cid"), " proto", "format=hproxy")
 			if r.Method == "GET" && r.Header.Get("Upgrade") == "websocket" {
 				if err := r.Write(srv); err != nil {
 					return err
@@ -314,7 +314,7 @@ func (l *Locale) ServeSocks4(ctx context.Context, app io.ReadWriteCloser) error 
 		dstHost = net.IP(fDstIP).String()
 	}
 	dst = dstHost + ":" + strconv.Itoa(int(dstPort))
-	log.Println(ctx.Value("cid"), "parser", "format=socks4")
+	log.Println(ctx.Value("cid"), " proto", "format=socks4")
 	switch fCode {
 	case 0x01:
 		srv, err = l.Dialer.Dial(ctx, "tcp", dst)
@@ -397,7 +397,7 @@ func (l *Locale) ServeSocks5(ctx context.Context, app io.ReadWriteCloser) error 
 
 // Socks5 TCP protocol.
 func (l *Locale) ServeSocks5TCP(ctx context.Context, app io.ReadWriteCloser, dst string) error {
-	log.Println(ctx.Value("cid"), "parser", "format=socks5")
+	log.Println(ctx.Value("cid"), " proto", "format=socks5")
 	srv, err := l.Dialer.Dial(ctx, "tcp", dst)
 	if err != nil {
 		app.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
@@ -482,7 +482,7 @@ func (l *Locale) ServeSocks5UDP(ctx context.Context, app io.ReadWriteCloser) err
 			goto send
 		}
 	init:
-		log.Println(ctx.Value("cid"), "parser", "format=socks5")
+		log.Println(ctx.Value("cid"), " proto", "format=socks5")
 		srv, err = l.Dialer.Dial(ctx, "udp", dst)
 		if err != nil {
 			log.Println(ctx.Value("cid"), err)
@@ -564,6 +564,7 @@ func (l *Locale) Run() error {
 	defer s.Close()
 	log.Println("listen and serve on", l.Listen)
 
+	i := uint32(math.MaxUint32)
 	for {
 		c, err := s.Accept()
 		if err != nil {
@@ -573,7 +574,7 @@ func (l *Locale) Run() error {
 		go func(c net.Conn) {
 			defer c.Close()
 			buf := make([]byte, 4)
-			rand.Read(buf)
+			binary.BigEndian.PutUint32(buf, atomic.AddUint32(&i, 1))
 			cid := hex.EncodeToString(buf)
 			ctx := context.WithValue(context.Background(), "cid", cid)
 			log.Printf("%s accept remote=%s", cid, c.RemoteAddr())
@@ -598,7 +599,7 @@ type Direct struct {
 }
 
 func (d *Direct) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
-	log.Printf("%s dialer routing=direct network=%s address=%s", ctx.Value("cid"), network, address)
+	log.Printf("%s   dial routing=direct network=%s address=%s", ctx.Value("cid"), network, address)
 	return net.Dial(network, address)
 }
 
