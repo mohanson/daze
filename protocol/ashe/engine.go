@@ -138,12 +138,12 @@ func (s *Server) Run() error {
 			log.Println(err)
 			continue
 		}
-		go func() {
+		go func(cli net.Conn) {
 			defer cli.Close()
 			if err := s.Serve(cli); err != nil {
 				log.Println(err)
 			}
-		}()
+		}(cli)
 	}
 }
 
