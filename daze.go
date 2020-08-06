@@ -86,7 +86,7 @@ func Resolve(addr string) {
 
 // Dialer contains options for connecting to an address.
 type Dialer interface {
-	Dial(network string, address string) (io.ReadWriteCloser, error)
+	Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error)
 }
 
 // IPv4ReservedIPNet returns reserved IPv4 addresses.
@@ -231,7 +231,7 @@ func (l *Locale) ServeProxy(ctx context.Context, app io.ReadWriteCloser) error {
 				port = r.URL.Port()
 			}
 
-			srv, err := l.Dialer.Dial("tcp", r.URL.Hostname()+":"+port)
+			srv, err := l.Dialer.Dial(ctx, "tcp", r.URL.Hostname()+":"+port)
 			if err != nil {
 				return err
 			}
@@ -317,7 +317,7 @@ func (l *Locale) ServeSocks4(ctx context.Context, app io.ReadWriteCloser) error 
 	log.Println(ctx.Value("cid"), "socks4", dst)
 	switch fCode {
 	case 0x01:
-		srv, err = l.Dialer.Dial("tcp", dst)
+		srv, err = l.Dialer.Dial(ctx, "tcp", dst)
 		if err != nil {
 			app.Write([]byte{0x00, 0x5b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 			return err
@@ -398,7 +398,7 @@ func (l *Locale) ServeSocks5(ctx context.Context, app io.ReadWriteCloser) error 
 // Socks5 TCP protocol.
 func (l *Locale) ServeSocks5TCP(ctx context.Context, app io.ReadWriteCloser, dst string) error {
 	log.Println(ctx.Value("cid"), "socks5", dst)
-	srv, err := l.Dialer.Dial("tcp", dst)
+	srv, err := l.Dialer.Dial(ctx, "tcp", dst)
 	if err != nil {
 		app.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 		return err
@@ -483,7 +483,7 @@ func (l *Locale) ServeSocks5UDP(ctx context.Context, app io.ReadWriteCloser) err
 		}
 	init:
 		log.Println(ctx.Value("cid"), "socks5", dst)
-		srv, err = l.Dialer.Dial("udp", dst)
+		srv, err = l.Dialer.Dial(ctx, "udp", dst)
 		if err != nil {
 			log.Println(ctx.Value("cid"), err)
 			continue
@@ -597,7 +597,7 @@ func NewLocale(listen string, dialer Dialer) *Locale {
 type Direct struct {
 }
 
-func (d *Direct) Dial(network string, address string) (io.ReadWriteCloser, error) {
+func (d *Direct) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
 	return net.Dial(network, address)
 }
 
@@ -697,25 +697,25 @@ type Squire struct {
 }
 
 // Dialer contains options for connecting to an address.
-func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error) {
+func (s *Squire) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
 	host, _, err := net.SplitHostPort(address)
 	mode := MPuzzle
 	if err = s.Memory.Get(host, &mode); err == nil {
 		switch mode {
 		case MLocale:
-			return s.Direct.Dial(network, address)
+			return s.Direct.Dial(ctx, network, address)
 		case MRemote:
-			return s.Dialer.Dial(network, address)
+			return s.Dialer.Dial(ctx, network, address)
 		}
 		panic("unreachable")
 	}
 	switch s.Rulels.Road(host) {
 	case MLocale:
 		s.Memory.Set(host, MLocale)
-		return s.Direct.Dial(network, address)
+		return s.Direct.Dial(ctx, network, address)
 	case MRemote:
 		s.Memory.Set(host, MRemote)
-		return s.Dialer.Dial(network, address)
+		return s.Dialer.Dial(ctx, network, address)
 	case MFucked:
 		return nil, fmt.Errorf("daze: %s has been blocked", host)
 	case MPuzzle:
@@ -723,10 +723,10 @@ func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error
 	l, err := net.LookupIP(host)
 	if err == nil && IPNetContains(s.IPNets, l[0]) {
 		s.Memory.Set(host, MLocale)
-		return s.Direct.Dial(network, address)
+		return s.Direct.Dial(ctx, network, address)
 	} else {
 		s.Memory.Set(host, MRemote)
-		return s.Dialer.Dial(network, address)
+		return s.Dialer.Dial(ctx, network, address)
 	}
 }
 

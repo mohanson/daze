@@ -1,6 +1,7 @@
 package ashe
 
 import (
+	"context"
 	"crypto/md5"
 	"crypto/rand"
 	"encoding/binary"
@@ -164,7 +165,7 @@ type Client struct {
 // Dial. It is similar to the server, the only difference is that it constructs the data and the server parses the
 // data. This code I refer to the golang socks5 official library. That is a good code which is opened with expectation,
 // and closed with delight and profit.
-func (c *Client) Dial(network string, address string) (io.ReadWriteCloser, error) {
+func (c *Client) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
 	var (
 		srv io.ReadWriteCloser
 		n   = len(address)
