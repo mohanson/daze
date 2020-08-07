@@ -22,13 +22,14 @@ import (
 	"time"
 
 	"github.com/mohanson/aget"
-	"github.com/mohanson/ddir"
 	"github.com/mohanson/lru"
+	"github.com/mohanson/res"
 )
 
 const (
-	DIAL_TIMEOUT    = time.Second * 8
-	LRU_MAX_ENTRIES = 1024
+	DIAL_TIMEOUT         = time.Second * 8
+	LRU_MAX_ENTRIES      = 1024
+	PATH_DELEGATED_APNIC = "/delegated-apnic-latest"
 )
 
 // Link copies from src to dst and dst to src until either EOF is reached.
@@ -153,7 +154,7 @@ func IPv6ReservedIPNet() []*net.IPNet {
 
 // CNIPNet returns full ipv4/6 CIDR in CN.
 func CNIPNet() []*net.IPNet {
-	name := ddir.Join("delegated-apnic-latest")
+	name := res.Path(PATH_DELEGATED_APNIC)
 	f, err := aget.Open(name)
 	if err != nil {
 		panic(err)

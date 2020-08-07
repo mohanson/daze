@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/mohanson/ddir"
+	"github.com/mohanson/res"
 )
 
 func call(name string, arg ...string) {
@@ -59,8 +59,8 @@ func cp(src string, dst string) {
 }
 
 func main() {
-	ddir.Base(".")
-	ddir.Make("bin")
+	res.Base(".")
+	res.Make("/bin")
 	flag.Parse()
 	args := flag.Args()
 	if len(args) == 0 {
@@ -69,18 +69,18 @@ func main() {
 	for _, e := range flag.Args() {
 		switch e {
 		case "develop":
-			ddir.Make("bin")
-			if _, err := os.Stat(ddir.Join("bin", "delegated-apnic-latest")); os.IsNotExist(err) {
-				wget("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest", ddir.Join("bin", "delegated-apnic-latest"))
+			res.Make("/bin")
+			if _, err := os.Stat(res.Path("/bin/delegated-apnic-latest")); os.IsNotExist(err) {
+				wget("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest", res.Path("/bin/delegated-apnic-latest"))
 			}
-			if _, err := os.Stat(ddir.Join("bin", "rule.ls")); os.IsNotExist(err) {
-				cp(ddir.Join("res", "rule.ls"), ddir.Join("bin", "rule.ls"))
+			if _, err := os.Stat(res.Path("/bin/rule.ls")); os.IsNotExist(err) {
+				cp(res.Path("/res/rule.ls"), res.Path("/bin/rule.ls"))
 			}
 			call("go", "build", "-o", "bin", "github.com/mohanson/daze/cmd/daze")
 		case "release":
-			os.RemoveAll(ddir.Join("bin", "release"))
-			ddir.Make("bin", "release")
-			ddir.Make("bin", "release", "gox")
+			os.RemoveAll(res.Path("/bin/release"))
+			res.Make("/bin/release")
+			res.Make("/bin/release/gox")
 			bash("cd bin/release && wget http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")
 			bash("cd bin/release/gox && gox github.com/mohanson/daze/cmd/daze")
 			l, _ := filepath.Glob("bin/release/gox/daze_*")
