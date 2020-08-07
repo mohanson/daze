@@ -30,10 +30,12 @@ var Conf = struct {
 	DialTimeout        time.Duration
 	LruMaxEntries      int
 	PathDelegatedApnic string
+	PathRule           string
 }{
 	DialTimeout:        time.Second * 8,
 	LruMaxEntries:      1024,
 	PathDelegatedApnic: "/delegated-apnic-latest",
+	PathRule:           "/rule.ls",
 }
 
 // Link copies from src to dst and dst to src until either EOF is reached.

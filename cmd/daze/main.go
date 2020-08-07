@@ -21,8 +21,6 @@ The most commonly used daze commands are:
 
 Run 'daze <command> -h' for more information on a command.`
 
-const rule = "/rule.ls"
-
 func main() {
 	if len(os.Args) <= 1 {
 		fmt.Println(help)
@@ -49,17 +47,18 @@ func main() {
 			panic(err)
 		}
 	case "client":
+		pathRule := daze.Conf.PathRule
 		var (
 			flListen = flag.String("l", "127.0.0.1:1080", "listen address")
 			flServer = flag.String("s", "127.0.0.1:1081", "server address")
 			flCipher = flag.String("k", "daze", "cipher, for encryption")
 			flFilter = flag.String("f", "ipcn", "filter {ipcn, none}")
-			flRulels = flag.String("r", res.Path(rule), "rule path")
+			flRulels = flag.String("r", pathRule, "rule path")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
-		if _, err := os.Stat(res.Path(rule)); err != nil {
-			f, er := os.Create(res.Path(rule))
+		if _, err := os.Stat(pathRule); err != nil {
+			f, er := os.Create(pathRule)
 			if er != nil {
 				panic(er)
 			}
