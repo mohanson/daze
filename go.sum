@@ -4,3 +4,5 @@ github.com/mohanson/aget v0.0.0-20200121135955-91781155fd7a h1:G28eRjI5SBRfCCbIl
 github.com/mohanson/aget v0.0.0-20200121135955-91781155fd7a/go.mod h1:HAlRhYkqXGYityX5GglZorpKVLIKRVCu6VB+uRqf2Zw=
 github.com/mohanson/ddir v0.0.0-20200325134232-2a67c1bc98a0 h1:QX7VALJdIiAbdq71ApmGmnJqaovN7iYZRazTxOBdAS8=
 github.com/mohanson/ddir v0.0.0-20200325134232-2a67c1bc98a0/go.mod h1:4BAE9OWHRjbScm4FsjDwEvi1YR50guvFr51jlntU+8E=
+github.com/mohanson/lru v0.0.0-20200807062111-9aea3aa5d730 h1:U/n2nMiJzIY77gJSiCFU/HPgxO2P81VPQEj44NkSurI=
+github.com/mohanson/lru v0.0.0-20200807062111-9aea3aa5d730/go.mod h1:6MuIsKg4QTtlY8yEF7CBHj8/unBW9Kwa1JqF+bNfhhk=

@@ -112,11 +112,11 @@ func (s *Server) Serve(ctx context.Context, cli io.ReadWriteCloser) error {
 	switch buf[10] {
 	case 0x01:
 		log.Printf("%s   dial network=tcp address=%s", ctx.Value("cid"), dst)
-		srv, err = net.DialTimeout("tcp", dst, time.Second*4)
+		srv, err = net.DialTimeout("tcp", dst, daze.DIAL_TIMEOUT)
 		cli = &TCPConn{cli}
 	case 0x03:
 		log.Printf("%s   dial network=udp address=%s", ctx.Value("cid"), dst)
-		srv, err = net.DialTimeout("udp", dst, time.Second*4)
+		srv, err = net.DialTimeout("udp", dst, daze.DIAL_TIMEOUT)
 		cli = &UDPConn{cli}
 	}
 	if err != nil {
@@ -189,7 +189,7 @@ func (c *Client) Dial(ctx context.Context, network string, address string) (io.R
 	if network != "tcp" && network != "udp" {
 		return nil, fmt.Errorf("daze: network must be tcp or udp, but get %s", network)
 	}
-	srv, err = net.DialTimeout("tcp", c.Server, time.Second*4)
+	srv, err = net.DialTimeout("tcp", c.Server, daze.DIAL_TIMEOUT)
 	if err != nil {
 		return nil, err
 	}

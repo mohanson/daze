@@ -19,10 +19,16 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"time"
 
-	"github.com/mohanson/acdb"
 	"github.com/mohanson/aget"
 	"github.com/mohanson/ddir"
+	"github.com/mohanson/lru"
+)
+
+const (
+	DIAL_TIMEOUT    = time.Second * 8
+	LRU_MAX_ENTRIES = 1024
 )
 
 // Link copies from src to dst and dst to src until either EOF is reached.
@@ -600,7 +606,7 @@ type Direct struct {
 
 func (d *Direct) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
 	log.Printf("%s   dial routing=direct network=%s address=%s", ctx.Value("cid"), network, address)
-	return net.Dial(network, address)
+	return net.DialTimeout(network, address, DIAL_TIMEOUT)
 }
 
 // A RoadMode represents a host's road mode.
@@ -693,17 +699,16 @@ func NewRulels() *Rulels {
 type Squire struct {
 	Dialer Dialer
 	Direct Dialer
-	Memory acdb.Client
+	Memory *lru.Cache
 	Rulels *Rulels
 	IPNets []*net.IPNet
 }
 
 // Dialer contains options for connecting to an address.
 func (s *Squire) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
-	host, _, err := net.SplitHostPort(address)
-	mode := MPuzzle
-	if err = s.Memory.Get(host, &mode); err == nil {
-		switch mode {
+	host, _, _ := net.SplitHostPort(address)
+	if md, fit := s.Memory.Get(host); fit {
+		switch md.(RoadMode) {
 		case MLocale:
 			return s.Direct.Dial(ctx, network, address)
 		case MRemote:
@@ -713,10 +718,10 @@ func (s *Squire) Dial(ctx context.Context, network string, address string) (io.R
 	}
 	switch s.Rulels.Road(host) {
 	case MLocale:
-		s.Memory.Set(host, MLocale)
+		s.Memory.Add(host, MLocale)
 		return s.Direct.Dial(ctx, network, address)
 	case MRemote:
-		s.Memory.Set(host, MRemote)
+		s.Memory.Add(host, MRemote)
 		return s.Dialer.Dial(ctx, network, address)
 	case MFucked:
 		return nil, fmt.Errorf("daze: %s has been blocked", host)
@@ -724,10 +729,10 @@ func (s *Squire) Dial(ctx context.Context, network string, address string) (io.R
 	}
 	l, err := net.LookupIP(host)
 	if err == nil && IPNetContains(s.IPNets, l[0]) {
-		s.Memory.Set(host, MLocale)
+		s.Memory.Add(host, MLocale)
 		return s.Direct.Dial(ctx, network, address)
 	} else {
-		s.Memory.Set(host, MRemote)
+		s.Memory.Add(host, MRemote)
 		return s.Dialer.Dial(ctx, network, address)
 	}
 }
@@ -737,7 +742,7 @@ func NewSquire(dialer Dialer) *Squire {
 	return &Squire{
 		Dialer: dialer,
 		Direct: &Direct{},
-		Memory: acdb.Lru(1024),
+		Memory: lru.New(LRU_MAX_ENTRIES),
 		Rulels: NewRulels(),
 	}
 }
