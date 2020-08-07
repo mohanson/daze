@@ -26,11 +26,15 @@ import (
 	"github.com/mohanson/res"
 )
 
-const (
-	DIAL_TIMEOUT         = time.Second * 8
-	LRU_MAX_ENTRIES      = 1024
-	PATH_DELEGATED_APNIC = "/delegated-apnic-latest"
-)
+var Conf = struct {
+	DialTimeout        time.Duration
+	LruMaxEntries      int
+	PathDelegatedApnic string
+}{
+	DialTimeout:        time.Second * 8,
+	LruMaxEntries:      1024,
+	PathDelegatedApnic: "/delegated-apnic-latest",
+}
 
 // Link copies from src to dst and dst to src until either EOF is reached.
 func Link(a, b io.ReadWriteCloser) {
@@ -154,7 +158,7 @@ func IPv6ReservedIPNet() []*net.IPNet {
 
 // CNIPNet returns full ipv4/6 CIDR in CN.
 func CNIPNet() []*net.IPNet {
-	name := res.Path(PATH_DELEGATED_APNIC)
+	name := res.Path(Conf.PathDelegatedApnic)
 	f, err := aget.Open(name)
 	if err != nil {
 		panic(err)
@@ -607,7 +611,7 @@ type Direct struct {
 
 func (d *Direct) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
 	log.Printf("%s   dial routing=direct network=%s address=%s", ctx.Value("cid"), network, address)
-	return net.DialTimeout(network, address, DIAL_TIMEOUT)
+	return net.DialTimeout(network, address, Conf.DialTimeout)
 }
 
 // A RoadMode represents a host's road mode.
@@ -743,7 +747,7 @@ func NewSquire(dialer Dialer) *Squire {
 	return &Squire{
 		Dialer: dialer,
 		Direct: &Direct{},
-		Memory: lru.New(LRU_MAX_ENTRIES),
+		Memory: lru.New(Conf.LruMaxEntries),
 		Rulels: NewRulels(),
 	}
 }
