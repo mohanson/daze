@@ -47,23 +47,15 @@ func main() {
 			panic(err)
 		}
 	case "client":
-		pathRule := daze.Conf.PathRule
 		var (
 			flListen = flag.String("l", "127.0.0.1:1080", "listen address")
 			flServer = flag.String("s", "127.0.0.1:1081", "server address")
 			flCipher = flag.String("k", "daze", "cipher, for encryption")
 			flFilter = flag.String("f", "ipcn", "filter {ipcn, none}")
-			flRulels = flag.String("r", pathRule, "rule path")
+			flRulels = flag.String("r", res.Path(daze.Conf.PathRule), "rule path")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
-		if _, err := os.Stat(pathRule); err != nil {
-			f, er := os.Create(pathRule)
-			if er != nil {
-				panic(er)
-			}
-			f.Close()
-		}
 		log.Println("remote server is", *flServer)
 		log.Println("client cipher is", *flCipher)
 		if *flDnserv != "" {
