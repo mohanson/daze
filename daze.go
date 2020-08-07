@@ -15,13 +15,13 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
 
-	"github.com/mohanson/aget"
 	"github.com/mohanson/lru"
 	"github.com/mohanson/res"
 )
@@ -160,8 +160,7 @@ func IPv6ReservedIPNet() []*net.IPNet {
 
 // CNIPNet returns full ipv4/6 CIDR in CN.
 func CNIPNet() []*net.IPNet {
-	name := res.Path(Conf.PathDelegatedApnic)
-	f, err := aget.Open(name)
+	f, err := os.Open(res.Path(Conf.PathDelegatedApnic))
 	if err != nil {
 		panic(err)
 	}
@@ -207,6 +206,23 @@ func IPNetContains(l []*net.IPNet, ip net.IP) bool {
 		}
 	}
 	return false
+}
+
+// OpenFile select the appropriate method to open the file based on the incoming args automatically.
+//
+// Examples:
+//   OpenFile("/etc/hosts")
+//   OpenFile("https://raw.githubusercontent.com/mohanson/daze/master/README.md")
+func OpenFile(name string) (io.ReadCloser, error) {
+	if strings.HasPrefix(name, "http://") || strings.HasPrefix(name, "https://") {
+		resp, err := http.Get(name)
+		if err != nil {
+			return nil, err
+		}
+		return resp.Body, nil
+	} else {
+		return os.Open(name)
+	}
 }
 
 // Locale is the main process of daze. In most cases, it is usually deployed as a daemon on a local machine.
@@ -664,7 +680,7 @@ func (r *Rulels) Road(host string) RoadMode {
 
 // Load a RULE file.
 func (r *Rulels) Load(name string) error {
-	f, err := aget.Open(name)
+	f, err := OpenFile(name)
 	if err != nil {
 		return err
 	}

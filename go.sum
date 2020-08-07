@@ -1,8 +1,4 @@
-github.com/mohanson/aget v0.0.0-20200121135955-91781155fd7a h1:G28eRjI5SBRfCCbIl6xku4kb1yOxkoist++3MBPxPRw=
-github.com/mohanson/aget v0.0.0-20200121135955-91781155fd7a/go.mod h1:HAlRhYkqXGYityX5GglZorpKVLIKRVCu6VB+uRqf2Zw=
 github.com/mohanson/lru v0.0.0-20200807062111-9aea3aa5d730 h1:U/n2nMiJzIY77gJSiCFU/HPgxO2P81VPQEj44NkSurI=
 github.com/mohanson/lru v0.0.0-20200807062111-9aea3aa5d730/go.mod h1:6MuIsKg4QTtlY8yEF7CBHj8/unBW9Kwa1JqF+bNfhhk=
-github.com/mohanson/res v0.0.0-20200807075034-3035ea3a9440 h1:D0s0OdGbIiLp/2Ml+2Lm1Iir5UUKSetU81P7/XKdvAo=
-github.com/mohanson/res v0.0.0-20200807075034-3035ea3a9440/go.mod h1:0AEqs6ZyPjbvoBehQJ3jT8jVwQvDxKyfaE3DJd4IPDs=
 github.com/mohanson/res v0.0.0-20200807080104-76ffeffbd912 h1:UNcSboGelp28QMbXHTDcCVl7KQwGlQkHGBqNKdKpRDg=
 github.com/mohanson/res v0.0.0-20200807080104-76ffeffbd912/go.mod h1:0AEqs6ZyPjbvoBehQJ3jT8jVwQvDxKyfaE3DJd4IPDs=
