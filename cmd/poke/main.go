@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"io"
 	"log"
@@ -59,7 +60,7 @@ func mainTCPDaze() {
 	go mainTCPServer()
 	time.Sleep(time.Second)
 	client := ashe.NewClient(srvListen, cipher)
-	c, err := client.Dial("tcp", tcpListen)
+	c, err := client.Dial(context.Background(), "tcp", tcpListen)
 	if err != nil {
 		panic(err)
 	}
@@ -116,7 +117,7 @@ func mainUDPDaze() {
 	go mainUDPServer()
 	time.Sleep(time.Second)
 	client := ashe.NewClient(srvListen, cipher)
-	c, err := client.Dial("udp", udpListen)
+	c, err := client.Dial(context.Background(), "udp", udpListen)
 	if err != nil {
 		panic(err)
 	}

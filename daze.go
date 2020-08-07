@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 
 	"github.com/mohanson/acdb"
 	"github.com/mohanson/aget"
@@ -85,7 +86,7 @@ func Resolve(addr string) {
 
 // Dialer contains options for connecting to an address.
 type Dialer interface {
-	Dial(network string, address string) (io.ReadWriteCloser, error)
+	Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error)
 }
 
 // IPv4ReservedIPNet returns reserved IPv4 addresses.
@@ -213,7 +214,7 @@ type Locale struct {
 // to the one persistent connection. I have been debugging for a long time.
 //
 // Fuck.
-func (l *Locale) ServeProxy(app io.ReadWriteCloser) error {
+func (l *Locale) ServeProxy(ctx context.Context, app io.ReadWriteCloser) error {
 	reader := bufio.NewReader(app)
 
 	for {
@@ -230,7 +231,7 @@ func (l *Locale) ServeProxy(app io.ReadWriteCloser) error {
 				port = r.URL.Port()
 			}
 
-			srv, err := l.Dialer.Dial("tcp", r.URL.Hostname()+":"+port)
+			srv, err := l.Dialer.Dial(ctx, "tcp", r.URL.Hostname()+":"+port)
 			if err != nil {
 				return err
 			}
@@ -238,7 +239,7 @@ func (l *Locale) ServeProxy(app io.ReadWriteCloser) error {
 			servReader := bufio.NewReader(srv)
 
 			if r.Method == "CONNECT" {
-				log.Println("connect[tunnel]", r.URL.Hostname()+":"+port)
+				log.Println(ctx.Value("cid"), " proto", "format=tunnel")
 				_, err := app.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
 				if err != nil {
 					return err
@@ -247,7 +248,7 @@ func (l *Locale) ServeProxy(app io.ReadWriteCloser) error {
 				return nil
 			}
 
-			log.Println("connect[hproxy]", r.URL.Hostname()+":"+port)
+			log.Println(ctx.Value("cid"), " proto", "format=hproxy")
 			if r.Method == "GET" && r.Header.Get("Upgrade") == "websocket" {
 				if err := r.Write(srv); err != nil {
 					return err
@@ -275,7 +276,7 @@ func (l *Locale) ServeProxy(app io.ReadWriteCloser) error {
 // Introduction:
 //   See https://en.wikipedia.org/wiki/SOCKS
 //   See http://ftp.icm.edu.pl/packages/socks/socks4/SOCKS4.protocol
-func (l *Locale) ServeSocks4(app io.ReadWriteCloser) error {
+func (l *Locale) ServeSocks4(ctx context.Context, app io.ReadWriteCloser) error {
 	var (
 		reader    = bufio.NewReader(app)
 		fCode     uint8
@@ -313,10 +314,10 @@ func (l *Locale) ServeSocks4(app io.ReadWriteCloser) error {
 		dstHost = net.IP(fDstIP).String()
 	}
 	dst = dstHost + ":" + strconv.Itoa(int(dstPort))
-	log.Println("connect[socks4]", dst)
+	log.Println(ctx.Value("cid"), " proto", "format=socks4")
 	switch fCode {
 	case 0x01:
-		srv, err = l.Dialer.Dial("tcp", dst)
+		srv, err = l.Dialer.Dial(ctx, "tcp", dst)
 		if err != nil {
 			app.Write([]byte{0x00, 0x5b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 			return err
@@ -337,7 +338,7 @@ func (l *Locale) ServeSocks4(app io.ReadWriteCloser) error {
 // Introduction:
 //   See https://en.wikipedia.org/wiki/SOCKS
 //   See https://tools.ietf.org/html/rfc1928
-func (l *Locale) ServeSocks5(app io.ReadWriteCloser) error {
+func (l *Locale) ServeSocks5(ctx context.Context, app io.ReadWriteCloser) error {
 	var (
 		reader   = bufio.NewReader(app)
 		fN       uint8
@@ -385,19 +386,19 @@ func (l *Locale) ServeSocks5(app io.ReadWriteCloser) error {
 	dst = dstHost + ":" + strconv.Itoa(int(dstPort))
 	switch fCmd {
 	case 0x01:
-		return l.ServeSocks5TCP(app, dst)
+		return l.ServeSocks5TCP(ctx, app, dst)
 	case 0x02:
 		panic("unreachable")
 	case 0x03:
-		return l.ServeSocks5UDP(app)
+		return l.ServeSocks5UDP(ctx, app)
 	}
 	return nil
 }
 
 // Socks5 TCP protocol.
-func (l *Locale) ServeSocks5TCP(app io.ReadWriteCloser, dst string) error {
-	log.Println("connect[socks5]", dst)
-	srv, err := l.Dialer.Dial("tcp", dst)
+func (l *Locale) ServeSocks5TCP(ctx context.Context, app io.ReadWriteCloser, dst string) error {
+	log.Println(ctx.Value("cid"), " proto", "format=socks5")
+	srv, err := l.Dialer.Dial(ctx, "tcp", dst)
 	if err != nil {
 		app.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 		return err
@@ -410,7 +411,7 @@ func (l *Locale) ServeSocks5TCP(app io.ReadWriteCloser, dst string) error {
 }
 
 // Socks5 UDP protocol.
-func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
+func (l *Locale) ServeSocks5UDP(ctx context.Context, app io.ReadWriteCloser) error {
 	var (
 		bndAddr     *net.UDPAddr
 		bndPort     uint16
@@ -481,10 +482,10 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 			goto send
 		}
 	init:
-		log.Println("connect[socks5]", dst)
-		srv, err = l.Dialer.Dial("udp", dst)
+		log.Println(ctx.Value("cid"), " proto", "format=socks5")
+		srv, err = l.Dialer.Dial(ctx, "udp", dst)
 		if err != nil {
-			log.Println(err)
+			log.Println(ctx.Value("cid"), " error", err)
 			continue
 		}
 		cpl[dst] = srv
@@ -512,7 +513,7 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 	send:
 		_, err = srv.(io.ReadWriteCloser).Write(buf[appHeadSize:appSize])
 		if err != nil {
-			log.Println(err)
+			log.Println(ctx.Value("cid"), " error", err)
 			srv.Close()
 			goto init
 		}
@@ -525,7 +526,7 @@ func (l *Locale) ServeSocks5UDP(app io.ReadWriteCloser) error {
 
 // We should be very clear about what it does. It judges the traffic type and processes it with a different
 // handler(ServeProxy/ServeSocks4/ServeSocks5).
-func (l *Locale) Serve(app io.ReadWriteCloser) error {
+func (l *Locale) Serve(ctx context.Context, app io.ReadWriteCloser) error {
 	var (
 		buf = make([]byte, 1)
 		err error
@@ -546,12 +547,12 @@ func (l *Locale) Serve(app io.ReadWriteCloser) error {
 		Closer: app,
 	}
 	if buf[0] == 0x05 {
-		return l.ServeSocks5(app)
+		return l.ServeSocks5(ctx, app)
 	}
 	if buf[0] == 0x04 {
-		return l.ServeSocks4(app)
+		return l.ServeSocks4(ctx, app)
 	}
-	return l.ServeProxy(app)
+	return l.ServeProxy(ctx, app)
 }
 
 // Run.
@@ -563,6 +564,7 @@ func (l *Locale) Run() error {
 	defer s.Close()
 	log.Println("listen and serve on", l.Listen)
 
+	i := uint32(math.MaxUint32)
 	for {
 		c, err := s.Accept()
 		if err != nil {
@@ -571,9 +573,15 @@ func (l *Locale) Run() error {
 		}
 		go func(c net.Conn) {
 			defer c.Close()
-			if err := l.Serve(c); err != nil {
-				log.Println(err)
+			buf := make([]byte, 4)
+			binary.BigEndian.PutUint32(buf, atomic.AddUint32(&i, 1))
+			cid := hex.EncodeToString(buf)
+			ctx := context.WithValue(context.Background(), "cid", cid)
+			log.Printf("%s accept remote=%s", cid, c.RemoteAddr())
+			if err := l.Serve(ctx, c); err != nil {
+				log.Println(cid, " error", err)
 			}
+			log.Println(cid, "closed")
 		}(c)
 	}
 }
@@ -590,7 +598,8 @@ func NewLocale(listen string, dialer Dialer) *Locale {
 type Direct struct {
 }
 
-func (d *Direct) Dial(network string, address string) (io.ReadWriteCloser, error) {
+func (d *Direct) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
+	log.Printf("%s   dial routing=direct network=%s address=%s", ctx.Value("cid"), network, address)
 	return net.Dial(network, address)
 }
 
@@ -690,25 +699,25 @@ type Squire struct {
 }
 
 // Dialer contains options for connecting to an address.
-func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error) {
+func (s *Squire) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
 	host, _, err := net.SplitHostPort(address)
 	mode := MPuzzle
 	if err = s.Memory.Get(host, &mode); err == nil {
 		switch mode {
 		case MLocale:
-			return s.Direct.Dial(network, address)
+			return s.Direct.Dial(ctx, network, address)
 		case MRemote:
-			return s.Dialer.Dial(network, address)
+			return s.Dialer.Dial(ctx, network, address)
 		}
 		panic("unreachable")
 	}
 	switch s.Rulels.Road(host) {
 	case MLocale:
 		s.Memory.Set(host, MLocale)
-		return s.Direct.Dial(network, address)
+		return s.Direct.Dial(ctx, network, address)
 	case MRemote:
 		s.Memory.Set(host, MRemote)
-		return s.Dialer.Dial(network, address)
+		return s.Dialer.Dial(ctx, network, address)
 	case MFucked:
 		return nil, fmt.Errorf("daze: %s has been blocked", host)
 	case MPuzzle:
@@ -716,10 +725,10 @@ func (s *Squire) Dial(network string, address string) (io.ReadWriteCloser, error
 	l, err := net.LookupIP(host)
 	if err == nil && IPNetContains(s.IPNets, l[0]) {
 		s.Memory.Set(host, MLocale)
-		return s.Direct.Dial(network, address)
+		return s.Direct.Dial(ctx, network, address)
 	} else {
 		s.Memory.Set(host, MRemote)
-		return s.Dialer.Dial(network, address)
+		return s.Dialer.Dial(ctx, network, address)
 	}
 }
 
