@@ -151,7 +151,7 @@ func (s *Server) Run() error {
 			ctx := context.WithValue(context.Background(), "cid", cid)
 			log.Printf("%s accept remote=%s", cid, cli.RemoteAddr())
 			if err := s.Serve(ctx, cli); err != nil {
-				log.Println(err)
+				log.Println(cid, " error", err)
 			}
 			log.Println(cid, "closed")
 		}(cli)

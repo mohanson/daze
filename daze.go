@@ -485,7 +485,7 @@ func (l *Locale) ServeSocks5UDP(ctx context.Context, app io.ReadWriteCloser) err
 		log.Println(ctx.Value("cid"), " proto", "format=socks5")
 		srv, err = l.Dialer.Dial(ctx, "udp", dst)
 		if err != nil {
-			log.Println(ctx.Value("cid"), err)
+			log.Println(ctx.Value("cid"), " error", err)
 			continue
 		}
 		cpl[dst] = srv
@@ -513,7 +513,7 @@ func (l *Locale) ServeSocks5UDP(ctx context.Context, app io.ReadWriteCloser) err
 	send:
 		_, err = srv.(io.ReadWriteCloser).Write(buf[appHeadSize:appSize])
 		if err != nil {
-			log.Println(ctx.Value("cid"), err)
+			log.Println(ctx.Value("cid"), " error", err)
 			srv.Close()
 			goto init
 		}
@@ -579,7 +579,7 @@ func (l *Locale) Run() error {
 			ctx := context.WithValue(context.Background(), "cid", cid)
 			log.Printf("%s accept remote=%s", cid, c.RemoteAddr())
 			if err := l.Serve(ctx, c); err != nil {
-				log.Println(cid, err)
+				log.Println(cid, " error", err)
 			}
 			log.Println(cid, "closed")
 		}(c)
