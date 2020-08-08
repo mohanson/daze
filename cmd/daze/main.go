@@ -6,11 +6,10 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/protocol/ashe"
-	"github.com/mohanson/ddir"
+	"github.com/mohanson/res"
 )
 
 const help = `usage: daze <command> [<args>]
@@ -27,11 +26,7 @@ func main() {
 		fmt.Println(help)
 		os.Exit(0)
 	}
-	p, err := os.Executable()
-	if err != nil {
-		panic(err)
-	}
-	ddir.Base(filepath.Dir(p))
+	res.BaseExec()
 	subCommand := os.Args[1]
 	os.Args = os.Args[1:len(os.Args)]
 	switch subCommand {
@@ -57,17 +52,10 @@ func main() {
 			flServer = flag.String("s", "127.0.0.1:1081", "server address")
 			flCipher = flag.String("k", "daze", "cipher, for encryption")
 			flFilter = flag.String("f", "ipcn", "filter {ipcn, none}")
-			flRulels = flag.String("r", ddir.Join("rule.ls"), "rule path")
+			flRulels = flag.String("r", res.Path(daze.Conf.PathRule), "rule path")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
-		if _, err := os.Stat(ddir.Join("rule.ls")); err != nil {
-			f, er := os.Create(ddir.Join("rule.ls"))
-			if er != nil {
-				panic(er)
-			}
-			f.Close()
-		}
 		log.Println("remote server is", *flServer)
 		log.Println("client cipher is", *flCipher)
 		if *flDnserv != "" {

@@ -15,15 +15,28 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"time"
 
-	"github.com/mohanson/acdb"
-	"github.com/mohanson/aget"
-	"github.com/mohanson/ddir"
+	"github.com/mohanson/lru"
+	"github.com/mohanson/res"
 )
+
+var Conf = struct {
+	DialTimeout        time.Duration
+	LruMaxEntries      int
+	PathDelegatedApnic string
+	PathRule           string
+}{
+	DialTimeout:        time.Second * 8,
+	LruMaxEntries:      1024,
+	PathDelegatedApnic: "/delegated-apnic-latest",
+	PathRule:           "/rule.ls",
+}
 
 // Link copies from src to dst and dst to src until either EOF is reached.
 func Link(a, b io.ReadWriteCloser) {
@@ -147,8 +160,7 @@ func IPv6ReservedIPNet() []*net.IPNet {
 
 // CNIPNet returns full ipv4/6 CIDR in CN.
 func CNIPNet() []*net.IPNet {
-	name := ddir.Join("delegated-apnic-latest")
-	f, err := aget.Open(name)
+	f, err := os.Open(res.Path(Conf.PathDelegatedApnic))
 	if err != nil {
 		panic(err)
 	}
@@ -194,6 +206,23 @@ func IPNetContains(l []*net.IPNet, ip net.IP) bool {
 		}
 	}
 	return false
+}
+
+// OpenFile select the appropriate method to open the file based on the incoming args automatically.
+//
+// Examples:
+//   OpenFile("/etc/hosts")
+//   OpenFile("https://raw.githubusercontent.com/mohanson/daze/master/README.md")
+func OpenFile(name string) (io.ReadCloser, error) {
+	if strings.HasPrefix(name, "http://") || strings.HasPrefix(name, "https://") {
+		resp, err := http.Get(name)
+		if err != nil {
+			return nil, err
+		}
+		return resp.Body, nil
+	} else {
+		return os.Open(name)
+	}
 }
 
 // Locale is the main process of daze. In most cases, it is usually deployed as a daemon on a local machine.
@@ -600,7 +629,7 @@ type Direct struct {
 
 func (d *Direct) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
 	log.Printf("%s   dial routing=direct network=%s address=%s", ctx.Value("cid"), network, address)
-	return net.Dial(network, address)
+	return net.DialTimeout(network, address, Conf.DialTimeout)
 }
 
 // A RoadMode represents a host's road mode.
@@ -651,7 +680,7 @@ func (r *Rulels) Road(host string) RoadMode {
 
 // Load a RULE file.
 func (r *Rulels) Load(name string) error {
-	f, err := aget.Open(name)
+	f, err := OpenFile(name)
 	if err != nil {
 		return err
 	}
@@ -693,17 +722,16 @@ func NewRulels() *Rulels {
 type Squire struct {
 	Dialer Dialer
 	Direct Dialer
-	Memory acdb.Client
+	Memory *lru.Cache
 	Rulels *Rulels
 	IPNets []*net.IPNet
 }
 
 // Dialer contains options for connecting to an address.
 func (s *Squire) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
-	host, _, err := net.SplitHostPort(address)
-	mode := MPuzzle
-	if err = s.Memory.Get(host, &mode); err == nil {
-		switch mode {
+	host, _, _ := net.SplitHostPort(address)
+	if md, fit := s.Memory.Get(host); fit {
+		switch md.(RoadMode) {
 		case MLocale:
 			return s.Direct.Dial(ctx, network, address)
 		case MRemote:
@@ -713,10 +741,10 @@ func (s *Squire) Dial(ctx context.Context, network string, address string) (io.R
 	}
 	switch s.Rulels.Road(host) {
 	case MLocale:
-		s.Memory.Set(host, MLocale)
+		s.Memory.Add(host, MLocale)
 		return s.Direct.Dial(ctx, network, address)
 	case MRemote:
-		s.Memory.Set(host, MRemote)
+		s.Memory.Add(host, MRemote)
 		return s.Dialer.Dial(ctx, network, address)
 	case MFucked:
 		return nil, fmt.Errorf("daze: %s has been blocked", host)
@@ -724,10 +752,10 @@ func (s *Squire) Dial(ctx context.Context, network string, address string) (io.R
 	}
 	l, err := net.LookupIP(host)
 	if err == nil && IPNetContains(s.IPNets, l[0]) {
-		s.Memory.Set(host, MLocale)
+		s.Memory.Add(host, MLocale)
 		return s.Direct.Dial(ctx, network, address)
 	} else {
-		s.Memory.Set(host, MRemote)
+		s.Memory.Add(host, MRemote)
 		return s.Dialer.Dial(ctx, network, address)
 	}
 }
@@ -737,7 +765,7 @@ func NewSquire(dialer Dialer) *Squire {
 	return &Squire{
 		Dialer: dialer,
 		Direct: &Direct{},
-		Memory: acdb.Lru(1024),
+		Memory: lru.New(Conf.LruMaxEntries),
 		Rulels: NewRulels(),
 	}
 }
