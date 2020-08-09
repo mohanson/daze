@@ -66,10 +66,9 @@ func main() {
 	if len(args) == 0 {
 		args = append(args, "develop")
 	}
-	for _, e := range flag.Args() {
+	for _, e := range args {
 		switch e {
 		case "develop":
-			res.Make("/bin")
 			if _, err := os.Stat(res.Path("/bin/delegated-apnic-latest")); os.IsNotExist(err) {
 				wget("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest", res.Path("/bin/delegated-apnic-latest"))
 			}
