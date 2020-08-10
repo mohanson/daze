@@ -722,7 +722,7 @@ func NewRulels() *Rulels {
 type Squire struct {
 	Dialer Dialer
 	Direct Dialer
-	Memory *lru.Cache
+	Memory lru.Driver
 	Rulels *Rulels
 	IPNets []*net.IPNet
 }
@@ -741,10 +741,10 @@ func (s *Squire) Dial(ctx context.Context, network string, address string) (io.R
 	}
 	switch s.Rulels.Road(host) {
 	case MLocale:
-		s.Memory.Add(host, MLocale)
+		s.Memory.Set(host, MLocale)
 		return s.Direct.Dial(ctx, network, address)
 	case MRemote:
-		s.Memory.Add(host, MRemote)
+		s.Memory.Set(host, MRemote)
 		return s.Dialer.Dial(ctx, network, address)
 	case MFucked:
 		return nil, fmt.Errorf("daze: %s has been blocked", host)
@@ -752,10 +752,10 @@ func (s *Squire) Dial(ctx context.Context, network string, address string) (io.R
 	}
 	l, err := net.LookupIP(host)
 	if err == nil && IPNetContains(s.IPNets, l[0]) {
-		s.Memory.Add(host, MLocale)
+		s.Memory.Set(host, MLocale)
 		return s.Direct.Dial(ctx, network, address)
 	} else {
-		s.Memory.Add(host, MRemote)
+		s.Memory.Set(host, MRemote)
 		return s.Dialer.Dial(ctx, network, address)
 	}
 }

@@ -1,4 +1,6 @@
 github.com/mohanson/lru v0.0.0-20200807062111-9aea3aa5d730 h1:U/n2nMiJzIY77gJSiCFU/HPgxO2P81VPQEj44NkSurI=
 github.com/mohanson/lru v0.0.0-20200807062111-9aea3aa5d730/go.mod h1:6MuIsKg4QTtlY8yEF7CBHj8/unBW9Kwa1JqF+bNfhhk=
+github.com/mohanson/lru v0.0.0-20200810132242-7e832e215ae9 h1:GCz5+0jzGXB0zjIQhc18PN/RAoC4kjEj4YuS3CuvJSA=
+github.com/mohanson/lru v0.0.0-20200810132242-7e832e215ae9/go.mod h1:6MuIsKg4QTtlY8yEF7CBHj8/unBW9Kwa1JqF+bNfhhk=
 github.com/mohanson/res v0.0.0-20200809135507-53ac0bff5a9b h1:DGiu2ezyx5JO5jg4ETdBx7QoT/tBzzFSOmQrpVi7sUc=
 github.com/mohanson/res v0.0.0-20200809135507-53ac0bff5a9b/go.mod h1:0AEqs6ZyPjbvoBehQJ3jT8jVwQvDxKyfaE3DJd4IPDs=
