@@ -8,5 +8,7 @@ github.com/mohanson/lru v0.0.0-20200810134020-c6789234fff0 h1:ESoFJn40Ff8krFv+Vp
 github.com/mohanson/lru v0.0.0-20200810134020-c6789234fff0/go.mod h1:6MuIsKg4QTtlY8yEF7CBHj8/unBW9Kwa1JqF+bNfhhk=
 github.com/mohanson/lru v0.0.0-20200810134710-037cae31f70b h1:nrW0Swy3F7jgA/K612VRlfX2nj6dSPBuHN58QE92Zm0=
 github.com/mohanson/lru v0.0.0-20200810134710-037cae31f70b/go.mod h1:6MuIsKg4QTtlY8yEF7CBHj8/unBW9Kwa1JqF+bNfhhk=
+github.com/mohanson/lru v0.0.0-20200810140448-32dd24320273 h1:wcMee4mOT5zQ5w6P3u7PREodqIxVini8u2SsVfBW6qA=
+github.com/mohanson/lru v0.0.0-20200810140448-32dd24320273/go.mod h1:6MuIsKg4QTtlY8yEF7CBHj8/unBW9Kwa1JqF+bNfhhk=
 github.com/mohanson/res v0.0.0-20200809135507-53ac0bff5a9b h1:DGiu2ezyx5JO5jg4ETdBx7QoT/tBzzFSOmQrpVi7sUc=
 github.com/mohanson/res v0.0.0-20200809135507-53ac0bff5a9b/go.mod h1:0AEqs6ZyPjbvoBehQJ3jT8jVwQvDxKyfaE3DJd4IPDs=
