@@ -722,7 +722,7 @@ func NewRulels() *Rulels {
 type Squire struct {
 	Dialer Dialer
 	Direct Dialer
-	Memory lru.Driver
+	Memory *lru.Cache
 	Rulels *Rulels
 	IPNets []*net.IPNet
 }
