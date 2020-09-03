@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/mohanson/daze/router"
 	"github.com/mohanson/lru"
 	"github.com/mohanson/res"
 )
@@ -632,16 +633,6 @@ func (d *Direct) Dial(ctx context.Context, network string, address string) (io.R
 	return net.DialTimeout(network, address, Conf.DialTimeout)
 }
 
-// A RoadMode represents a host's road mode.
-type RoadMode int
-
-const (
-	MLocale RoadMode = iota
-	MRemote
-	MFucked
-	MPuzzle
-)
-
 // RULE file aims to be a minimal configuration file format that's easy to read due to obvious semantics.
 // There are two parts per line on RULE file: mode and glob. mode are on the left of the space sign and glob are on the
 // right. mode is an char and describes whether the host should go proxy, glob supported glob-style patterns:
@@ -661,10 +652,10 @@ const (
 // R(emote)  means using remote network
 // B(anned)  means block it
 type Rulels struct {
-	Dict map[string]RoadMode
+	Dict map[string]router.Road
 }
 
-func (r *Rulels) Road(host string) RoadMode {
+func (r *Rulels) Road(host string) router.Road {
 	for p, i := range r.Dict {
 		b, err := filepath.Match(p, host)
 		if err != nil {
@@ -675,7 +666,7 @@ func (r *Rulels) Road(host string) RoadMode {
 		}
 		return i
 	}
-	return MPuzzle
+	return router.Puzzle
 }
 
 // Load a RULE file.
@@ -696,15 +687,15 @@ func (r *Rulels) Load(name string) error {
 		case "#":
 		case "L":
 			for _, e := range seps[1:] {
-				r.Dict[e] = MLocale
+				r.Dict[e] = router.Direct
 			}
 		case "R":
 			for _, e := range seps[1:] {
-				r.Dict[e] = MRemote
+				r.Dict[e] = router.Daze
 			}
 		case "B":
 			for _, e := range seps[1:] {
-				r.Dict[e] = MFucked
+				r.Dict[e] = router.Fucked
 			}
 		}
 	}
@@ -714,7 +705,7 @@ func (r *Rulels) Load(name string) error {
 // NewRoaderRule returns a new RoaderRule.
 func NewRulels() *Rulels {
 	return &Rulels{
-		Dict: map[string]RoadMode{},
+		Dict: map[string]router.Road{},
 	}
 }
 
@@ -731,31 +722,31 @@ type Squire struct {
 func (s *Squire) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
 	host, _, _ := net.SplitHostPort(address)
 	if md, fit := s.Memory.Get(host); fit {
-		switch md.(RoadMode) {
-		case MLocale:
+		switch md.(router.Road) {
+		case router.Direct:
 			return s.Direct.Dial(ctx, network, address)
-		case MRemote:
+		case router.Daze:
 			return s.Dialer.Dial(ctx, network, address)
 		}
 		panic("unreachable")
 	}
 	switch s.Rulels.Road(host) {
-	case MLocale:
-		s.Memory.Set(host, MLocale)
+	case router.Direct:
+		s.Memory.Set(host, router.Direct)
 		return s.Direct.Dial(ctx, network, address)
-	case MRemote:
-		s.Memory.Set(host, MRemote)
+	case router.Daze:
+		s.Memory.Set(host, router.Daze)
 		return s.Dialer.Dial(ctx, network, address)
-	case MFucked:
+	case router.Fucked:
 		return nil, fmt.Errorf("daze: %s has been blocked", host)
-	case MPuzzle:
+	case router.Puzzle:
 	}
 	l, err := net.LookupIP(host)
 	if err == nil && IPNetContains(s.IPNets, l[0]) {
-		s.Memory.Set(host, MLocale)
+		s.Memory.Set(host, router.Direct)
 		return s.Direct.Dial(ctx, network, address)
 	} else {
-		s.Memory.Set(host, MRemote)
+		s.Memory.Set(host, router.Daze)
 		return s.Dialer.Dial(ctx, network, address)
 	}
 }
