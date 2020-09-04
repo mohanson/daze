@@ -30,7 +30,7 @@ import (
 // +-----+-----------+------+-----+---------+---------+
 //
 // - OTA: random 128 bytes for rc4 key
-// - Handshake: must be 0xFF, 0xFF
+// - Handshake: must be 0xff, 0xff
 // - Time: timestamp of request
 // - Net: tcp(0x01), udp(0x03)
 // - DST.Len: len of DST. If DST is https://google.com, DST.Len is 0x12
@@ -41,14 +41,9 @@ type TCPConn struct {
 	io.ReadWriteCloser
 }
 
-// UDPConn is the implementation of the Conn and PacketConn interfaces for UDP network connections.
+// UDPConn is an implementation of the Conn interface for UDP network connections.
 type UDPConn struct {
 	io.ReadWriteCloser
-}
-
-// Close closes the connection.
-func (c *UDPConn) Close() error {
-	return c.ReadWriteCloser.Close()
 }
 
 // Read implements the Conn Read method.
@@ -68,7 +63,10 @@ func (c *UDPConn) Write(p []byte) (int, error) {
 	}
 	b := make([]byte, 4)
 	binary.BigEndian.PutUint32(b, uint32(len(p)))
-	c.ReadWriteCloser.Write(b)
+	_, err := c.ReadWriteCloser.Write(b)
+	if err != nil {
+		return 0, err
+	}
 	return c.ReadWriteCloser.Write(p)
 }
 

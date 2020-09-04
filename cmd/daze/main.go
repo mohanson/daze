@@ -9,6 +9,7 @@ import (
 
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/protocol/ashe"
+	"github.com/mohanson/daze/router"
 	"github.com/mohanson/res"
 )
 
@@ -63,20 +64,42 @@ func main() {
 			log.Println("domain server is", *flDnserv)
 		}
 		client := ashe.NewClient(*flServer, *flCipher)
-		squire := daze.NewSquire(client)
-		log.Println("load rule", *flRulels)
-		if err := squire.Rulels.Load(*flRulels); err != nil {
-			panic(err)
-		}
-		log.Println("load rule reserved IPv4/6 CIDRs")
-		squire.IPNets = append(squire.IPNets, daze.IPv4ReservedIPNet()...)
-		squire.IPNets = append(squire.IPNets, daze.IPv6ReservedIPNet()...)
-		if *flFilter == "ipcn" {
-			log.Println("load rule CN(China PR) CIDRs")
-			ipnets := daze.CNIPNet()
-			log.Println("find", len(ipnets), "IP nets")
-			squire.IPNets = append(squire.IPNets, ipnets...)
-		}
+		router := func() router.Router {
+			routerCompose := router.NewRouterCompose()
+
+			log.Println("load rule", *flRulels)
+			routerRule := router.NewRouterRule()
+			f, err := daze.OpenFile(*flRulels)
+			if err != nil {
+				panic(err)
+			}
+			defer f.Close()
+			if err := routerRule.FromReader(f); err != nil {
+				panic(err)
+			}
+			routerCompose.Join(routerRule)
+
+			log.Println("load rule reserved IPv4/6 CIDRs")
+			routerCompose.Join(router.NewRouterReservedIPv4())
+			routerCompose.Join(router.NewRouterReservedIPv6())
+
+			if *flFilter == "ipcn" {
+				log.Println("load rule CN(China PR) CIDRs")
+				f, err := daze.OpenFile(res.Path(daze.Conf.PathDelegatedApnic))
+				if err != nil {
+					panic(err)
+				}
+				defer f.Close()
+				routerApnic := router.NewRouterApnic(f)
+				log.Println("find", len(routerApnic.Blocks), "IP nets")
+				routerCompose.Join(routerApnic)
+			}
+
+			routerCompose.Join(router.NewRouterAlways(router.Daze))
+
+			return router.NewRouterLRU(routerCompose)
+		}()
+		squire := daze.NewSquire(client, router)
 		locale := daze.NewLocale(*flListen, squire)
 		if err := locale.Run(); err != nil {
 			panic(err)

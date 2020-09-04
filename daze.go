@@ -16,24 +16,20 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
 
-	"github.com/mohanson/lru"
-	"github.com/mohanson/res"
+	"github.com/mohanson/daze/router"
 )
 
 var Conf = struct {
 	DialTimeout        time.Duration
-	LruMaxEntries      int
 	PathDelegatedApnic string
 	PathRule           string
 }{
 	DialTimeout:        time.Second * 8,
-	LruMaxEntries:      1024,
 	PathDelegatedApnic: "/delegated-apnic-latest",
 	PathRule:           "/rule.ls",
 }
@@ -100,112 +96,6 @@ func Resolve(addr string) {
 // Dialer contains options for connecting to an address.
 type Dialer interface {
 	Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error)
-}
-
-// IPv4ReservedIPNet returns reserved IPv4 addresses.
-//
-// Introduction:
-//   See https://en.wikipedia.org/wiki/Reserved_IP_addresses
-func IPv4ReservedIPNet() []*net.IPNet {
-	r := []*net.IPNet{}
-	for _, entry := range [][2]string{
-		{"00000000", "FF000000"},
-		{"0A000000", "FF000000"},
-		{"7F000000", "FF000000"},
-		{"A9FE0000", "FFFF0000"},
-		{"AC100000", "FFF00000"},
-		{"C0000000", "FFFFFFF8"},
-		{"C00000AA", "FFFFFFFE"},
-		{"C0000200", "FFFFFF00"},
-		{"C0A80000", "FFFF0000"},
-		{"C6120000", "FFFE0000"},
-		{"C6336400", "FFFFFF00"},
-		{"CB007100", "FFFFFF00"},
-		{"F0000000", "F0000000"},
-		{"FFFFFFFF", "FFFFFFFF"},
-	} {
-		i, _ := hex.DecodeString(entry[0])
-		m, _ := hex.DecodeString(entry[1])
-		r = append(r, &net.IPNet{IP: i, Mask: m})
-	}
-	return r
-}
-
-// IPv6ReservedIPNet returns reserved IPv6 addresses.
-//
-// Introduction:
-//   See https://en.wikipedia.org/wiki/Reserved_IP_addresses
-func IPv6ReservedIPNet() []*net.IPNet {
-	r := []*net.IPNet{}
-	for _, entry := range [][2]string{
-		{"00000000000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
-		{"00000000000000000000000000000001", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
-		{"01000000000000000000000000000000", "FFFFFFFFFFFFFFFF0000000000000000"},
-		{"0064FF9B000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFF00000000"},
-		{"20010000000000000000000000000000", "FFFFFFFF000000000000000000000000"},
-		{"20010010000000000000000000000000", "FFFFFFF0000000000000000000000000"},
-		{"20010020000000000000000000000000", "FFFFFFF0000000000000000000000000"},
-		{"20010DB8000000000000000000000000", "FFFFFFFF000000000000000000000000"},
-		{"20020000000000000000000000000000", "FFFF0000000000000000000000000000"},
-		{"FC000000000000000000000000000000", "FE000000000000000000000000000000"},
-		{"FE800000000000000000000000000000", "FFC00000000000000000000000000000"},
-		{"FF000000000000000000000000000000", "FF000000000000000000000000000000"},
-	} {
-		i, _ := hex.DecodeString(entry[0])
-		m, _ := hex.DecodeString(entry[1])
-		r = append(r, &net.IPNet{IP: i, Mask: m})
-	}
-	return r
-}
-
-// CNIPNet returns full ipv4/6 CIDR in CN.
-func CNIPNet() []*net.IPNet {
-	f, err := os.Open(res.Path(Conf.PathDelegatedApnic))
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-	r := []*net.IPNet{}
-	s := bufio.NewScanner(f)
-	for s.Scan() {
-		line := s.Text()
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		switch {
-		case strings.HasPrefix(line, "apnic|CN|ipv4"):
-			seps := strings.Split(line, "|")
-			sep4, err := strconv.Atoi(seps[4])
-			if err != nil {
-				panic(err)
-			}
-			mask := 32 - int(math.Log2(float64(sep4)))
-			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%d", seps[3], mask))
-			if err != nil {
-				panic(err)
-			}
-			r = append(r, cidr)
-		case strings.HasPrefix(line, "apnic|CN|ipv6"):
-			seps := strings.Split(line, "|")
-			sep4 := seps[4]
-			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%s", seps[3], sep4))
-			if err != nil {
-				panic(err)
-			}
-			r = append(r, cidr)
-		}
-	}
-	return r
-}
-
-// IPNetContains.
-func IPNetContains(l []*net.IPNet, ip net.IP) bool {
-	for _, e := range l {
-		if e.Contains(ip) {
-			return true
-		}
-	}
-	return false
 }
 
 // OpenFile select the appropriate method to open the file based on the incoming args automatically.
@@ -632,140 +522,34 @@ func (d *Direct) Dial(ctx context.Context, network string, address string) (io.R
 	return net.DialTimeout(network, address, Conf.DialTimeout)
 }
 
-// A RoadMode represents a host's road mode.
-type RoadMode int
-
-const (
-	MLocale RoadMode = iota
-	MRemote
-	MFucked
-	MPuzzle
-)
-
-// RULE file aims to be a minimal configuration file format that's easy to read due to obvious semantics.
-// There are two parts per line on RULE file: mode and glob. mode are on the left of the space sign and glob are on the
-// right. mode is an char and describes whether the host should go proxy, glob supported glob-style patterns:
-//
-//   h?llo matches hello, hallo and hxllo
-//   h*llo matches hllo and heeeello
-//   h[ae]llo matches hello and hallo, but not hillo
-//   h[^e]llo matches hallo, hbllo, ... but not hello
-//   h[a-b]llo matches hallo and hbllo
-//
-// This is a RULE document:
-//   L a.com
-//   R b.com
-//   B c.com
-//
-// L(ocale)  means using locale network
-// R(emote)  means using remote network
-// B(anned)  means block it
-type Rulels struct {
-	Dict map[string]RoadMode
-}
-
-func (r *Rulels) Road(host string) RoadMode {
-	for p, i := range r.Dict {
-		b, err := filepath.Match(p, host)
-		if err != nil {
-			panic(err)
-		}
-		if !b {
-			continue
-		}
-		return i
-	}
-	return MPuzzle
-}
-
-// Load a RULE file.
-func (r *Rulels) Load(name string) error {
-	f, err := OpenFile(name)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := scanner.Text()
-		seps := strings.Split(line, " ")
-		if len(seps) < 2 {
-			continue
-		}
-		switch seps[0] {
-		case "#":
-		case "L":
-			for _, e := range seps[1:] {
-				r.Dict[e] = MLocale
-			}
-		case "R":
-			for _, e := range seps[1:] {
-				r.Dict[e] = MRemote
-			}
-		case "B":
-			for _, e := range seps[1:] {
-				r.Dict[e] = MFucked
-			}
-		}
-	}
-	return scanner.Err()
-}
-
-// NewRoaderRule returns a new RoaderRule.
-func NewRulels() *Rulels {
-	return &Rulels{
-		Dict: map[string]RoadMode{},
-	}
-}
-
 // Squire is a bit smart guy, it can automatically distinguish whether to use a proxy or a local network.
 type Squire struct {
 	Dialer Dialer
 	Direct Dialer
-	Memory *lru.Cache
-	Rulels *Rulels
-	IPNets []*net.IPNet
+	Router router.Router
 }
 
 // Dialer contains options for connecting to an address.
 func (s *Squire) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
 	host, _, _ := net.SplitHostPort(address)
-	if md, fit := s.Memory.Get(host); fit {
-		switch md.(RoadMode) {
-		case MLocale:
-			return s.Direct.Dial(ctx, network, address)
-		case MRemote:
-			return s.Dialer.Dial(ctx, network, address)
-		}
-		panic("unreachable")
-	}
-	switch s.Rulels.Road(host) {
-	case MLocale:
-		s.Memory.Set(host, MLocale)
+	switch s.Router.Choose(host) {
+	case router.Direct:
 		return s.Direct.Dial(ctx, network, address)
-	case MRemote:
-		s.Memory.Set(host, MRemote)
+	case router.Daze:
 		return s.Dialer.Dial(ctx, network, address)
-	case MFucked:
+	case router.Fucked:
 		return nil, fmt.Errorf("daze: %s has been blocked", host)
-	case MPuzzle:
-	}
-	l, err := net.LookupIP(host)
-	if err == nil && IPNetContains(s.IPNets, l[0]) {
-		s.Memory.Set(host, MLocale)
-		return s.Direct.Dial(ctx, network, address)
-	} else {
-		s.Memory.Set(host, MRemote)
+	case router.Puzzle:
 		return s.Dialer.Dial(ctx, network, address)
 	}
+	return s.Dialer.Dial(ctx, network, address)
 }
 
 // NewSquire.
-func NewSquire(dialer Dialer) *Squire {
+func NewSquire(dialer Dialer, router router.Router) *Squire {
 	return &Squire{
 		Dialer: dialer,
 		Direct: &Direct{},
-		Memory: lru.New(Conf.LruMaxEntries),
-		Rulels: NewRulels(),
+		Router: router,
 	}
 }
