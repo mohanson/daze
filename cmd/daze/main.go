@@ -97,7 +97,6 @@ func main() {
 			routerCompose.Join(router.NewRouterAlways(router.Daze))
 			return router.NewRouterLRU(routerCompose)
 		}()
-
 		squire := daze.NewSquire(client, router)
 		locale := daze.NewLocale(*flListen, squire)
 		if err := locale.Run(); err != nil {
