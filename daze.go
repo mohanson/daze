@@ -23,18 +23,14 @@ import (
 	"time"
 
 	"github.com/mohanson/daze/router"
-	"github.com/mohanson/lru"
-	"github.com/mohanson/res"
 )
 
 var Conf = struct {
 	DialTimeout        time.Duration
-	LruMaxEntries      int
 	PathDelegatedApnic string
 	PathRule           string
 }{
 	DialTimeout:        time.Second * 8,
-	LruMaxEntries:      1024,
 	PathDelegatedApnic: "/delegated-apnic-latest",
 	PathRule:           "/rule.ls",
 }
@@ -101,112 +97,6 @@ func Resolve(addr string) {
 // Dialer contains options for connecting to an address.
 type Dialer interface {
 	Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error)
-}
-
-// IPv4ReservedIPNet returns reserved IPv4 addresses.
-//
-// Introduction:
-//   See https://en.wikipedia.org/wiki/Reserved_IP_addresses
-func IPv4ReservedIPNet() []*net.IPNet {
-	r := []*net.IPNet{}
-	for _, entry := range [][2]string{
-		{"00000000", "FF000000"},
-		{"0A000000", "FF000000"},
-		{"7F000000", "FF000000"},
-		{"A9FE0000", "FFFF0000"},
-		{"AC100000", "FFF00000"},
-		{"C0000000", "FFFFFFF8"},
-		{"C00000AA", "FFFFFFFE"},
-		{"C0000200", "FFFFFF00"},
-		{"C0A80000", "FFFF0000"},
-		{"C6120000", "FFFE0000"},
-		{"C6336400", "FFFFFF00"},
-		{"CB007100", "FFFFFF00"},
-		{"F0000000", "F0000000"},
-		{"FFFFFFFF", "FFFFFFFF"},
-	} {
-		i, _ := hex.DecodeString(entry[0])
-		m, _ := hex.DecodeString(entry[1])
-		r = append(r, &net.IPNet{IP: i, Mask: m})
-	}
-	return r
-}
-
-// IPv6ReservedIPNet returns reserved IPv6 addresses.
-//
-// Introduction:
-//   See https://en.wikipedia.org/wiki/Reserved_IP_addresses
-func IPv6ReservedIPNet() []*net.IPNet {
-	r := []*net.IPNet{}
-	for _, entry := range [][2]string{
-		{"00000000000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
-		{"00000000000000000000000000000001", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
-		{"01000000000000000000000000000000", "FFFFFFFFFFFFFFFF0000000000000000"},
-		{"0064FF9B000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFF00000000"},
-		{"20010000000000000000000000000000", "FFFFFFFF000000000000000000000000"},
-		{"20010010000000000000000000000000", "FFFFFFF0000000000000000000000000"},
-		{"20010020000000000000000000000000", "FFFFFFF0000000000000000000000000"},
-		{"20010DB8000000000000000000000000", "FFFFFFFF000000000000000000000000"},
-		{"20020000000000000000000000000000", "FFFF0000000000000000000000000000"},
-		{"FC000000000000000000000000000000", "FE000000000000000000000000000000"},
-		{"FE800000000000000000000000000000", "FFC00000000000000000000000000000"},
-		{"FF000000000000000000000000000000", "FF000000000000000000000000000000"},
-	} {
-		i, _ := hex.DecodeString(entry[0])
-		m, _ := hex.DecodeString(entry[1])
-		r = append(r, &net.IPNet{IP: i, Mask: m})
-	}
-	return r
-}
-
-// CNIPNet returns full ipv4/6 CIDR in CN.
-func CNIPNet() []*net.IPNet {
-	f, err := os.Open(res.Path(Conf.PathDelegatedApnic))
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-	r := []*net.IPNet{}
-	s := bufio.NewScanner(f)
-	for s.Scan() {
-		line := s.Text()
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		switch {
-		case strings.HasPrefix(line, "apnic|CN|ipv4"):
-			seps := strings.Split(line, "|")
-			sep4, err := strconv.Atoi(seps[4])
-			if err != nil {
-				panic(err)
-			}
-			mask := 32 - int(math.Log2(float64(sep4)))
-			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%d", seps[3], mask))
-			if err != nil {
-				panic(err)
-			}
-			r = append(r, cidr)
-		case strings.HasPrefix(line, "apnic|CN|ipv6"):
-			seps := strings.Split(line, "|")
-			sep4 := seps[4]
-			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%s", seps[3], sep4))
-			if err != nil {
-				panic(err)
-			}
-			r = append(r, cidr)
-		}
-	}
-	return r
-}
-
-// IPNetContains.
-func IPNetContains(l []*net.IPNet, ip net.IP) bool {
-	for _, e := range l {
-		if e.Contains(ip) {
-			return true
-		}
-	}
-	return false
 }
 
 // OpenFile select the appropriate method to open the file based on the incoming args automatically.
@@ -713,50 +603,28 @@ func NewRulels() *Rulels {
 type Squire struct {
 	Dialer Dialer
 	Direct Dialer
-	Memory *lru.Cache
-	Rulels *Rulels
-	IPNets []*net.IPNet
+	Router router.Router
 }
 
 // Dialer contains options for connecting to an address.
 func (s *Squire) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
 	host, _, _ := net.SplitHostPort(address)
-	if md, fit := s.Memory.Get(host); fit {
-		switch md.(router.Road) {
-		case router.Direct:
-			return s.Direct.Dial(ctx, network, address)
-		case router.Daze:
-			return s.Dialer.Dial(ctx, network, address)
-		}
-		panic("unreachable")
-	}
-	switch s.Rulels.Road(host) {
+	switch s.Router.Choose(host) {
 	case router.Direct:
-		s.Memory.Set(host, router.Direct)
 		return s.Direct.Dial(ctx, network, address)
 	case router.Daze:
-		s.Memory.Set(host, router.Daze)
 		return s.Dialer.Dial(ctx, network, address)
 	case router.Fucked:
 		return nil, fmt.Errorf("daze: %s has been blocked", host)
-	case router.Puzzle:
 	}
-	l, err := net.LookupIP(host)
-	if err == nil && IPNetContains(s.IPNets, l[0]) {
-		s.Memory.Set(host, router.Direct)
-		return s.Direct.Dial(ctx, network, address)
-	} else {
-		s.Memory.Set(host, router.Daze)
-		return s.Dialer.Dial(ctx, network, address)
-	}
+	return s.Dialer.Dial(ctx, network, address)
 }
 
 // NewSquire.
-func NewSquire(dialer Dialer) *Squire {
+func NewSquire(dialer Dialer, router router.Router) *Squire {
 	return &Squire{
 		Dialer: dialer,
 		Direct: &Direct{},
-		Memory: lru.New(Conf.LruMaxEntries),
-		Rulels: NewRulels(),
+		Router: router,
 	}
 }

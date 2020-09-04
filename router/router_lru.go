@@ -6,26 +6,26 @@ import (
 
 // RouterLRU cache routing results for next use.
 type RouterLRU struct {
-	i Router
-	c *lru.Cache
+	Pit Router
+	Box *lru.Cache
 }
 
 // Choose.
 func (r *RouterLRU) Choose(host string) Road {
-	if a, b := r.c.Get(host); b {
+	if a, b := r.Box.Get(host); b {
 		return a.(Road)
 	}
-	a := r.i.Choose(host)
+	a := r.Pit.Choose(host)
 	if a != Puzzle {
-		r.c.Set(host, a)
+		r.Box.Set(host, a)
 	}
 	return a
 }
 
 // NewRouterLRU returns a new RouterLRU.
-func NewRouterLRU(r Router, size int) *RouterLRU {
+func NewRouterLRU(r Router) *RouterLRU {
 	return &RouterLRU{
-		i: r,
-		c: lru.New(size),
+		Pit: r,
+		Box: lru.New(1024),
 	}
 }
