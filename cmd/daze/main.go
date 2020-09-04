@@ -94,7 +94,9 @@ func main() {
 				log.Println("find", len(routerApnic.Blocks), "IP nets")
 				routerCompose.Join(routerApnic)
 			}
+
 			routerCompose.Join(router.NewRouterAlways(router.Daze))
+
 			return router.NewRouterLRU(routerCompose)
 		}()
 		squire := daze.NewSquire(client, router)
