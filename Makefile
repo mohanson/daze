@@ -1,5 +1,5 @@
 main:
-	@ go run cmd/make/main.go develop
+	@ go run github.com/mohanson/daze/cmd/make develop
 
 test:
 	@ go test -v github.com/mohanson/daze/router
