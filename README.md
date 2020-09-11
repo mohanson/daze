@@ -11,7 +11,11 @@ Compile or [Download](https://github.com/mohanson/daze/releases) daze:
 ```sh
 $ git clone https://github.com/mohanson/daze
 $ cd daze
-$ go run cmd/make/main.go develop
+
+# On Linux
+$ ./cmd/develop.sh
+# On Windows
+$ ./cmd/develop.ps1
 ```
 
 Build results will be saved in directory `bin`. You can just keep this directory, all other files are not required.

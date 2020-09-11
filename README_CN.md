@@ -11,7 +11,11 @@ Daze 是一款帮助你连接至**互联网**的工具.
 ```sh
 $ git clone https://github.com/mohanson/daze
 $ cd daze
-$ go run cmd/make/main.go develop
+
+# On Linux
+$ ./cmd/develop.sh
+# On Windows
+$ ./cmd/develop.ps1
 ```
 
 构建结果将被保存在目录 `bin` 中. 只有这个目录下的文件是必须的, 你不必保留整份源代码.

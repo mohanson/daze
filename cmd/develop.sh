@@ -1,9 +1,11 @@
-mkdir -p bin
+set -ex
+
+if [ ! -d ./bin ]; then
+    mkdir bin
+fi
 
 if [ ! -f ./bin/delegated-apnic-latest ]; then
-    cd bin
-    wget http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest
-    cd ..
+    wget -q http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest -O ./bin/delegated-apnic-latest
 fi
 
 if [ ! -f ./bin/rule.ls ]; then
