@@ -3,7 +3,7 @@ if (!(Test-Path ./bin)) {
 }
 
 if (!(Test-Path ./bin/delegated-apnic-latest)) {
-    Invoke-WebRequest -Uri http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest -OutFile ./bin/delegated-apnic-latest | Out-Null
+    Invoke-WebRequest -Uri http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest -OutFile ./bin/delegated-apnic-latest
 }
 
 if (!(Test-Path ./bin/rule.ls)) {
