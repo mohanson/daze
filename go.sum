@@ -1,0 +1,4 @@
+github.com/mohanson/easyfs v0.0.0-20201102020136-298cf0f761d9 h1:WEQylHsZqFmPIxsBv1tTy0a3voVW5nrTNqEdatmI1UA=
+github.com/mohanson/easyfs v0.0.0-20201102020136-298cf0f761d9/go.mod h1:SAgMTKE+bPeVYQ64Kjk4lSjY1/3stqVcfdkmuFZxdrM=
+github.com/mohanson/lru v0.0.0-20201102142719-02d3c91298d4 h1:f+EjADX3DkJlh9Cx4zIYnaEfTompZUWLcYL/mcFLqbc=
+github.com/mohanson/lru v0.0.0-20201102142719-02d3c91298d4/go.mod h1:6MuIsKg4QTtlY8yEF7CBHj8/unBW9Kwa1JqF+bNfhhk=
