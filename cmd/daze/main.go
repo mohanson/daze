@@ -80,8 +80,7 @@ func main() {
 			routerCompose.Join(routerRule)
 
 			log.Println("load rule reserved IPv4/6 CIDRs")
-			routerCompose.Join(router.NewRouterReservedIPv4())
-			routerCompose.Join(router.NewRouterReservedIPv6())
+			routerCompose.Join(router.NewRouterReservedIP())
 
 			if *flFilter == "ipcn" {
 				log.Println("load rule CN(China PR) CIDRs")

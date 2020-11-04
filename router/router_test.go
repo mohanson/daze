@@ -16,7 +16,7 @@ func TestAlways(t *testing.T) {
 }
 
 func TestReservedIPv4(t *testing.T) {
-	r := NewRouterReservedIPv4()
+	r := NewRouterReservedIP()
 	if r.Choose("127.0.0.1") != Direct {
 		t.FailNow()
 	}
@@ -26,7 +26,7 @@ func TestReservedIPv4(t *testing.T) {
 }
 
 func TestReservedIPv6(t *testing.T) {
-	r := NewRouterReservedIPv6()
+	r := NewRouterReservedIP()
 	if r.Choose("::1") != Direct {
 		t.FailNow()
 	}
@@ -34,7 +34,7 @@ func TestReservedIPv6(t *testing.T) {
 
 func TestCompose(t *testing.T) {
 	r := NewRouterCompose()
-	r.Join(NewRouterReservedIPv4())
+	r.Join(NewRouterReservedIP())
 	r.Join(NewRouterAlways(Daze))
 	if r.Choose("127.0.0.1") != Direct {
 		t.FailNow()
@@ -45,7 +45,7 @@ func TestCompose(t *testing.T) {
 }
 
 func TestLru(t *testing.T) {
-	r := NewRouterLRU(NewRouterReservedIPv4())
+	r := NewRouterLRU(NewRouterReservedIP())
 	if r.Choose("127.0.0.1") != Direct {
 		t.FailNow()
 	}

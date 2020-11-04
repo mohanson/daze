@@ -5,13 +5,27 @@ import (
 	"net"
 )
 
-// Returns a new RouterReservedIPv6 struct.
-//
 // Introduction:
 //   See https://en.wikipedia.org/wiki/Reserved_IP_addresses
-func NewRouterReservedIPv6() *RouterIPNet {
+func NewRouterReservedIP() *RouterIPNet {
 	r := []*net.IPNet{}
 	for _, entry := range [][2]string{
+		// IPv4
+		{"00000000", "FF000000"},
+		{"0A000000", "FF000000"},
+		{"7F000000", "FF000000"},
+		{"A9FE0000", "FFFF0000"},
+		{"AC100000", "FFF00000"},
+		{"C0000000", "FFFFFFF8"},
+		{"C00000AA", "FFFFFFFE"},
+		{"C0000200", "FFFFFF00"},
+		{"C0A80000", "FFFF0000"},
+		{"C6120000", "FFFE0000"},
+		{"C6336400", "FFFFFF00"},
+		{"CB007100", "FFFFFF00"},
+		{"F0000000", "F0000000"},
+		{"FFFFFFFF", "FFFFFFFF"},
+		// IPv6
 		{"00000000000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
 		{"00000000000000000000000000000001", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
 		{"01000000000000000000000000000000", "FFFFFFFFFFFFFFFF0000000000000000"},
