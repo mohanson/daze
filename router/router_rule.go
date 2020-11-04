@@ -5,6 +5,8 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
+
+	"github.com/mohanson/doa"
 )
 
 // A single rule in RULE file.
@@ -38,11 +40,7 @@ type RouterRule struct {
 // Choose.
 func (r *RouterRule) Choose(host string) Road {
 	for _, e := range r.rule {
-		b, err := filepath.Match(e.Pattern, host)
-		if err != nil {
-			panic(err)
-		}
-		if b {
+		if doa.Try2(filepath.Match(e.Pattern, host)).(bool) {
 			return e.Road
 		}
 	}
