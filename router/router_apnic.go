@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"math"
+	"math/bits"
 	"net"
 	"strconv"
 	"strings"
@@ -25,11 +25,14 @@ func NewRouterApnic(f io.Reader, region string) *RouterIPNet {
 		switch {
 		case strings.HasPrefix(line, ipv4Prefix):
 			seps := strings.Split(line, "|")
-			sep4, err := strconv.Atoi(seps[4])
+			sep4, err := strconv.ParseUint(seps[4], 0, 32)
 			if err != nil {
 				panic(err)
 			}
-			mask := 32 - int(math.Log2(float64(sep4)))
+			if bits.OnesCount64(sep4) != 1 {
+				panic("unreachable")
+			}
+			mask := bits.LeadingZeros64(sep4) - 31
 			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%d", seps[3], mask))
 			if err != nil {
 				panic(err)
