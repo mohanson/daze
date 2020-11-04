@@ -3,6 +3,8 @@ package router
 import (
 	"encoding/hex"
 	"net"
+
+	"github.com/mohanson/doa"
 )
 
 // Introduction:
@@ -39,8 +41,8 @@ func NewRouterReservedIP() *RouterIPNet {
 		{"FE800000000000000000000000000000", "FFC00000000000000000000000000000"},
 		{"FF000000000000000000000000000000", "FF000000000000000000000000000000"},
 	} {
-		i, _ := hex.DecodeString(entry[0])
-		m, _ := hex.DecodeString(entry[1])
+		i := doa.Try2(hex.DecodeString(entry[0])).([]byte)
+		m := doa.Try2(hex.DecodeString(entry[1])).([]byte)
 		r = append(r, &net.IPNet{IP: i, Mask: m})
 	}
 	return NewRouterIPNet(r, Direct, Puzzle)

@@ -8,6 +8,8 @@ import (
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/mohanson/doa"
 )
 
 // NewRouterApnic returns a new RouterApnic.
@@ -25,27 +27,18 @@ func NewRouterApnic(f io.Reader, region string) *RouterIPNet {
 		switch {
 		case strings.HasPrefix(line, ipv4Prefix):
 			seps := strings.Split(line, "|")
-			sep4, err := strconv.ParseUint(seps[4], 0, 32)
-			if err != nil {
-				panic(err)
-			}
+			sep4 := doa.Try2(strconv.ParseUint(seps[4], 0, 32)).(uint64)
 			if bits.OnesCount64(sep4) != 1 {
 				panic("unreachable")
 			}
 			mask := bits.LeadingZeros64(sep4) - 31
-			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%d", seps[3], mask))
-			if err != nil {
-				panic(err)
-			}
-			r = append(r, cidr)
+			_, cidr := doa.Try3(net.ParseCIDR(fmt.Sprintf("%s/%d", seps[3], mask)))
+			r = append(r, cidr.(*net.IPNet))
 		case strings.HasPrefix(line, ipv6Prefix):
 			seps := strings.Split(line, "|")
 			sep4 := seps[4]
-			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%s", seps[3], sep4))
-			if err != nil {
-				panic(err)
-			}
-			r = append(r, cidr)
+			_, cidr := doa.Try3(net.ParseCIDR(fmt.Sprintf("%s/%s", seps[3], sep4)))
+			r = append(r, cidr.(*net.IPNet))
 		}
 	}
 	return NewRouterIPNet(r, Direct, Daze)

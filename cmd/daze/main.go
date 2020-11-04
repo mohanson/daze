@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -10,6 +11,7 @@ import (
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/protocol/ashe"
 	"github.com/mohanson/daze/router"
+	"github.com/mohanson/doa"
 	"github.com/mohanson/easyfs"
 )
 
@@ -44,9 +46,7 @@ func main() {
 			log.Println("domain server is", *flDnserv)
 		}
 		server := ashe.NewServer(*flListen, *flCipher)
-		if err := server.Run(); err != nil {
-			panic(err)
-		}
+		doa.Try1(server.Run())
 	case "client":
 		var (
 			flListen = flag.String("l", "127.0.0.1:1080", "listen address")
@@ -69,14 +69,9 @@ func main() {
 
 			log.Println("load rule", *flRulels)
 			routerRule := router.NewRouterRule()
-			f, err := daze.OpenFile(*flRulels)
-			if err != nil {
-				panic(err)
-			}
+			f := doa.Try2(daze.OpenFile(*flRulels)).(io.ReadCloser)
 			defer f.Close()
-			if err := routerRule.FromReader(f); err != nil {
-				panic(err)
-			}
+			doa.Try1(routerRule.FromReader(f))
 			routerCompose.Join(routerRule)
 
 			log.Println("load rule reserved IPv4/6 CIDRs")
@@ -84,10 +79,7 @@ func main() {
 
 			if *flFilter == "ipcn" {
 				log.Println("load rule CN(China PR) CIDRs")
-				f, err := daze.OpenFile(easyfs.Path(daze.Conf.PathDelegatedApnic))
-				if err != nil {
-					panic(err)
-				}
+				f := doa.Try2(daze.OpenFile(easyfs.Path(daze.Conf.PathDelegatedApnic))).(io.ReadCloser)
 				defer f.Close()
 				routerApnic := router.NewRouterApnic(f, "CN")
 				log.Println("find", len(routerApnic.Blocks), "IP nets")
@@ -100,9 +92,7 @@ func main() {
 		}()
 		squire := daze.NewSquire(client, router)
 		locale := daze.NewLocale(*flListen, squire)
-		if err := locale.Run(); err != nil {
-			panic(err)
-		}
+		doa.Try1(locale.Run())
 	case "cmd":
 		var (
 			flClient = flag.String("c", "127.0.0.1:1080", "client address")
@@ -117,9 +107,7 @@ func main() {
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			panic(err)
-		}
+		doa.Try1(cmd.Run())
 	default:
 		fmt.Println(help)
 		os.Exit(0)
