@@ -28,7 +28,8 @@ func NewRouterApnic(f io.Reader, region string) *RouterIPNet {
 		case strings.HasPrefix(line, ipv4Prefix):
 			seps := strings.Split(line, "|")
 			sep4 := doa.Try2(strconv.ParseUint(seps[4], 0, 32)).(uint64)
-			if bits.OnesCount64(sep4) != 1 {
+			// Determine whether it is a power of 2
+			if sep4&(sep4-1) != 0 {
 				panic("unreachable")
 			}
 			mask := bits.LeadingZeros64(sep4) - 31
