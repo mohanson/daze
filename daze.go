@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/mohanson/daze/router"
+	"github.com/mohanson/doa"
 )
 
 var Conf = struct {
@@ -56,20 +57,20 @@ type ReadWriteCloser struct {
 
 // GravityReader wraps an io.Reader with RC4 crypto.
 func GravityReader(r io.Reader, k []byte) io.Reader {
-	cr, _ := rc4.NewCipher(k)
+	cr := doa.Try2(rc4.NewCipher(k)).(*rc4.Cipher)
 	return cipher.StreamReader{S: cr, R: r}
 }
 
 // GravityWriter wraps an io.Writer with RC4 crypto.
 func GravityWriter(w io.Writer, k []byte) io.Writer {
-	cw, _ := rc4.NewCipher(k)
+	cw := doa.Try2(rc4.NewCipher(k)).(*rc4.Cipher)
 	return cipher.StreamWriter{S: cw, W: w}
 }
 
 // Double gravity, double happiness.
 func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
-	cr, _ := rc4.NewCipher(k)
-	cw, _ := rc4.NewCipher(k)
+	cr := doa.Try2(rc4.NewCipher(k)).(*rc4.Cipher)
+	cw := doa.Try2(rc4.NewCipher(k)).(*rc4.Cipher)
 	return &ReadWriteCloser{
 		Reader: cipher.StreamReader{S: cr, R: conn},
 		Writer: cipher.StreamWriter{S: cw, W: conn},
