@@ -1,0 +1,6 @@
+github.com/mohanson/doa v0.0.0-20201114092000-57967055d5aa h1:sLHnq6LTRVsH70TPNoP6XdEmP/gOtX1pMZhxN1/Io7Y=
+github.com/mohanson/doa v0.0.0-20201114092000-57967055d5aa/go.mod h1:HKQ6V1vOcd+H4giXI8HFM08xPJLJHUhhSGlZAMz/T7k=
+github.com/mohanson/easyfs v0.0.0-20201114092049-47ba004c6c74 h1:UTtVnAlbXeyh1YIf6hu7bcL4Dn4KKb++pOytGaa5ArE=
+github.com/mohanson/easyfs v0.0.0-20201114092049-47ba004c6c74/go.mod h1:SAgMTKE+bPeVYQ64Kjk4lSjY1/3stqVcfdkmuFZxdrM=
+github.com/mohanson/lru v0.0.0-20201114092131-d8316afe1dbb h1:uW0iG7+qYmKSasYQX5yQCoaOXtmfk3mqwlspSX6qREg=
+github.com/mohanson/lru v0.0.0-20201114092131-d8316afe1dbb/go.mod h1:6MuIsKg4QTtlY8yEF7CBHj8/unBW9Kwa1JqF+bNfhhk=
