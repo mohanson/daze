@@ -6,7 +6,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"os/exec"
 
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/protocol/ashe"
@@ -15,12 +14,14 @@ import (
 	"github.com/mohanson/easyfs"
 )
 
+const version = "1.15.1"
+
 const help = `usage: daze <command> [<args>]
 
 The most commonly used daze commands are:
   server     Start daze server
   client     Start daze client
-  cmd        Execute a command by a running client
+  ver        Print the daze version number and exit
 
 Run 'daze <command> -h' for more information on a command.`
 
@@ -93,21 +94,8 @@ func main() {
 		squire := daze.NewSquire(client, router)
 		locale := daze.NewLocale(*flListen, squire)
 		doa.Try1(locale.Run())
-	case "cmd":
-		var (
-			flClient = flag.String("c", "127.0.0.1:1080", "client address")
-		)
-		if len(os.Args) <= 1 {
-			return
-		}
-		cmd := exec.Command(os.Args[1], os.Args[2:]...)
-		env := os.Environ()
-		env = append(env, "all_proxy=socks4a://"+*flClient)
-		cmd.Env = env
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		doa.Try1(cmd.Run())
+	case "ver":
+		fmt.Println("daze", version)
 	default:
 		fmt.Println(help)
 		os.Exit(0)
