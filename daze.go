@@ -27,10 +27,12 @@ import (
 
 var Conf = struct {
 	DialTimeout        time.Duration
+	LifeExpired        uint64
 	PathDelegatedApnic string
 	PathRule           string
 }{
 	DialTimeout:        time.Second * 8,
+	LifeExpired:        120,
 	PathDelegatedApnic: "/delegated-apnic-latest",
 	PathRule:           "/rule.ls",
 }

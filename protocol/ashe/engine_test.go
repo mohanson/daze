@@ -11,10 +11,16 @@ import (
 	"time"
 )
 
+const (
+	EchoServerListenOn = "127.0.0.1:28080"
+	DazeServerListenOn = "127.0.0.1:21081"
+	Password           = "password"
+)
+
 func TestProtocolAsheTCP(t *testing.T) {
 	log.SetOutput(ioutil.Discard)
 
-	echoListener, _ := net.Listen("tcp", "127.0.0.1:21007")
+	echoListener, _ := net.Listen("tcp", EchoServerListenOn)
 	defer echoListener.Close()
 	go func() {
 		c, _ := echoListener.Accept()
@@ -22,14 +28,14 @@ func TestProtocolAsheTCP(t *testing.T) {
 		c.Close()
 	}()
 
-	dazeServer := NewServer("127.0.0.1:21081", "password")
+	dazeServer := NewServer(DazeServerListenOn, Password)
 	go dazeServer.Run()
 
 	time.Sleep(time.Second)
 
-	dazeClient := NewClient("127.0.0.1:21081", "password")
+	dazeClient := NewClient(DazeServerListenOn, Password)
 	ctx := context.WithValue(context.Background(), "cid", "00000000")
-	c, _ := dazeClient.Dial(ctx, "tcp", "127.0.0.1:21007")
+	c, _ := dazeClient.Dial(ctx, "tcp", EchoServerListenOn)
 	defer c.Close()
 
 	buf0 := []byte("Hello World!")
@@ -44,7 +50,7 @@ func TestProtocolAsheTCP(t *testing.T) {
 func TestProtocolAsheUDP(t *testing.T) {
 	log.SetOutput(ioutil.Discard)
 
-	echoAddr, _ := net.ResolveUDPAddr("udp", "127.0.0.1:21007")
+	echoAddr, _ := net.ResolveUDPAddr("udp", EchoServerListenOn)
 	echoServer, _ := net.ListenUDP("udp", echoAddr)
 	defer echoServer.Close()
 
@@ -56,14 +62,14 @@ func TestProtocolAsheUDP(t *testing.T) {
 		}
 	}()
 
-	dazeServer := NewServer("127.0.0.1:21081", "password")
+	dazeServer := NewServer(DazeServerListenOn, Password)
 	go dazeServer.Run()
 
 	time.Sleep(time.Second)
 
-	dazeClient := NewClient("127.0.0.1:21081", "password")
+	dazeClient := NewClient(DazeServerListenOn, Password)
 	ctx := context.WithValue(context.Background(), "cid", "00000000")
-	c, _ := dazeClient.Dial(ctx, "udp", "127.0.0.1:21007")
+	c, _ := dazeClient.Dial(ctx, "udp", EchoServerListenOn)
 	defer c.Close()
 
 	buf0 := []byte("Hello World!")

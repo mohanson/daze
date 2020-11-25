@@ -78,18 +78,19 @@ type Server struct {
 }
 
 // Serve.
-func (s *Server) Serve(ctx context.Context, cli io.ReadWriteCloser) error {
+func (s *Server) Serve(ctx context.Context, raw io.ReadWriteCloser) error {
 	var (
 		buf = make([]byte, 1024)
+		cli io.ReadWriteCloser
 		dst string
 		srv io.ReadWriteCloser
 		err error
 	)
-	_, err = io.ReadFull(cli, buf[:128])
+	_, err = io.ReadFull(raw, buf[:128])
 	if err != nil {
 		return err
 	}
-	cli = daze.Gravity(cli, append(buf[:128], s.Cipher[:]...))
+	cli = daze.Gravity(raw, append(buf[:128], s.Cipher[:]...))
 
 	_, err = io.ReadFull(cli, buf[:12])
 	if err != nil {
@@ -98,8 +99,9 @@ func (s *Server) Serve(ctx context.Context, cli io.ReadWriteCloser) error {
 	if buf[0] != 0xff || buf[1] != 0xff {
 		return fmt.Errorf("daze: malformed request: [%# 02x]", buf[0:2])
 	}
-	d := int64(binary.BigEndian.Uint64(buf[2:10]))
-	if math.Abs(float64(time.Now().Unix()-d)) > 120 {
+	d := time.Now().Unix() - int64(binary.BigEndian.Uint64(buf[2:10]))
+	y := d >> 63
+	if uint64(d^y-y) > daze.Conf.LifeExpired {
 		return fmt.Errorf("daze: expired: %v", time.Unix(d, 0))
 	}
 	_, err = io.ReadFull(cli, buf[12:12+buf[11]])
@@ -138,7 +140,6 @@ func (s *Server) Run() error {
 	for {
 		cli, err := ln.Accept()
 		if err != nil {
-			log.Println(err)
 			continue
 		}
 		go func(cli net.Conn) {
@@ -181,11 +182,11 @@ func (c *Client) Dial(ctx context.Context, network string, address string) (io.R
 		buf = make([]byte, 512)
 		err error
 	)
-	if n > 256 {
+	if n > 255 {
 		return nil, fmt.Errorf("daze: destination address too long: %s", address)
 	}
 	if network != "tcp" && network != "udp" {
-		return nil, fmt.Errorf("daze: network must be tcp or udp, but get %s", network)
+		return nil, fmt.Errorf("daze: network must be tcp or udp")
 	}
 	srv, err = net.DialTimeout("tcp", c.Server, daze.Conf.DialTimeout)
 	if err != nil {
