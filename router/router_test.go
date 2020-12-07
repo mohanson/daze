@@ -2,6 +2,7 @@ package router
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 )
 
@@ -67,10 +68,7 @@ func TestLru(t *testing.T) {
 }
 
 func TestRule(t *testing.T) {
-	data := `R a.com *.a.com
-B b.com *.b.com
-L c.com *.c.com
-`
+	data := strings.Join([]string{"R a.com *.a.com", "B b.com *.b.com", "L c.com *.c.com"}, "\n")
 	r := NewRouterRule()
 	r.FromReader(bytes.NewReader([]byte(data)))
 	if r.Choose("a.com") != Daze {
