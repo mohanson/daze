@@ -18,23 +18,58 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/mohanson/daze/router"
 	"github.com/mohanson/doa"
+	"github.com/mohanson/lru"
 )
 
+// ============================================================================
+//               ___           ___           ___           ___
+//              /\  \         /\  \         /\  \         /\  \
+//             /::\  \       /::\  \        \:\  \       /::\  \
+//            /:/\:\  \     /:/\:\  \        \:\  \     /:/\:\  \
+//           /:/  \:\__\   /::\~\:\  \        \:\  \   /::\~\:\  \
+//          /:/__/ \:|__| /:/\:\ \:\__\ _______\:\__\ /:/\:\ \:\__\
+//          \:\  \ /:/  / \/__\:\/:/  / \::::::::/__/ \:\~\:\ \/__/
+//           \:\  /:/  /       \::/  /   \:\~~\~~      \:\ \:\__\
+//            \:\/:/  /        /:/  /     \:\  \        \:\ \/__/
+//             \::/__/        /:/  /       \:\__\        \:\__\
+//              ~~            \/__/         \/__/         \/__/
+// ============================================================================
+
+// Conf is acting as package level configuration.
 var Conf = struct {
-	DialTimeout        time.Duration
-	LifeExpired        uint64
-	PathDelegatedApnic string
-	PathRule           string
+	Dialer      net.Dialer
+	IdleTime    time.Duration
+	RouterCache uint32
 }{
-	DialTimeout:        time.Second * 8,
-	LifeExpired:        120,
-	PathDelegatedApnic: "/delegated-apnic-latest",
-	PathRule:           "/rule.ls",
+	Dialer: net.Dialer{
+		Resolver: net.DefaultResolver,
+		Timeout:  time.Second * 8,
+	},
+	IdleTime:    time.Minute * 2,
+	RouterCache: 64,
+}
+
+// SetConfResolver modifies the DefaultResolver(which is the resolver used by the package-level Lookup functions and by
+// Dialers without a specified Resolver).
+//
+// Examples:
+//   SetConfResolver("8.8.8.8:53")
+//   SetConfResolver("114.114.114.114:53")
+func SetConfResolver(addr string) {
+	Conf.Dialer.Resolver = &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			d := net.Dialer{
+				Timeout: Conf.Dialer.Timeout,
+			}
+			return d.DialContext(ctx, "udp", addr)
+		},
+	}
 }
 
 // Link copies from src to dst and dst to src until either EOF is reached.
@@ -49,73 +84,24 @@ func Link(a, b io.ReadWriteCloser) {
 	a.Close()
 }
 
-// ReadWriteCloser is the interface that groups the basic Read, Write and
-// Close methods.
+// ReadWriteCloser is the interface that groups the basic Read, Write and Close methods.
 type ReadWriteCloser struct {
 	io.Reader
 	io.Writer
 	io.Closer
 }
 
-// GravityReader wraps an io.Reader with RC4 crypto.
-func GravityReader(r io.Reader, k []byte) io.Reader {
-	cr := doa.Try2(rc4.NewCipher(k)).(*rc4.Cipher)
-	return cipher.StreamReader{S: cr, R: r}
-}
-
-// GravityWriter wraps an io.Writer with RC4 crypto.
-func GravityWriter(w io.Writer, k []byte) io.Writer {
-	cw := doa.Try2(rc4.NewCipher(k)).(*rc4.Cipher)
-	return cipher.StreamWriter{S: cw, W: w}
-}
-
-// Double gravity, double happiness.
-func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
-	cr := doa.Try2(rc4.NewCipher(k)).(*rc4.Cipher)
-	cw := doa.Try2(rc4.NewCipher(k)).(*rc4.Cipher)
-	return &ReadWriteCloser{
-		Reader: cipher.StreamReader{S: cr, R: conn},
-		Writer: cipher.StreamWriter{S: cw, W: conn},
-		Closer: conn,
-	}
-}
-
-// Resolve modifies the net.DefaultResolver(which is the resolver used by the package-level Lookup functions and by
-// Dialers without a specified Resolver).
-//
-// Examples:
-//   Resolve("8.8.8.8:53")
-//   Resolve("114.114.114.114:53")
-func Resolve(addr string) {
-	net.DefaultResolver = &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			var d net.Dialer
-			return d.DialContext(ctx, "udp", addr)
-		},
-	}
-}
-
-// Dialer contains options for connecting to an address.
+// Dialer abstracts the way to establish network connections.
 type Dialer interface {
 	Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error)
 }
 
-// OpenFile select the appropriate method to open the file based on the incoming args automatically.
-//
-// Examples:
-//   OpenFile("/etc/hosts")
-//   OpenFile("https://raw.githubusercontent.com/mohanson/daze/master/README.md")
-func OpenFile(name string) (io.ReadCloser, error) {
-	if strings.HasPrefix(name, "http://") || strings.HasPrefix(name, "https://") {
-		resp, err := http.Get(name)
-		if err != nil {
-			return nil, err
-		}
-		return resp.Body, nil
-	} else {
-		return os.Open(name)
-	}
+// Direct is the default dialer for connecting to an address.
+type Direct struct{}
+
+func (d *Direct) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
+	log.Printf("%s   dial routing=direct network=%s address=%s", ctx.Value("cid"), network, address)
+	return Conf.Dialer.Dial(network, address)
 }
 
 // Locale is the main process of daze. In most cases, it is usually deployed as a daemon on a local machine.
@@ -137,60 +123,58 @@ type Locale struct {
 //
 // Fuck.
 func (l *Locale) ServeProxy(ctx context.Context, app io.ReadWriteCloser) error {
-	reader := bufio.NewReader(app)
-
-	for {
-		if err := func() error {
-			r, err := http.ReadRequest(reader)
-			if err != nil {
-				return err
-			}
-
-			var port string
-			if r.URL.Port() == "" {
-				port = "80"
-			} else {
-				port = r.URL.Port()
-			}
-
-			srv, err := l.Dialer.Dial(ctx, "tcp", r.URL.Hostname()+":"+port)
-			if err != nil {
-				return err
-			}
-			defer srv.Close()
-			servReader := bufio.NewReader(srv)
-
-			if r.Method == "CONNECT" {
-				log.Println(ctx.Value("cid"), " proto", "format=tunnel")
-				_, err := app.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
-				if err != nil {
-					return err
-				}
-				Link(app, srv)
-				return nil
-			}
-
-			log.Println(ctx.Value("cid"), " proto", "format=hproxy")
-			if r.Method == "GET" && r.Header.Get("Upgrade") == "websocket" {
-				if err := r.Write(srv); err != nil {
-					return err
-				}
-				Link(app, srv)
-				return nil
-			}
-			if err := r.Write(srv); err != nil {
-				return err
-			}
-			resp, err := http.ReadResponse(servReader, r)
-			if err != nil {
-				return err
-			}
-			return resp.Write(app)
-		}(); err != nil {
-			break
-		}
+	appReader := bufio.NewReader(app)
+	app = ReadWriteCloser{
+		Reader: appReader,
+		Writer: app,
+		Closer: app,
 	}
-	return nil
+	r, err := http.ReadRequest(appReader)
+	if err != nil {
+		return err
+	}
+
+	var port string
+	if r.URL.Port() == "" {
+		port = "80"
+	} else {
+		port = r.URL.Port()
+	}
+
+	srv, err := l.Dialer.Dial(ctx, "tcp", r.URL.Hostname()+":"+port)
+	if err != nil {
+		return err
+	}
+	defer srv.Close()
+
+	if r.Method == "CONNECT" {
+		log.Println(ctx.Value("cid"), " proto", "format=tunnel")
+		_, err := app.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+		if err != nil {
+			return err
+		}
+		Link(app, srv)
+		return nil
+	}
+
+	log.Println(ctx.Value("cid"), " proto", "format=hproxy")
+	if r.Method == "GET" && r.Header.Get("Upgrade") == "websocket" {
+		if err := r.Write(srv); err != nil {
+			return err
+		}
+		Link(app, srv)
+		return nil
+	}
+
+	srvReader := bufio.NewReader(srv)
+	if err := r.Write(srv); err != nil {
+		return err
+	}
+	s, err := http.ReadResponse(srvReader, r)
+	if err != nil {
+		return err
+	}
+	return s.Write(app)
 }
 
 // Serve traffic in SOCKS4/SOCKS4a format.
@@ -199,8 +183,13 @@ func (l *Locale) ServeProxy(ctx context.Context, app io.ReadWriteCloser) error {
 //   See https://en.wikipedia.org/wiki/SOCKS
 //   See http://ftp.icm.edu.pl/packages/socks/socks4/SOCKS4.protocol
 func (l *Locale) ServeSocks4(ctx context.Context, app io.ReadWriteCloser) error {
+	appReader := bufio.NewReader(app)
+	app = ReadWriteCloser{
+		Reader: appReader,
+		Writer: app,
+		Closer: app,
+	}
 	var (
-		reader    = bufio.NewReader(app)
 		fCode     uint8
 		fDstPort  = make([]byte, 2)
 		fDstIP    = make([]byte, 4)
@@ -211,22 +200,17 @@ func (l *Locale) ServeSocks4(ctx context.Context, app io.ReadWriteCloser) error 
 		srv       io.ReadWriteCloser
 		err       error
 	)
-	app = ReadWriteCloser{
-		Reader: reader,
-		Writer: app,
-		Closer: app,
-	}
-	reader.Discard(1)
-	fCode, _ = reader.ReadByte()
-	io.ReadFull(reader, fDstPort)
+	appReader.Discard(1)
+	fCode, _ = appReader.ReadByte()
+	io.ReadFull(appReader, fDstPort)
 	dstPort = binary.BigEndian.Uint16(fDstPort)
-	io.ReadFull(reader, fDstIP)
-	_, err = reader.ReadBytes(0x00)
+	io.ReadFull(appReader, fDstIP)
+	_, err = appReader.ReadBytes(0x00)
 	if err != nil {
 		return err
 	}
 	if bytes.Equal(fDstIP[:3], []byte{0x00, 0x00, 0x00}) && fDstIP[3] != 0x00 {
-		fHostName, err = reader.ReadBytes(0x00)
+		fHostName, err = appReader.ReadBytes(0x00)
 		if err != nil {
 			return err
 		}
@@ -240,14 +224,14 @@ func (l *Locale) ServeSocks4(ctx context.Context, app io.ReadWriteCloser) error 
 	switch fCode {
 	case 0x01:
 		srv, err = l.Dialer.Dial(ctx, "tcp", dst)
-		if err != nil {
-			app.Write([]byte{0x00, 0x5b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-			return err
-		} else {
+		if err == nil {
 			defer srv.Close()
 			app.Write([]byte{0x00, 0x5a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 			Link(app, srv)
 			return nil
+		} else {
+			app.Write([]byte{0x00, 0x5b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+			return err
 		}
 	case 0x02:
 		panic("unreachable")
@@ -261,8 +245,13 @@ func (l *Locale) ServeSocks4(ctx context.Context, app io.ReadWriteCloser) error 
 //   See https://en.wikipedia.org/wiki/SOCKS
 //   See https://tools.ietf.org/html/rfc1928
 func (l *Locale) ServeSocks5(ctx context.Context, app io.ReadWriteCloser) error {
+	appReader := bufio.NewReader(app)
+	app = ReadWriteCloser{
+		Reader: appReader,
+		Writer: app,
+		Closer: app,
+	}
 	var (
-		reader   = bufio.NewReader(app)
 		fN       uint8
 		fCmd     uint8
 		fAT      uint8
@@ -273,35 +262,31 @@ func (l *Locale) ServeSocks5(ctx context.Context, app io.ReadWriteCloser) error 
 		dst      string
 		err      error
 	)
-	app = ReadWriteCloser{
-		Reader: reader,
-		Writer: app,
-		Closer: app,
-	}
-	reader.Discard(1)
-	fN, _ = reader.ReadByte()
-	reader.Discard(int(fN))
+	appReader.Discard(1)
+	fN, _ = appReader.ReadByte()
+	appReader.Discard(int(fN))
 	app.Write([]byte{0x05, 0x00})
-	reader.Discard(1)
-	fCmd, _ = reader.ReadByte()
-	reader.Discard(1)
-	fAT, _ = reader.ReadByte()
+	appReader.Discard(1)
+	fCmd, _ = appReader.ReadByte()
+	appReader.Discard(1)
+	fAT, _ = appReader.ReadByte()
 	switch fAT {
 	case 0x01:
 		fDstAddr = make([]byte, 4)
-		io.ReadFull(reader, fDstAddr)
+		io.ReadFull(appReader, fDstAddr)
 		dstHost = net.IP(fDstAddr).String()
 	case 0x03:
-		fN, _ = reader.ReadByte()
+		fN, _ = appReader.ReadByte()
 		fDstAddr = make([]byte, int(fN))
-		io.ReadFull(reader, fDstAddr)
+		io.ReadFull(appReader, fDstAddr)
 		dstHost = string(fDstAddr)
 	case 0x04:
 		fDstAddr = make([]byte, 16)
-		io.ReadFull(reader, fDstAddr)
+		io.ReadFull(appReader, fDstAddr)
 		dstHost = net.IP(fDstAddr).String()
 	}
-	if _, err = io.ReadFull(app, fDstPort); err != nil {
+	_, err = io.ReadFull(app, fDstPort)
+	if err != nil {
 		return err
 	}
 	dstPort = binary.BigEndian.Uint16(fDstPort)
@@ -321,14 +306,14 @@ func (l *Locale) ServeSocks5(ctx context.Context, app io.ReadWriteCloser) error 
 func (l *Locale) ServeSocks5TCP(ctx context.Context, app io.ReadWriteCloser, dst string) error {
 	log.Println(ctx.Value("cid"), " proto", "format=socks5")
 	srv, err := l.Dialer.Dial(ctx, "tcp", dst)
-	if err != nil {
-		app.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-		return err
-	} else {
+	if err == nil {
 		defer srv.Close()
 		app.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 		Link(app, srv)
 		return nil
+	} else {
+		app.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		return err
 	}
 }
 
@@ -347,32 +332,63 @@ func (l *Locale) ServeSocks5UDP(ctx context.Context, app io.ReadWriteCloser) err
 		dst         string
 		srv         io.ReadWriteCloser
 		b           bool
-		cpl         = map[string]io.ReadWriteCloser{}
-		buf         = make([]byte, 2048)
+		c           uint32 = 0
+		cpl                = map[string]io.ReadWriteCloser{}
+		cll                = map[string]time.Time{}
+		buf                = make([]byte, 2048)
 		err         error
 	)
-
-	defer app.Close()
-	bndAddr, _ = net.ResolveUDPAddr("udp", "127.0.0.1:0")
-	bnd, _ = net.ListenUDP("udp", bndAddr)
+	bndAddr = doa.Try2(net.ResolveUDPAddr("udp", "127.0.0.1:0")).(*net.UDPAddr)
+	bnd = doa.Try2(net.ListenUDP("udp", bndAddr)).(*net.UDPConn)
 	defer bnd.Close()
 	bndPort = uint16(bnd.LocalAddr().(*net.UDPAddr).Port)
 	copy(buf, []byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 	binary.BigEndian.PutUint16(buf[8:10], bndPort)
-	app.Write(buf[:10])
+	_, err = app.Write(buf[:10])
+	if err != nil {
+		return err
+	}
 
+	// The life of app and bnd are bound together. This means that when the app is disconnected, bnd should also be
+	// destroyed.
 	go func() {
 		io.Copy(ioutil.Discard, app)
-		app.Close()
 		bnd.Close()
 	}()
 
 	for {
+		// Close connections that have not been used.
+		c += 1
+		if c&0x0FFF == 0x00 {
+			n := time.Now()
+			s := []string{}
+			for k, v := range cll {
+				if n.After(v) {
+					s = append(s, k)
+				}
+			}
+			for _, e := range s {
+				delete(cll, e)
+				cpl[e].Close()
+				delete(cpl, e)
+			}
+		}
+		if len(cpl) != len(cll) {
+			panic("unreachable")
+		}
+
 		appSize, appAddr, err = bnd.ReadFromUDP(buf)
 		if err != nil {
 			break
 		}
-
+		if buf[0] != 0x00 || buf[1] != 0x00 {
+			panic("unreachable")
+		}
+		// Implementation of fragmentation is optional; an implementation that does not support fragmentation MUST drop
+		// any datagram whose FRAG field is other than X'00'.
+		if buf[2] != 0x00 {
+			panic("unreachable")
+		}
 		switch buf[3] {
 		case 0x01:
 			appHeadSize = 10
@@ -402,6 +418,8 @@ func (l *Locale) ServeSocks5UDP(ctx context.Context, app io.ReadWriteCloser) err
 		srv, b = cpl[dst]
 		if b {
 			goto send
+		} else {
+			goto init
 		}
 	init:
 		log.Println(ctx.Value("cid"), " proto", "format=socks5")
@@ -411,6 +429,7 @@ func (l *Locale) ServeSocks5UDP(ctx context.Context, app io.ReadWriteCloser) err
 			continue
 		}
 		cpl[dst] = srv
+		cll[dst] = time.Now().Add(Conf.IdleTime)
 
 		go func(srv io.ReadWriteCloser, appHead []byte, appAddr *net.UDPAddr) {
 			var (
@@ -433,12 +452,15 @@ func (l *Locale) ServeSocks5UDP(ctx context.Context, app io.ReadWriteCloser) err
 			srv.Close()
 		}(srv, appHead, appAddr)
 	send:
-		_, err = srv.(io.ReadWriteCloser).Write(buf[appHeadSize:appSize])
+		_, err = srv.Write(buf[appHeadSize:appSize])
 		if err != nil {
 			log.Println(ctx.Value("cid"), " error", err)
-			srv.Close()
-			goto init
+			delete(cll, dst)
+			cpl[dst].Close()
+			delete(cpl, dst)
+			continue
 		}
+		cll[dst] = time.Now().Add(Conf.IdleTime)
 	}
 	for _, e := range cpl {
 		e.Close()
@@ -516,43 +538,252 @@ func NewLocale(listen string, dialer Dialer) *Locale {
 	}
 }
 
-// Direct is the default dialer for connecting to an address.
-type Direct struct {
+// ============================================================================
+//               ___           ___           ___           ___
+//              /\  \         /\  \         /\  \         /\  \
+//             /::\  \       /::\  \       /::\  \       /::\  \
+//            /:/\:\  \     /:/\:\  \     /:/\:\  \     /:/\:\  \
+//           /::\~\:\  \   /:/  \:\  \   /::\~\:\  \   /:/  \:\__\
+//          /:/\:\ \:\__\ /:/__/ \:\__\ /:/\:\ \:\__\ /:/__/ \:|__|
+//          \/_|::\/:/  / \:\  \ /:/  / \/__\:\/:/  / \:\  \ /:/  /
+//             |:|::/  /   \:\  /:/  /       \::/  /   \:\  /:/  /
+//             |:|\/__/     \:\/:/  /        /:/  /     \:\/:/  /
+//             |:|  |        \::/  /        /:/  /       \::/__/
+//              \|__|         \/__/         \/__/         ~~
+// ============================================================================
+
+// A Road represents a host's road mode.
+type Road uint32
+
+const (
+	RoadLocale Road = iota // Don't need a proxy
+	RoadRemote             // This network are accessed through daze
+	RoadFucked             // Pure rubbish
+	RoadPuzzle             // ?
+)
+
+// Router is a selector that will judge the host address.
+type Router interface {
+	// The host must be a literal IP address, or a host name that can be resolved to IP addresses.
+	// Examples:
+	//	 Road("golang.org")
+	//	 Road("192.0.2.1")
+	Road(host string) Road
 }
 
-func (d *Direct) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
-	log.Printf("%s   dial routing=direct network=%s address=%s", ctx.Value("cid"), network, address)
-	return net.DialTimeout(network, address, Conf.DialTimeout)
+// IPNet is a router by IPNets. It judges whether an IP or domain name is within its range, if so, it returns Y,
+// otherwise it returns N.
+type RouterIPNet struct {
+	L []*net.IPNet
+	Y Road
+	N Road
 }
 
-// Squire is a bit smart guy, it can automatically distinguish whether to use a proxy or a local network.
-type Squire struct {
-	Dialer Dialer
-	Direct Dialer
-	Router router.Router
+// Road implements daze.Router.
+func (r *RouterIPNet) Road(host string) Road {
+	if len(r.L) == 0 {
+		return r.N
+	}
+	l, err := Conf.Dialer.Resolver.LookupIPAddr(context.Background(), host)
+	if err != nil {
+		return RoadPuzzle
+	}
+	a := l[0]
+	for _, e := range r.L {
+		if e.Contains(a.IP) {
+			return r.Y
+		}
+	}
+	return r.N
+}
+
+// NewIPNet returns a new IPNet object.
+func NewRouterIPNet(ipnets []*net.IPNet, y Road, n Road) *RouterIPNet {
+	return &RouterIPNet{
+		L: ipnets,
+		Y: y,
+		N: n,
+	}
+}
+
+// Introduction:
+//   See https://en.wikipedia.org/wiki/Reserved_IP_addresses
+func NewRouterReservedIP() *RouterIPNet {
+	r := []*net.IPNet{}
+	for _, entry := range [][2]string{
+		// IPv4
+		{"00000000", "FF000000"},
+		{"0A000000", "FF000000"},
+		{"7F000000", "FF000000"},
+		{"A9FE0000", "FFFF0000"},
+		{"AC100000", "FFF00000"},
+		{"C0000000", "FFFFFFF8"},
+		{"C00000AA", "FFFFFFFE"},
+		{"C0000200", "FFFFFF00"},
+		{"C0A80000", "FFFF0000"},
+		{"C6120000", "FFFE0000"},
+		{"C6336400", "FFFFFF00"},
+		{"CB007100", "FFFFFF00"},
+		{"F0000000", "F0000000"},
+		{"FFFFFFFF", "FFFFFFFF"},
+		// IPv6
+		{"00000000000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
+		{"00000000000000000000000000000001", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
+		{"01000000000000000000000000000000", "FFFFFFFFFFFFFFFF0000000000000000"},
+		{"0064FF9B000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFF00000000"},
+		{"20010000000000000000000000000000", "FFFFFFFF000000000000000000000000"},
+		{"20010010000000000000000000000000", "FFFFFFF0000000000000000000000000"},
+		{"20010020000000000000000000000000", "FFFFFFF0000000000000000000000000"},
+		{"20010DB8000000000000000000000000", "FFFFFFFF000000000000000000000000"},
+		{"20020000000000000000000000000000", "FFFF0000000000000000000000000000"},
+		{"FC000000000000000000000000000000", "FE000000000000000000000000000000"},
+		{"FE800000000000000000000000000000", "FFC00000000000000000000000000000"},
+		{"FF000000000000000000000000000000", "FF000000000000000000000000000000"},
+	} {
+		i := doa.Try2(hex.DecodeString(entry[0])).([]byte)
+		m := doa.Try2(hex.DecodeString(entry[1])).([]byte)
+		r = append(r, &net.IPNet{IP: i, Mask: m})
+	}
+	return NewRouterIPNet(r, RoadLocale, RoadPuzzle)
+}
+
+// Cache cache routing results for next use.
+type RouterCache struct {
+	Pit Router
+	Box *lru.Cache
+	m   sync.Mutex
+}
+
+// Road implements daze.Router.
+func (r *RouterCache) Road(host string) Road {
+	r.m.Lock()
+	defer r.m.Unlock()
+	if a, b := r.Box.Get(host); b {
+		return a.(Road)
+	}
+	a := r.Pit.Road(host)
+	r.Box.Set(host, a)
+	return a
+}
+
+// NewCache returns a new Cache object.
+func NewRouterCache(r Router) *RouterCache {
+	return &RouterCache{
+		Pit: r,
+		Box: lru.New(int(Conf.RouterCache)),
+		m:   sync.Mutex{},
+	}
+}
+
+// RouterClump concat multiple routers in series.
+type RouterClump struct {
+	L []Router
+}
+
+// Road implements daze.Router.
+func (r *RouterClump) Road(host string) Road {
+	var a Road
+	for _, e := range r.L {
+		a = e.Road(host)
+		if a != RoadPuzzle {
+			return a
+		}
+	}
+	return RoadPuzzle
+}
+
+// NewRouterClump returns a new RouterClump.
+func NewRouterClump(router ...Router) *RouterClump {
+	return &RouterClump{
+		L: router,
+	}
+}
+
+// Aimbot automatically distinguish whether to use a proxy or a local network.
+type Aimbot struct {
+	Remote Dialer
+	Locale Dialer
+	Router Router
 }
 
 // Dialer contains options for connecting to an address.
-func (s *Squire) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
-	host, _, _ := net.SplitHostPort(address)
-	switch s.Router.Choose(host) {
-	case router.Direct:
-		return s.Direct.Dial(ctx, network, address)
-	case router.Daze:
-		return s.Dialer.Dial(ctx, network, address)
-	case router.Fucked:
-		return nil, fmt.Errorf("daze: %s has been blocked", host)
-	case router.Puzzle:
-		return s.Dialer.Dial(ctx, network, address)
+func (s *Aimbot) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, err
 	}
-	return s.Dialer.Dial(ctx, network, address)
+	switch s.Router.Road(host) {
+	case RoadLocale:
+		return s.Locale.Dial(ctx, network, address)
+	case RoadRemote:
+		return s.Remote.Dial(ctx, network, address)
+	case RoadFucked:
+		return nil, fmt.Errorf("daze: %s has been blocked", host)
+	case RoadPuzzle:
+		return s.Remote.Dial(ctx, network, address)
+	}
+	return s.Remote.Dial(ctx, network, address)
 }
 
-// NewSquire.
-func NewSquire(dialer Dialer, router router.Router) *Squire {
-	return &Squire{
-		Dialer: dialer,
-		Direct: &Direct{},
-		Router: router,
+// ============================================================================
+//               ___           ___           ___           ___
+//              /\  \         /\  \         /\  \         /\__\
+//              \:\  \       /::\  \       /::\  \       /:/  /
+//               \:\  \     /:/\:\  \     /:/\:\  \     /:/  /
+//               /::\  \   /:/  \:\  \   /:/  \:\  \   /:/  /
+//              /:/\:\__\ /:/__/ \:\__\ /:/__/ \:\__\ /:/__/
+//             /:/  \/__/ \:\  \ /:/  / \:\  \ /:/  / \:\  \
+//            /:/  /       \:\  /:/  /   \:\  /:/  /   \:\  \
+//           /:/  /         \:\/:/  /     \:\/:/  /     \:\  \
+//          /:/  /           \::/  /       \::/  /       \:\__\
+//          \/__/             \/__/         \/__/         \/__/
+// ============================================================================
+
+// Check interface implementation.
+var (
+	_ Dialer = (*Direct)(nil)
+	_ Dialer = (*Aimbot)(nil)
+	_ Router = (*RouterIPNet)(nil)
+	_ Router = (*RouterCache)(nil)
+	_ Router = (*RouterClump)(nil)
+)
+
+// GravityReader wraps an io.Reader with RC4 crypto.
+func GravityReader(r io.Reader, k []byte) io.Reader {
+	cr := doa.Try2(rc4.NewCipher(k)).(*rc4.Cipher)
+	return cipher.StreamReader{S: cr, R: r}
+}
+
+// GravityWriter wraps an io.Writer with RC4 crypto.
+func GravityWriter(w io.Writer, k []byte) io.Writer {
+	cw := doa.Try2(rc4.NewCipher(k)).(*rc4.Cipher)
+	return cipher.StreamWriter{S: cw, W: w}
+}
+
+// Double gravity, double happiness.
+func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
+	cr := doa.Try2(rc4.NewCipher(k)).(*rc4.Cipher)
+	cw := doa.Try2(rc4.NewCipher(k)).(*rc4.Cipher)
+	return &ReadWriteCloser{
+		Reader: cipher.StreamReader{S: cr, R: conn},
+		Writer: cipher.StreamWriter{S: cw, W: conn},
+		Closer: conn,
+	}
+}
+
+// OpenFile select the appropriate method to open the file based on the incoming args automatically.
+//
+// Examples:
+//   OpenFile("/etc/hosts")
+//   OpenFile("https://raw.githubusercontent.com/mohanson/daze/master/README.md")
+func OpenFile(name string) (io.ReadCloser, error) {
+	if strings.HasPrefix(name, "http://") || strings.HasPrefix(name, "https://") {
+		resp, err := http.Get(name)
+		if err != nil {
+			return nil, err
+		}
+		return resp.Body, nil
+	} else {
+		return os.Open(name)
 	}
 }

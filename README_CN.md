@@ -31,7 +31,7 @@ $ daze server -l 0.0.0.0:1081
 # 使用如下命令连接至你的服务端(将 $SERVER 替换为你的服务器地址)
 $ daze client -s $SERVER:1081 -l 127.0.0.1:1080 -dns 114.114.114.114:53
 # 现在, 你即可自由地访问互联网
-$ curl -x socks4a://127.0.0.1:1080 google.com
+$ curl -x socks5://127.0.0.1:1080 google.com
 ```
 
 # 在浏览器中使用, Firefox, Chrome 或 Edge

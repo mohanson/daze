@@ -31,7 +31,7 @@ $ daze server -l 0.0.0.0:1081
 # use the following command to link your server(replace $SERVER with your server ip):
 $ daze client -s $SERVER:1081 -l 127.0.0.1:1080 -dns 114.114.114.114:53
 # now, you are free to visit Internet
-$ curl -x socks4a://127.0.0.1:1080 google.com
+$ curl -x socks5://127.0.0.1:1080 google.com
 ```
 
 # For browser, Firefox, Chrome or Edge e.g.
