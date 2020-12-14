@@ -36,6 +36,12 @@ import (
 // - DST.Len: len of DST. If DST is https://google.com, DST.Len is 0x12
 // - DST: desired destination address
 
+var Conf = struct {
+	LifeExpired uint64
+}{
+	LifeExpired: 120,
+}
+
 // TCPConn is an implementation of the Conn interface for TCP network connections.
 type TCPConn struct {
 	io.ReadWriteCloser
@@ -101,7 +107,7 @@ func (s *Server) Serve(ctx context.Context, raw io.ReadWriteCloser) error {
 	}
 	d := time.Now().Unix() - int64(binary.BigEndian.Uint64(buf[2:10]))
 	y := d >> 63
-	if uint64(d^y-y) > daze.Conf.LifeExpired {
+	if uint64(d^y-y) > Conf.LifeExpired {
 		return fmt.Errorf("daze: expired: %v", time.Unix(d, 0))
 	}
 	_, err = io.ReadFull(cli, buf[12:12+buf[11]])
@@ -112,11 +118,11 @@ func (s *Server) Serve(ctx context.Context, raw io.ReadWriteCloser) error {
 	switch buf[10] {
 	case 0x01:
 		log.Printf("%s   dial network=tcp address=%s", ctx.Value("cid"), dst)
-		srv, err = net.DialTimeout("tcp", dst, daze.Conf.DialTimeout)
+		srv, err = daze.Conf.Dialer.Dial("tcp", dst)
 		cli = &TCPConn{cli}
 	case 0x03:
 		log.Printf("%s   dial network=udp address=%s", ctx.Value("cid"), dst)
-		srv, err = net.DialTimeout("udp", dst, daze.Conf.DialTimeout)
+		srv, err = daze.Conf.Dialer.Dial("udp", dst)
 		cli = &UDPConn{cli}
 	}
 	if err != nil {
@@ -188,7 +194,7 @@ func (c *Client) Dial(ctx context.Context, network string, address string) (io.R
 	if network != "tcp" && network != "udp" {
 		return nil, fmt.Errorf("daze: network must be tcp or udp")
 	}
-	srv, err = net.DialTimeout("tcp", c.Server, daze.Conf.DialTimeout)
+	srv, err = daze.Conf.Dialer.Dial("tcp", c.Server)
 	if err != nil {
 		return nil, err
 	}

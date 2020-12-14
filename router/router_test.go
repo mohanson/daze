@@ -4,96 +4,99 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/mohanson/daze"
 )
 
 func TestAlways(t *testing.T) {
-	r := NewRouterAlways(Daze)
-	if r.Choose("127.0.0.1") != Daze {
+	r := NewAlways(daze.RoadRemote)
+	if r.Road("127.0.0.1") != daze.RoadRemote {
 		t.FailNow()
 	}
-	if r.Choose("ip.cn") != Daze {
+	if r.Road("ip.cn") != daze.RoadRemote {
 		t.FailNow()
 	}
 }
 
 func TestReservedIPv4(t *testing.T) {
-	r := NewRouterReservedIP()
-	if r.Choose("127.0.0.1") != Direct {
+	r := daze.NewRouterReservedIP()
+	if r.Road("127.0.0.1") != daze.RoadLocale {
 		t.FailNow()
 	}
-	if r.Choose("ip.cn") != Puzzle {
+	if r.Road("ip.cn") != daze.RoadPuzzle {
 		t.FailNow()
 	}
 }
 
 func TestReservedIPv6(t *testing.T) {
-	r := NewRouterReservedIP()
-	if r.Choose("::1") != Direct {
+	r := daze.NewRouterReservedIP()
+	if r.Road("::1") != daze.RoadLocale {
 		t.FailNow()
 	}
 }
 
-func TestCompose(t *testing.T) {
-	r := NewRouterCompose()
-	r.Join(NewRouterReservedIP())
-	r.Join(NewRouterAlways(Daze))
-	if r.Choose("127.0.0.1") != Direct {
+func TestClump(t *testing.T) {
+	r := daze.NewRouterClump(
+		daze.NewRouterReservedIP(),
+		NewAlways(daze.RoadRemote),
+	)
+	if r.Road("127.0.0.1") != daze.RoadLocale {
 		t.FailNow()
 	}
-	if r.Choose("ip.cn") != Daze {
+	if r.Road("ip.cn") != daze.RoadRemote {
 		t.FailNow()
 	}
 }
 
-func TestLru(t *testing.T) {
-	r := NewRouterLRU(NewRouterReservedIP())
-	if r.Choose("127.0.0.1") != Direct {
+func TestCache(t *testing.T) {
+	r := daze.NewRouterCache(daze.NewRouterReservedIP())
+	if r.Road("127.0.0.1") != daze.RoadLocale {
 		t.FailNow()
 	}
-	if r.Choose("ip.cn") != Puzzle {
+	if r.Road("ip.cn") != daze.RoadPuzzle {
 		t.FailNow()
 	}
-	if a, b := r.Box.Get("127.0.0.1"); !b || a.(Road) != Direct {
+	if a, b := r.Box.Get("127.0.0.1"); !b || a.(daze.Road) != daze.RoadLocale {
 		t.FailNow()
 	}
-	if _, b := r.Box.Get("ip.cn"); b {
+	if a, b := r.Box.Get("ip.cn"); !b || a.(daze.Road) != daze.RoadPuzzle {
 		t.FailNow()
 	}
-	if r.Choose("127.0.0.1") != Direct {
+	if r.Road("127.0.0.1") != daze.RoadLocale {
 		t.FailNow()
 	}
-	if r.Choose("ip.cn") != Puzzle {
+	if r.Road("ip.cn") != daze.RoadPuzzle {
 		t.FailNow()
 	}
 }
 
 func TestRule(t *testing.T) {
 	data := strings.Join([]string{"R a.com *.a.com", "B b.com *.b.com", "L c.com *.c.com"}, "\n")
-	r := NewRouterRule()
+	r := NewRule()
 	r.FromReader(bytes.NewReader([]byte(data)))
-	if r.Choose("a.com") != Daze {
+	if r.Road("a.com") != daze.RoadRemote {
 		t.FailNow()
 	}
-	if r.Choose("b.com") != Fucked {
+	if r.Road("b.com") != daze.RoadFucked {
 		t.FailNow()
 	}
-	if r.Choose("c.com") != Direct {
+	if r.Road("c.com") != daze.RoadLocale {
 		t.FailNow()
 	}
-	if r.Choose("d.com") != Puzzle {
+	if r.Road("d.com") != daze.RoadPuzzle {
 		t.FailNow()
 	}
 
-	if r.Choose("a.a.com") != Daze {
+	if r.Road("a.a.com") != daze.RoadRemote {
 		t.FailNow()
 	}
-	if r.Choose("a.b.com") != Fucked {
+	if r.Road("a.b.com") != daze.RoadFucked {
 		t.FailNow()
 	}
-	if r.Choose("a.c.com") != Direct {
+	if r.Road("a.c.com") != daze.RoadLocale {
 		t.FailNow()
 	}
-	if r.Choose("a.d.com") != Puzzle {
+	if r.Road("a.d.com") != daze.RoadPuzzle {
 		t.FailNow()
 	}
 }
