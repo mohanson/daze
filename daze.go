@@ -13,9 +13,11 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
+	"math/bits"
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -606,9 +608,14 @@ func NewRouterIPNet(ipnets []*net.IPNet, y Road, n Road) *RouterIPNet {
 	}
 }
 
+// NewRouterRight.
+func NewRouterRight(road Road) *RouterIPNet {
+	return &RouterIPNet{L: []*net.IPNet{}, Y: road, N: road}
+}
+
 // Introduction:
 //   See https://en.wikipedia.org/wiki/Reserved_IP_addresses
-func NewRouterReservedIP() *RouterIPNet {
+func NewRouterLocal() *RouterIPNet {
 	r := []*net.IPNet{}
 	for _, entry := range [][2]string{
 		// IPv4
@@ -699,6 +706,120 @@ func NewRouterClump(router ...Router) *RouterClump {
 	}
 }
 
+// RULE file aims to be a minimal configuration file format that's easy to read due to obvious semantics.
+// There are two parts per line on RULE file: mode and glob. mode are on the left of the space sign and glob are on the
+// right. mode is an char and describes whether the host should go proxy, glob supported glob-style patterns:
+//
+//   h?llo matches hello, hallo and hxllo
+//   h*llo matches hllo and heeeello
+//   h[ae]llo matches hello and hallo, but not hillo
+//   h[^e]llo matches hallo, hbllo, ... but not hello
+//   h[a-b]llo matches hallo and hbllo
+//
+// This is a RULE document:
+//   L a.com a.a.com
+//   R b.com *.b.com
+//   B c.com
+//
+// L(ocale)  means using locale network
+// R(emote)  means using remote network
+// B(anned)  means block it
+type RouterRules struct {
+	L []string
+	R []string
+	B []string
+}
+
+// Road implements daze.Router.
+func (r *RouterRules) Road(host string) Road {
+	for _, e := range r.L {
+		if doa.Try2(filepath.Match(e, host)).(bool) {
+			return RoadLocale
+		}
+	}
+	for _, e := range r.R {
+		if doa.Try2(filepath.Match(e, host)).(bool) {
+			return RoadRemote
+		}
+	}
+	for _, e := range r.B {
+		if doa.Try2(filepath.Match(e, host)).(bool) {
+			return RoadFucked
+		}
+	}
+	return RoadPuzzle
+}
+
+// Load a RULE file from reader.
+func (r *RouterRules) FromReader(f io.Reader) error {
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		seps := strings.Fields(line)
+		if len(seps) < 2 {
+			continue
+		}
+		switch seps[0] {
+		case "#":
+		case "L":
+			for _, e := range seps[1:] {
+				r.L = append(r.L, e)
+			}
+		case "R":
+			for _, e := range seps[1:] {
+				r.R = append(r.R, e)
+			}
+		case "B":
+			for _, e := range seps[1:] {
+				r.B = append(r.B, e)
+			}
+		}
+	}
+	return scanner.Err()
+}
+
+// NewRouterRules returns a new RoaderRules.
+func NewRouterRules() *RouterRules {
+	return &RouterRules{
+		L: []string{},
+		R: []string{},
+		B: []string{},
+	}
+}
+
+// When compounding region, return daze.RoadLocale.
+// The original address of the f is http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest
+func NewRouterApnic(f io.Reader, region string) *RouterIPNet {
+	ipv4Prefix := fmt.Sprintf("apnic|%s|ipv4", region)
+	ipv6Prefix := fmt.Sprintf("apnic|%s|ipv6", region)
+	r := []*net.IPNet{}
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		line := s.Text()
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(line, ipv4Prefix):
+			seps := strings.Split(line, "|")
+			sep4 := doa.Try2(strconv.ParseUint(seps[4], 0, 32)).(uint64)
+			// Determine whether it is a power of 2
+			if sep4&(sep4-1) != 0 {
+				panic("unreachable")
+			}
+			mask := bits.LeadingZeros64(sep4) - 31
+			_, cidr := doa.Try3(net.ParseCIDR(fmt.Sprintf("%s/%d", seps[3], mask)))
+			r = append(r, cidr.(*net.IPNet))
+		case strings.HasPrefix(line, ipv6Prefix):
+			seps := strings.Split(line, "|")
+			sep4 := seps[4]
+			_, cidr := doa.Try3(net.ParseCIDR(fmt.Sprintf("%s/%s", seps[3], sep4)))
+			r = append(r, cidr.(*net.IPNet))
+		}
+	}
+	return NewRouterIPNet(r, RoadLocale, RoadPuzzle)
+}
+
 // Aimbot automatically distinguish whether to use a proxy or a local network.
 type Aimbot struct {
 	Remote Dialer
@@ -741,11 +862,12 @@ func (s *Aimbot) Dial(ctx context.Context, network string, address string) (io.R
 
 // Check interface implementation.
 var (
-	_ Dialer = (*Direct)(nil)
 	_ Dialer = (*Aimbot)(nil)
-	_ Router = (*RouterIPNet)(nil)
+	_ Dialer = (*Direct)(nil)
 	_ Router = (*RouterCache)(nil)
 	_ Router = (*RouterClump)(nil)
+	_ Router = (*RouterIPNet)(nil)
+	_ Router = (*RouterRules)(nil)
 )
 
 // GravityReader wraps an io.Reader with RC4 crypto.

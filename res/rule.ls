@@ -11,8 +11,8 @@
 #   h[a-b]llo matches hallo and hbllo
 #
 # This is a RULE document:
-#   L a.com
-#   R b.com
+#   L a.com a.a.com
+#   R b.com *.b.com
 #   B c.com
 #
 # L(ocale)  means using locale network

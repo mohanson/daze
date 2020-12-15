@@ -9,7 +9,6 @@ import (
 
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/protocol/ashe"
-	"github.com/mohanson/daze/router"
 	"github.com/mohanson/doa"
 	"github.com/mohanson/easyfs"
 )
@@ -45,7 +44,7 @@ func main() {
 	case "server":
 		var (
 			flListen = flag.String("l", "0.0.0.0:1081", "listen address")
-			flCipher = flag.String("k", "daze", "cipher, for encryption")
+			flCipher = flag.String("k", "daze", "cipher, for encryption, same as server")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
@@ -60,7 +59,7 @@ func main() {
 		var (
 			flListen = flag.String("l", "127.0.0.1:1080", "listen address")
 			flServer = flag.String("s", "127.0.0.1:1081", "server address")
-			flCipher = flag.String("k", "daze", "cipher, for encryption")
+			flCipher = flag.String("k", "daze", "cipher, for encryption, same as client")
 			flFilter = flag.String("f", "ipcn", "filter {ipcn, none, full}")
 			flRulels = flag.String("r", easyfs.Path(Conf.PathRule), "rule path")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
@@ -75,32 +74,37 @@ func main() {
 		client := ashe.NewClient(*flServer, *flCipher)
 		router := func() daze.Router {
 			if *flFilter == "full" {
-				routerAlways := router.NewAlways(daze.RoadLocale)
-				return routerAlways
+				routerRight := daze.NewRouterRight(daze.RoadLocale)
+				return routerRight
 			}
 			if *flFilter == "none" {
 				log.Println("load rule reserved IPv4/6 CIDRs")
-				routerReservedIP := daze.NewRouterReservedIP()
-				routerAlways := router.NewAlways(daze.RoadRemote)
-				routerClump := daze.NewRouterClump(routerReservedIP, routerAlways)
+				routerLocal := daze.NewRouterLocal()
+				routerRight := daze.NewRouterRight(daze.RoadRemote)
+				routerClump := daze.NewRouterClump(routerLocal, routerRight)
 				routerCache := daze.NewRouterCache(routerClump)
 				return routerCache
 			}
 			if *flFilter == "ipcn" {
 				log.Println("load rule", *flRulels)
-				routerRule := router.NewRule()
+				routerRules := daze.NewRouterRules()
 				f1 := doa.Try2(daze.OpenFile(*flRulels)).(io.ReadCloser)
 				defer f1.Close()
-				doa.Try1(routerRule.FromReader(f1))
+				doa.Try1(routerRules.FromReader(f1))
+				log.Println("find", len(routerRules.L)+len(routerRules.R)+len(routerRules.B))
+
 				log.Println("load rule reserved IPv4/6 CIDRs")
-				routerReservedIP := daze.NewRouterReservedIP()
+				routerLocal := daze.NewRouterLocal()
+				log.Println("find", len(routerLocal.L))
+
 				log.Println("load rule CN(China PR) CIDRs")
 				f2 := doa.Try2(daze.OpenFile(easyfs.Path(Conf.PathDelegatedApnic))).(io.ReadCloser)
 				defer f2.Close()
-				routerApnic := router.NewApnic(f2, "CN")
-				log.Println("find", len(routerApnic.L), "IP nets")
-				routerAlways := router.NewAlways(daze.RoadRemote)
-				routerClump := daze.NewRouterClump(routerRule, routerReservedIP, routerApnic, routerAlways)
+				routerApnic := daze.NewRouterApnic(f2, "CN")
+				log.Println("find", len(routerApnic.L))
+
+				routerRight := daze.NewRouterRight(daze.RoadRemote)
+				routerClump := daze.NewRouterClump(routerRules, routerLocal, routerApnic, routerRight)
 				routerCache := daze.NewRouterCache(routerClump)
 				return routerCache
 			}
