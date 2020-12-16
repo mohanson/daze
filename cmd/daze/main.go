@@ -44,7 +44,7 @@ func main() {
 	case "server":
 		var (
 			flListen = flag.String("l", "0.0.0.0:1081", "listen address")
-			flCipher = flag.String("k", "daze", "cipher, for encryption, same as server")
+			flCipher = flag.String("k", "daze", "cipher, for encryption, same as client")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
@@ -59,7 +59,7 @@ func main() {
 		var (
 			flListen = flag.String("l", "127.0.0.1:1080", "listen address")
 			flServer = flag.String("s", "127.0.0.1:1081", "server address")
-			flCipher = flag.String("k", "daze", "cipher, for encryption, same as client")
+			flCipher = flag.String("k", "daze", "cipher, for encryption, same as server")
 			flFilter = flag.String("f", "ipcn", "filter {ipcn, none, full}")
 			flRulels = flag.String("r", easyfs.Path(Conf.PathRule), "rule path")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
