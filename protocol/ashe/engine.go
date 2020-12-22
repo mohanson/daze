@@ -181,7 +181,6 @@ type Client struct {
 // data. This code I refer to the golang socks5 official library. That is a good code which is opened with expectation,
 // and closed with delight and profit.
 func (c *Client) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
-	log.Printf("%s   dial routing=client network=%s address=%s", ctx.Value("cid"), network, address)
 	var (
 		srv io.ReadWriteCloser
 		n   = len(address)

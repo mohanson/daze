@@ -102,7 +102,6 @@ type Dialer interface {
 type Direct struct{}
 
 func (d *Direct) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
-	log.Printf("%s   dial routing=direct network=%s address=%s", ctx.Value("cid"), network, address)
 	return Conf.Dialer.Dial(network, address)
 }
 
@@ -564,13 +563,27 @@ const (
 	RoadPuzzle             // ?
 )
 
+func (r Road) String() string {
+	switch r {
+	case RoadLocale:
+		return "direct"
+	case RoadRemote:
+		return "remote"
+	case RoadFucked:
+		return "fucked"
+	case RoadPuzzle:
+		return "puzzle"
+	}
+	panic("unreachable")
+}
+
 // Router is a selector that will judge the host address.
 type Router interface {
 	// The host must be a literal IP address, or a host name that can be resolved to IP addresses.
 	// Examples:
 	//	 Road("golang.org")
 	//	 Road("192.0.2.1")
-	Road(host string) Road
+	Road(ctx context.Context, host string) Road
 }
 
 // IPNet is a router by IPNets. It judges whether an IP or domain name is within its range, if so, it returns Y,
@@ -582,7 +595,7 @@ type RouterIPNet struct {
 }
 
 // Road implements daze.Router.
-func (r *RouterIPNet) Road(host string) Road {
+func (r *RouterIPNet) road(ctx context.Context, host string) Road {
 	if len(r.L) == 0 {
 		return r.N
 	}
@@ -597,6 +610,13 @@ func (r *RouterIPNet) Road(host string) Road {
 		}
 	}
 	return r.N
+}
+
+// Road implements daze.Router.
+func (r *RouterIPNet) Road(ctx context.Context, host string) Road {
+	road := r.road(ctx, host)
+	log.Printf("%s  route router=ipnet road=%s\n", ctx.Value("cid"), road)
+	return road
 }
 
 // NewIPNet returns a new IPNet object.
@@ -662,15 +682,22 @@ type RouterCache struct {
 }
 
 // Road implements daze.Router.
-func (r *RouterCache) Road(host string) Road {
-	r.m.Lock()
-	defer r.m.Unlock()
+func (r *RouterCache) road(ctx context.Context, host string) Road {
 	if a, b := r.Box.Get(host); b {
 		return a.(Road)
 	}
-	a := r.Pit.Road(host)
+	a := r.Pit.Road(ctx, host)
 	r.Box.Set(host, a)
 	return a
+}
+
+// Road implements daze.Router.
+func (r *RouterCache) Road(ctx context.Context, host string) Road {
+	r.m.Lock()
+	defer r.m.Unlock()
+	road := r.road(ctx, host)
+	log.Printf("%s  route router=cache road=%s\n", ctx.Value("cid"), road)
+	return road
 }
 
 // NewCache returns a new Cache object.
@@ -688,15 +715,22 @@ type RouterClump struct {
 }
 
 // Road implements daze.Router.
-func (r *RouterClump) Road(host string) Road {
+func (r *RouterClump) road(ctx context.Context, host string) Road {
 	var a Road
 	for _, e := range r.L {
-		a = e.Road(host)
+		a = e.Road(ctx, host)
 		if a != RoadPuzzle {
 			return a
 		}
 	}
 	return RoadPuzzle
+}
+
+// Road implements daze.Router.
+func (r *RouterClump) Road(ctx context.Context, host string) Road {
+	road := r.road(ctx, host)
+	log.Printf("%s  route router=clump road=%s\n", ctx.Value("cid"), road)
+	return road
 }
 
 // NewRouterClump returns a new RouterClump.
@@ -731,7 +765,7 @@ type RouterRules struct {
 }
 
 // Road implements daze.Router.
-func (r *RouterRules) Road(host string) Road {
+func (r *RouterRules) road(ctx context.Context, host string) Road {
 	for _, e := range r.L {
 		if doa.Try2(filepath.Match(e, host)).(bool) {
 			return RoadLocale
@@ -748,6 +782,13 @@ func (r *RouterRules) Road(host string) Road {
 		}
 	}
 	return RoadPuzzle
+}
+
+// Road implements daze.Router.
+func (r *RouterRules) Road(ctx context.Context, host string) Road {
+	road := r.road(ctx, host)
+	log.Printf("%s  route router=rules road=%s\n", ctx.Value("cid"), road)
+	return road
 }
 
 // Load a RULE file from reader.
@@ -829,11 +870,12 @@ type Aimbot struct {
 
 // Dialer contains options for connecting to an address.
 func (s *Aimbot) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
+	log.Printf("%s   dial network=%s address=%s", ctx.Value("cid"), network, address)
 	host, _, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
 	}
-	switch s.Router.Road(host) {
+	switch s.Router.Road(ctx, host) {
 	case RoadLocale:
 		return s.Locale.Dial(ctx, network, address)
 	case RoadRemote:
