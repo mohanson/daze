@@ -42,13 +42,11 @@ Daze forces any TCP/UDP connection to follow through proxy like SOCKS4, SOCKS5 o
 
 Daze can work well on **Windows**, **Linux** and **macOS**. In additional, it can also work on **Android**, just it will be a bit complicated.
 
-1. Download [SDK Platform Tools](https://developer.android.com/studio/releases/platform-tools) and make sure you can use `adb` normally.
-2. Connect your phone to your computer with USB. Use `adb devices` to list devices.
-2. Cross compile daze for android: `GOOS=linux GOARCH=arm go build -o daze github.com/mohanson/daze/cmd/daze`
-4. Push binary and open shell: `adb push daze /data/local/tmp/daze`, `adb shell`
-5. Open daze client: `cd /data/local/tmp`, `chmod +x daze`, `daze client -s $SERVER:1081 -l 127.0.0.1:1080 -dns 114.114.114.114:53`. Attention, you may wish use `setsid` to run daze in a new session.
-6. Set the proxy for phone: WLAN -> Settings -> Proxy -> Fill in `127.0.0.1:1080`
-7. Now, you are free to visit Internet.
+0. Cross compile daze for android: `GOOS=linux GOARCH=arm64 go build -o daze github.com/mohanson/daze/cmd/daze`
+0. Push the compiled file to the phone. You can use `adb` or `termux` + `wget`, they are both possible.
+0. Run `daze client -l 127.0.0.1:1080 ...` in the background.
+0. Set the proxy for phone: WLAN -> Settings -> Proxy -> Fill in `127.0.0.1:1080`
+0. Now, you are free to visit Internet.
 
 # Use custom rules
 

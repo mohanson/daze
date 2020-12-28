@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"os"
 
 	"github.com/mohanson/daze"
@@ -20,7 +21,7 @@ var Conf = struct {
 }{
 	PathDelegatedApnic: "/delegated-apnic-latest",
 	PathRule:           "/rule.ls",
-	Version:            "1.15.2",
+	Version:            "1.15.3",
 }
 
 const Help = `usage: daze <command> [<args>]
@@ -37,6 +38,11 @@ func main() {
 		fmt.Println(Help)
 		os.Exit(0)
 	}
+	// If daze runs in Android through termux, then we set a default dns for it. See:
+	// https://stackoverflow.com/questions/38959067/dns-lookup-issue-when-running-my-go-app-in-termux
+	if os.Getenv("ANDROID_ROOT") != "" {
+		net.DefaultResolver = daze.Resolver("8.8.8.8:53")
+	}
 	easyfs.BaseExec()
 	subCommand := os.Args[1]
 	os.Args = os.Args[1:len(os.Args)]
@@ -50,7 +56,7 @@ func main() {
 		flag.Parse()
 		log.Println("server cipher is", *flCipher)
 		if *flDnserv != "" {
-			daze.SetConfResolver(*flDnserv)
+			daze.Conf.Dialer.Resolver = daze.Resolver(*flDnserv)
 			log.Println("domain server is", *flDnserv)
 		}
 		server := ashe.NewServer(*flListen, *flCipher)
@@ -68,7 +74,7 @@ func main() {
 		log.Println("remote server is", *flServer)
 		log.Println("client cipher is", *flCipher)
 		if *flDnserv != "" {
-			daze.SetConfResolver(*flDnserv)
+			daze.Conf.Dialer.Resolver = daze.Resolver(*flDnserv)
 			log.Println("domain server is", *flDnserv)
 		}
 		client := ashe.NewClient(*flServer, *flCipher)

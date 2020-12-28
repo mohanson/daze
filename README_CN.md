@@ -42,13 +42,11 @@ Daze 通过代理技术, 如 SOCKS4, SOCKS5 和 HTTP(S) 代理转发任何本机
 
 Daze 可以在 **Windows**, **Linux** 和 **macOS** 下正常工作. 另外, 它同样适用于 **Android**, 只是配置起来稍显复杂.
 
-1. 下载 [SDK Platform Tools](https://developer.android.com/studio/releases/platform-tools) 并确保你能正常使用 `adb` 命令.
-2. 使用 USB 连接你的手机和电脑. 使用 `adb devices` 可显示已连接的设备, 确保连接成功.
-2. 交叉编译: `GOOS=linux GOARCH=arm go build -o daze github.com/mohanson/daze/cmd/daze`
-4. 推送二进制文件至手机并进入 Shell: `adb push daze /data/local/tmp/daze`, `adb shell`
-5. 启动 daze 客户端: `cd /data/local/tmp`, `chmod +x daze`, `daze client -s $SERVER:1081 -l 127.0.0.1:1080 -dns 114.114.114.114:53`. 注意的是, 你可能需要使用 `setsid` 命令将客户端程序托管至后台运行.
-6. 设置代理: 连接任意 Wifi -> 设置 -> 代理 -> 填写 `127.0.0.1:1080`
-7. 现在, 你即可自由地访问互联网
+0. 交叉编译: `GOOS=linux GOARCH=arm64 go build -o daze github.com/mohanson/daze/cmd/daze`.
+0. 推送二进制文件至手机. 你可以使用 `adb` 或者 `termux` + `wget`, 它们都是可行的.
+0. 后台运行 `daze client -l 127.0.0.1:1080 ...`.
+0. 设置代理: 连接任意 Wifi -> 设置 -> 代理 -> 填写 `127.0.0.1:1080`
+0. 现在, 你即可自由地访问互联网
 
 # 启用用户规则
 

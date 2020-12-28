@@ -56,14 +56,14 @@ var Conf = struct {
 	RouterCache: 64,
 }
 
-// SetConfResolver modifies the DefaultResolver(which is the resolver used by the package-level Lookup functions and by
-// Dialers without a specified Resolver).
+// Resolver returns a new Resolver used by the package-level Lookup functions and by Dialers without a specified
+// Resolver.
 //
 // Examples:
-//   SetConfResolver("8.8.8.8:53")
-//   SetConfResolver("114.114.114.114:53")
-func SetConfResolver(addr string) {
-	Conf.Dialer.Resolver = &net.Resolver{
+//   Resolver("8.8.8.8:53")
+//   Resolver("114.114.114.114:53")
+func Resolver(addr string) *net.Resolver {
+	return &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 			d := net.Dialer{

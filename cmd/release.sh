@@ -15,6 +15,7 @@ make(){
 
 # https://golang.org/doc/install/source#environment
 make linux amd64
+make linux arm64
 make windows amd64
 
 rm ./bin/release/delegated-apnic-latest
