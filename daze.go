@@ -142,6 +142,12 @@ func (l *Locale) ServeProxy(ctx context.Context, app io.ReadWriteCloser) error {
 		port = r.URL.Port()
 	}
 
+	if r.Method == "CONNECT" {
+		log.Println(ctx.Value("cid"), " proto", "format=tunnel")
+	} else {
+		log.Println(ctx.Value("cid"), " proto", "format=hproxy")
+	}
+
 	srv, err := l.Dialer.Dial(ctx, "tcp", r.URL.Hostname()+":"+port)
 	if err != nil {
 		return err
@@ -149,7 +155,6 @@ func (l *Locale) ServeProxy(ctx context.Context, app io.ReadWriteCloser) error {
 	defer srv.Close()
 
 	if r.Method == "CONNECT" {
-		log.Println(ctx.Value("cid"), " proto", "format=tunnel")
 		_, err := app.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
 		if err != nil {
 			return err
@@ -157,8 +162,6 @@ func (l *Locale) ServeProxy(ctx context.Context, app io.ReadWriteCloser) error {
 		Link(app, srv)
 		return nil
 	}
-
-	log.Println(ctx.Value("cid"), " proto", "format=hproxy")
 	if r.Method == "GET" && r.Header.Get("Upgrade") == "websocket" {
 		if err := r.Write(srv); err != nil {
 			return err
