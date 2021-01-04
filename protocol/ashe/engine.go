@@ -37,7 +37,7 @@ import (
 // - DST: desired destination address
 
 var Conf = struct {
-	LifeExpired uint64
+	LifeExpired int
 }{
 	LifeExpired: 120,
 }
@@ -107,7 +107,7 @@ func (s *Server) Serve(ctx context.Context, raw io.ReadWriteCloser) error {
 	}
 	d := time.Now().Unix() - int64(binary.BigEndian.Uint64(buf[2:10]))
 	y := d >> 63
-	if uint64(d^y-y) > Conf.LifeExpired {
+	if d^y-y > int64(Conf.LifeExpired) {
 		return fmt.Errorf("daze: expired: %v", time.Unix(d, 0))
 	}
 	_, err = io.ReadFull(cli, buf[12:12+buf[11]])

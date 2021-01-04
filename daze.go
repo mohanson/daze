@@ -46,7 +46,7 @@ import (
 var Conf = struct {
 	Dialer      net.Dialer
 	IdleTime    time.Duration
-	RouterCache uint32
+	RouterCache int
 }{
 	Dialer: net.Dialer{
 		Resolver: net.DefaultResolver,
@@ -707,7 +707,7 @@ func (r *RouterCache) Road(ctx context.Context, host string) Road {
 func NewRouterCache(r Router) *RouterCache {
 	return &RouterCache{
 		Pit: r,
-		Box: lru.New(int(Conf.RouterCache)),
+		Box: lru.New(Conf.RouterCache),
 		m:   sync.Mutex{},
 	}
 }
