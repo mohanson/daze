@@ -35,6 +35,17 @@ import (
 // - Net: tcp(0x01), udp(0x03)
 // - DST.Len: len of DST. If DST is https://google.com, DST.Len is 0x12
 // - DST: desired destination address
+//
+// The server returns:
+//
+// +------+
+// | Code |
+// +------+
+// |  1   |
+// +------+
+//
+// - Code 0x00: request granted
+// - Code 0x01: general failure
 
 var Conf = struct {
 	LifeExpired int

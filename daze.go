@@ -24,8 +24,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/mohanson/doa"
-	"github.com/mohanson/lru"
+	"github.com/godump/doa"
+	"github.com/godump/lru"
 )
 
 // ============================================================================
@@ -342,8 +342,8 @@ func (l *Locale) ServeSocks5UDP(ctx context.Context, app io.ReadWriteCloser) err
 		buf                = make([]byte, 2048)
 		err         error
 	)
-	bndAddr = doa.Try2(net.ResolveUDPAddr("udp", "127.0.0.1:0")).(*net.UDPAddr)
-	bnd = doa.Try2(net.ListenUDP("udp", bndAddr)).(*net.UDPConn)
+	bndAddr = doa.Try(net.ResolveUDPAddr("udp", "127.0.0.1:0")).(*net.UDPAddr)
+	bnd = doa.Try(net.ListenUDP("udp", bndAddr)).(*net.UDPConn)
 	defer bnd.Close()
 	bndPort = uint16(bnd.LocalAddr().(*net.UDPAddr).Port)
 	copy(buf, []byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
@@ -670,8 +670,8 @@ func NewRouterLocal() *RouterIPNet {
 		{"FE800000000000000000000000000000", "FFC00000000000000000000000000000"},
 		{"FF000000000000000000000000000000", "FF000000000000000000000000000000"},
 	} {
-		i := doa.Try2(hex.DecodeString(entry[0])).([]byte)
-		m := doa.Try2(hex.DecodeString(entry[1])).([]byte)
+		i := doa.Try(hex.DecodeString(entry[0])).([]byte)
+		m := doa.Try(hex.DecodeString(entry[1])).([]byte)
 		r = append(r, &net.IPNet{IP: i, Mask: m})
 	}
 	return NewRouterIPNet(r, RoadLocale, RoadPuzzle)
@@ -680,7 +680,7 @@ func NewRouterLocal() *RouterIPNet {
 // Cache cache routing results for next use.
 type RouterCache struct {
 	Pit Router
-	Box *lru.Cache
+	Box *lru.Lru
 	m   sync.Mutex
 }
 
@@ -707,7 +707,7 @@ func (r *RouterCache) Road(ctx context.Context, host string) Road {
 func NewRouterCache(r Router) *RouterCache {
 	return &RouterCache{
 		Pit: r,
-		Box: lru.New(Conf.RouterCache),
+		Box: lru.NewLru(Conf.RouterCache),
 		m:   sync.Mutex{},
 	}
 }
@@ -770,17 +770,17 @@ type RouterRules struct {
 // Road implements daze.Router.
 func (r *RouterRules) road(ctx context.Context, host string) Road {
 	for _, e := range r.L {
-		if doa.Try2(filepath.Match(e, host)).(bool) {
+		if doa.Try(filepath.Match(e, host)).(bool) {
 			return RoadLocale
 		}
 	}
 	for _, e := range r.R {
-		if doa.Try2(filepath.Match(e, host)).(bool) {
+		if doa.Try(filepath.Match(e, host)).(bool) {
 			return RoadRemote
 		}
 	}
 	for _, e := range r.B {
-		if doa.Try2(filepath.Match(e, host)).(bool) {
+		if doa.Try(filepath.Match(e, host)).(bool) {
 			return RoadFucked
 		}
 	}
@@ -846,19 +846,21 @@ func NewRouterApnic(f io.Reader, region string) *RouterIPNet {
 		switch {
 		case strings.HasPrefix(line, ipv4Prefix):
 			seps := strings.Split(line, "|")
-			sep4 := doa.Try2(strconv.ParseUint(seps[4], 0, 32)).(uint64)
+			sep4 := doa.Try(strconv.ParseUint(seps[4], 0, 32)).(uint64)
 			// Determine whether it is a power of 2
 			if sep4&(sep4-1) != 0 {
 				panic("unreachable")
 			}
 			mask := bits.LeadingZeros64(sep4) - 31
-			_, cidr := doa.Try3(net.ParseCIDR(fmt.Sprintf("%s/%d", seps[3], mask)))
-			r = append(r, cidr.(*net.IPNet))
+			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%d", seps[3], mask))
+			doa.Nil(err)
+			r = append(r, cidr)
 		case strings.HasPrefix(line, ipv6Prefix):
 			seps := strings.Split(line, "|")
 			sep4 := seps[4]
-			_, cidr := doa.Try3(net.ParseCIDR(fmt.Sprintf("%s/%s", seps[3], sep4)))
-			r = append(r, cidr.(*net.IPNet))
+			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%s", seps[3], sep4))
+			doa.Nil(err)
+			r = append(r, cidr)
 		}
 	}
 	return NewRouterIPNet(r, RoadLocale, RoadPuzzle)
@@ -917,20 +919,20 @@ var (
 
 // GravityReader wraps an io.Reader with RC4 crypto.
 func GravityReader(r io.Reader, k []byte) io.Reader {
-	cr := doa.Try2(rc4.NewCipher(k)).(*rc4.Cipher)
+	cr := doa.Try(rc4.NewCipher(k)).(*rc4.Cipher)
 	return cipher.StreamReader{S: cr, R: r}
 }
 
 // GravityWriter wraps an io.Writer with RC4 crypto.
 func GravityWriter(w io.Writer, k []byte) io.Writer {
-	cw := doa.Try2(rc4.NewCipher(k)).(*rc4.Cipher)
+	cw := doa.Try(rc4.NewCipher(k)).(*rc4.Cipher)
 	return cipher.StreamWriter{S: cw, W: w}
 }
 
 // Double gravity, double happiness.
 func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
-	cr := doa.Try2(rc4.NewCipher(k)).(*rc4.Cipher)
-	cw := doa.Try2(rc4.NewCipher(k)).(*rc4.Cipher)
+	cr := doa.Try(rc4.NewCipher(k)).(*rc4.Cipher)
+	cw := doa.Try(rc4.NewCipher(k)).(*rc4.Cipher)
 	return &ReadWriteCloser{
 		Reader: cipher.StreamReader{S: cr, R: conn},
 		Writer: cipher.StreamWriter{S: cw, W: conn},

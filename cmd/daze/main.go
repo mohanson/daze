@@ -8,10 +8,10 @@ import (
 	"net"
 	"os"
 
+	"github.com/godump/doa"
+	"github.com/godump/res"
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/protocol/ashe"
-	"github.com/mohanson/doa"
-	"github.com/mohanson/easyfs"
 )
 
 var Conf = struct {
@@ -43,7 +43,7 @@ func main() {
 	if os.Getenv("ANDROID_ROOT") != "" {
 		net.DefaultResolver = daze.Resolver("8.8.8.8:53")
 	}
-	easyfs.BaseExec()
+	resExec := res.BaseExec()
 	subCommand := os.Args[1]
 	os.Args = os.Args[1:len(os.Args)]
 	switch subCommand {
@@ -60,14 +60,14 @@ func main() {
 			log.Println("domain server is", *flDnserv)
 		}
 		server := ashe.NewServer(*flListen, *flCipher)
-		doa.Try1(server.Run())
+		doa.Nil(server.Run())
 	case "client":
 		var (
 			flListen = flag.String("l", "127.0.0.1:1080", "listen address")
 			flServer = flag.String("s", "127.0.0.1:1081", "server address")
 			flCipher = flag.String("k", "daze", "cipher, for encryption, same as server")
 			flFilter = flag.String("f", "ipcn", "filter {ipcn, none, full}")
-			flRulels = flag.String("r", easyfs.Path(Conf.PathRule), "rule path")
+			flRulels = flag.String("r", resExec.Join(Conf.PathRule), "rule path")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
@@ -94,9 +94,9 @@ func main() {
 			if *flFilter == "ipcn" {
 				log.Println("load rule", *flRulels)
 				routerRules := daze.NewRouterRules()
-				f1 := doa.Try2(daze.OpenFile(*flRulels)).(io.ReadCloser)
+				f1 := doa.Try(daze.OpenFile(*flRulels)).(io.ReadCloser)
 				defer f1.Close()
-				doa.Try1(routerRules.FromReader(f1))
+				doa.Nil(routerRules.FromReader(f1))
 				log.Println("find", len(routerRules.L)+len(routerRules.R)+len(routerRules.B))
 
 				log.Println("load rule reserved IPv4/6 CIDRs")
@@ -104,7 +104,7 @@ func main() {
 				log.Println("find", len(routerLocal.L))
 
 				log.Println("load rule CN(China PR) CIDRs")
-				f2 := doa.Try2(daze.OpenFile(easyfs.Path(Conf.PathDelegatedApnic))).(io.ReadCloser)
+				f2 := doa.Try(daze.OpenFile(resExec.Join(Conf.PathDelegatedApnic))).(io.ReadCloser)
 				defer f2.Close()
 				routerApnic := daze.NewRouterApnic(f2, "CN")
 				log.Println("find", len(routerApnic.L))
@@ -122,7 +122,7 @@ func main() {
 			Router: router,
 		}
 		locale := daze.NewLocale(*flListen, aimbot)
-		doa.Try1(locale.Run())
+		doa.Nil(locale.Run())
 	case "ver":
 		fmt.Println("daze", Conf.Version)
 	default:
