@@ -2,5 +2,3 @@ github.com/godump/doa v0.1.0 h1:gpNU4uVwjiWXWMOmKt6gAndCJ5iExgfIyKk/ZaVfrKs=
 github.com/godump/doa v0.1.0/go.mod h1:yYjHKMXnoVy7DVzo+snfMC4zplr/Qca9q0xQ73Qm4nU=
 github.com/godump/lru v0.1.0 h1:3ZXL2MOR7AHwUSMwNn0m2YByKHDgnZzeaf9fFhYPJiY=
 github.com/godump/lru v0.1.0/go.mod h1:LAlJPcMa7lg5PQtB6CXwWzhIY/1J9isckJRS/HQi3s4=
-github.com/godump/res v0.1.0 h1:Nwe8zDpcxUhrPNxDYgRoNiJ1TVvHigjNzCQC6DRZ8CI=
-github.com/godump/res v0.1.0/go.mod h1:qFI8CUfEy5fBgXCfvkfJNVlX8UtCtT6c+EK9Z/Y+RTc=

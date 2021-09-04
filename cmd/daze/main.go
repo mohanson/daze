@@ -7,9 +7,9 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 
 	"github.com/godump/doa"
-	"github.com/godump/res"
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/protocol/ashe"
 )
@@ -21,7 +21,7 @@ var Conf = struct {
 }{
 	PathDelegatedApnic: "/delegated-apnic-latest",
 	PathRule:           "/rule.ls",
-	Version:            "1.15.3",
+	Version:            "1.15.4",
 }
 
 const Help = `usage: daze <command> [<args>]
@@ -43,7 +43,7 @@ func main() {
 	if os.Getenv("ANDROID_ROOT") != "" {
 		net.DefaultResolver = daze.Resolver("8.8.8.8:53")
 	}
-	resExec := res.BaseExec()
+	resExec := filepath.Dir(doa.Try(os.Executable()).(string))
 	subCommand := os.Args[1]
 	os.Args = os.Args[1:len(os.Args)]
 	switch subCommand {
@@ -67,7 +67,7 @@ func main() {
 			flServer = flag.String("s", "127.0.0.1:1081", "server address")
 			flCipher = flag.String("k", "daze", "cipher, for encryption, same as server")
 			flFilter = flag.String("f", "ipcn", "filter {ipcn, none, full}")
-			flRulels = flag.String("r", resExec.Join(Conf.PathRule), "rule path")
+			flRulels = flag.String("r", filepath.Join(resExec, Conf.PathRule), "rule path")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
@@ -104,7 +104,7 @@ func main() {
 				log.Println("find", len(routerLocal.L))
 
 				log.Println("load rule CN(China PR) CIDRs")
-				f2 := doa.Try(daze.OpenFile(resExec.Join(Conf.PathDelegatedApnic))).(io.ReadCloser)
+				f2 := doa.Try(daze.OpenFile(filepath.Join(resExec, Conf.PathDelegatedApnic))).(io.ReadCloser)
 				defer f2.Close()
 				routerApnic := daze.NewRouterApnic(f2, "CN")
 				log.Println("find", len(routerApnic.L))
