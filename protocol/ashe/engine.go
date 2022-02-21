@@ -1,7 +1,6 @@
 package ashe
 
 import (
-	"context"
 	"crypto/md5"
 	"crypto/rand"
 	"encoding/binary"
@@ -95,7 +94,7 @@ type Server struct {
 }
 
 // Serve.
-func (s *Server) Serve(ctx context.Context, raw io.ReadWriteCloser) error {
+func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	var (
 		buf = make([]byte, 1024)
 		cli io.ReadWriteCloser
@@ -128,11 +127,11 @@ func (s *Server) Serve(ctx context.Context, raw io.ReadWriteCloser) error {
 	dst = string(buf[12 : 12+buf[11]])
 	switch buf[10] {
 	case 0x01:
-		log.Printf("%s   dial network=tcp address=%s", ctx.Value("cid"), dst)
+		log.Printf("%s   dial network=tcp address=%s", ctx.Cid, dst)
 		srv, err = daze.Conf.Dialer.Dial("tcp", dst)
 		cli = &TCPConn{cli}
 	case 0x03:
-		log.Printf("%s   dial network=udp address=%s", ctx.Value("cid"), dst)
+		log.Printf("%s   dial network=udp address=%s", ctx.Cid, dst)
 		srv, err = daze.Conf.Dialer.Dial("udp", dst)
 		cli = &UDPConn{cli}
 	}
@@ -164,7 +163,7 @@ func (s *Server) Run() error {
 			buf := make([]byte, 4)
 			binary.BigEndian.PutUint32(buf, atomic.AddUint32(&i, 1))
 			cid := hex.EncodeToString(buf)
-			ctx := context.WithValue(context.Background(), "cid", cid)
+			ctx := &daze.Context{Cid: cid}
 			log.Printf("%s accept remote=%s", cid, cli.RemoteAddr())
 			if err := s.Serve(ctx, cli); err != nil {
 				log.Println(cid, " error", err)
@@ -191,7 +190,7 @@ type Client struct {
 // Dial. It is similar to the server, the only difference is that it constructs the data and the server parses the
 // data. This code I refer to the golang socks5 official library. That is a good code which is opened with expectation,
 // and closed with delight and profit.
-func (c *Client) Dial(ctx context.Context, network string, address string) (io.ReadWriteCloser, error) {
+func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.ReadWriteCloser, error) {
 	var (
 		srv io.ReadWriteCloser
 		n   = len(address)

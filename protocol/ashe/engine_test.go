@@ -2,13 +2,14 @@ package ashe
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"io/ioutil"
 	"log"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/mohanson/daze"
 )
 
 const (
@@ -34,7 +35,7 @@ func TestProtocolAsheTCP(t *testing.T) {
 	time.Sleep(time.Second)
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
-	ctx := context.WithValue(context.Background(), "cid", "00000000")
+	ctx := &daze.Context{Cid: "00000000"}
 	c, _ := dazeClient.Dial(ctx, "tcp", EchoServerListenOn)
 	defer c.Close()
 
@@ -68,7 +69,7 @@ func TestProtocolAsheUDP(t *testing.T) {
 	time.Sleep(time.Second)
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
-	ctx := context.WithValue(context.Background(), "cid", "00000000")
+	ctx := &daze.Context{Cid: "00000000"}
 	c, _ := dazeClient.Dial(ctx, "udp", EchoServerListenOn)
 	defer c.Close()
 
