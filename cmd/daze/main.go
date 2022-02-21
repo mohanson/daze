@@ -21,7 +21,7 @@ var Conf = struct {
 }{
 	PathDelegatedApnic: "/delegated-apnic-latest",
 	PathRule:           "/rule.ls",
-	Version:            "1.15.4",
+	Version:            "1.15.5",
 }
 
 const Help = `usage: daze <command> [<args>]
@@ -86,6 +86,7 @@ func main() {
 			if *flFilter == "none" {
 				log.Println("load rule reserved IPv4/6 CIDRs")
 				routerLocal := daze.NewRouterLocal()
+				log.Println("find", len(routerLocal.L))
 				routerRight := daze.NewRouterRight(daze.RoadRemote)
 				routerClump := daze.NewRouterClump(routerLocal, routerRight)
 				routerCache := daze.NewRouterCache(routerClump)
