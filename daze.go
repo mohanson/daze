@@ -609,6 +609,10 @@ func (r *RouterIPNet) road(ctx *Context, host string) Road {
 	}
 	l, err := Conf.Dialer.Resolver.LookupIPAddr(context.Background(), host)
 	if err != nil {
+		log.Println(ctx.Cid, " error", err)
+		return RoadPuzzle
+	}
+	if len(l) == 0 {
 		return RoadPuzzle
 	}
 	a := l[0]
@@ -645,7 +649,7 @@ func NewRouterRight(road Road) *RouterIPNet {
 //   See https://en.wikipedia.org/wiki/Reserved_IP_addresses
 func NewRouterLocal() *RouterIPNet {
 	r := []*net.IPNet{}
-	for _, entry := range [][2]string{
+	for _, e := range [][2]string{
 		// IPv4
 		{"00000000", "FF000000"},
 		{"0A000000", "FF000000"},
@@ -675,8 +679,8 @@ func NewRouterLocal() *RouterIPNet {
 		{"FE800000000000000000000000000000", "FFC00000000000000000000000000000"},
 		{"FF000000000000000000000000000000", "FF000000000000000000000000000000"},
 	} {
-		i := doa.Try(hex.DecodeString(entry[0])).([]byte)
-		m := doa.Try(hex.DecodeString(entry[1])).([]byte)
+		i := doa.Try(hex.DecodeString(e[0])).([]byte)
+		m := doa.Try(hex.DecodeString(e[1])).([]byte)
 		r = append(r, &net.IPNet{IP: i, Mask: m})
 	}
 	return NewRouterIPNet(r, RoadLocale, RoadPuzzle)
