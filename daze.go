@@ -630,6 +630,21 @@ func (r *RouterIPNet) Road(ctx *Context, host string) Road {
 	return road
 }
 
+// Load a CIDR file from reader.
+func (r *RouterIPNet) FromReader(f io.Reader) error {
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		_, cidr, err := net.ParseCIDR(line)
+		doa.Nil(err)
+		r.L = append(r.L, cidr)
+	}
+	return scanner.Err()
+}
+
 // NewIPNet returns a new IPNet object.
 func NewRouterIPNet(ipnets []*net.IPNet, road Road) *RouterIPNet {
 	return &RouterIPNet{
@@ -843,41 +858,6 @@ func NewRouterRules() *RouterRules {
 	}
 }
 
-// When compounding region, return daze.RoadLocale.
-// The original address of the f is http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest
-func NewRouterApnic(f io.Reader, region string) *RouterIPNet {
-	ipv4Prefix := fmt.Sprintf("apnic|%s|ipv4", region)
-	ipv6Prefix := fmt.Sprintf("apnic|%s|ipv6", region)
-	r := []*net.IPNet{}
-	s := bufio.NewScanner(f)
-	for s.Scan() {
-		line := s.Text()
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		switch {
-		case strings.HasPrefix(line, ipv4Prefix):
-			seps := strings.Split(line, "|")
-			sep4 := doa.Try(strconv.ParseUint(seps[4], 0, 32)).(uint64)
-			// Determine whether it is a power of 2
-			if sep4&(sep4-1) != 0 {
-				panic("unreachable")
-			}
-			mask := bits.LeadingZeros64(sep4) - 31
-			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%d", seps[3], mask))
-			doa.Nil(err)
-			r = append(r, cidr)
-		case strings.HasPrefix(line, ipv6Prefix):
-			seps := strings.Split(line, "|")
-			sep4 := seps[4]
-			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%s", seps[3], sep4))
-			doa.Nil(err)
-			r = append(r, cidr)
-		}
-	}
-	return NewRouterIPNet(r, RoadLocale)
-}
-
 // Aimbot automatically distinguish whether to use a proxy or a local network.
 type Aimbot struct {
 	Remote Dialer
@@ -968,4 +948,53 @@ func OpenFile(name string) (io.ReadCloser, error) {
 	} else {
 		return os.Open(name)
 	}
+}
+
+// ============================================================================
+//                 ___           ___           ___           ___
+//                /\  \         /\  \         /\  \         /\  \
+//               /::\  \       /::\  \        \:\  \       /::\  \
+//              /:/\:\  \     /:/\:\  \        \:\  \     /:/\:\  \
+//             /:/  \:\__\   /::\~\:\  \       /::\  \   /::\~\:\  \
+//            /:/__/ \:|__| /:/\:\ \:\__\     /:/\:\__\ /:/\:\ \:\__\
+//            \:\  \ /:/  / \/__\:\/:/  /    /:/  \/__/ \/__\:\/:/  /
+//             \:\  /:/  /       \::/  /    /:/  /           \::/  /
+//              \:\/:/  /        /:/  /     \/__/            /:/  /
+//               \::/__/        /:/  /                      /:/  /
+//                ~~            \/__/                       \/__/
+// ============================================================================
+
+// Load remote resource. APNIC is the Regional Internet Registry administering IP addresses for the Asia Pacific.
+func LoadApnic() map[string][]*net.IPNet {
+	f := doa.Try(OpenFile("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")).(io.ReadCloser)
+	defer f.Close()
+	r := map[string][]*net.IPNet{}
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		line := s.Text()
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		seps := strings.Split(line, "|")
+		if seps[1] == "*" {
+			continue
+		}
+		switch seps[2] {
+		case "ipv4":
+			sep4 := doa.Try(strconv.ParseUint(seps[4], 0, 32)).(uint64)
+			// Determine whether it is a power of 2
+			doa.Doa(sep4&(sep4-1) == 0)
+			mask := bits.LeadingZeros64(sep4) - 31
+			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%d", seps[3], mask))
+			doa.Nil(err)
+			r[seps[1]] = append(r[seps[1]], cidr)
+		case "ipv6":
+			seps := strings.Split(line, "|")
+			sep4 := seps[4]
+			_, cidr, err := net.ParseCIDR(fmt.Sprintf("%s/%s", seps[3], sep4))
+			doa.Nil(err)
+			r[seps[1]] = append(r[seps[1]], cidr)
+		}
+	}
+	return r
 }

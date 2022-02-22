@@ -4,8 +4,8 @@ if [ ! -d ./bin ]; then
     mkdir bin
 fi
 
-if [ ! -f ./bin/delegated-apnic-latest ]; then
-    wget -q http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest -O ./bin/delegated-apnic-latest
+if [ ! -f ./bin/rule.cidr ]; then
+    cp ./res/rule.cidr ./bin/rule.cidr
 fi
 
 if [ ! -f ./bin/rule.ls ]; then

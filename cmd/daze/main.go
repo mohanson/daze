@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/godump/doa"
 	"github.com/mohanson/daze"
@@ -15,13 +16,13 @@ import (
 )
 
 var Conf = struct {
-	PathDelegatedApnic string
-	PathRule           string
-	Version            string
+	PathRule     string
+	PathRuleCIDR string
+	Version      string
 }{
-	PathDelegatedApnic: "/delegated-apnic-latest",
-	PathRule:           "/rule.ls",
-	Version:            "1.15.5",
+	PathRule:     "/rule.ls",
+	PathRuleCIDR: "/rule.cidr",
+	Version:      "1.15.5",
 }
 
 const Help = `usage: daze <command> [<args>]
@@ -29,6 +30,7 @@ const Help = `usage: daze <command> [<args>]
 The most commonly used daze commands are:
   server     Start daze server
   client     Start daze client
+  gen        Generate or update rule.cidr
   ver        Print the daze version number and exit
 
 Run 'daze <command> -h' for more information on a command.`
@@ -68,6 +70,7 @@ func main() {
 			flCipher = flag.String("k", "daze", "password, should be same as server")
 			flFilter = flag.String("f", "rule", "filter {rule, remote, locale}")
 			flRulels = flag.String("r", filepath.Join(resExec, Conf.PathRule), "rule path")
+			flCIDRls = flag.String("c", filepath.Join(resExec, Conf.PathRuleCIDR), "cidr path")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
@@ -104,10 +107,11 @@ func main() {
 				routerLocal := daze.NewRouterLocal()
 				log.Println("find", len(routerLocal.L))
 
-				log.Println("load rule CN(China PR) CIDRs")
-				f2 := doa.Try(daze.OpenFile(filepath.Join(resExec, Conf.PathDelegatedApnic))).(io.ReadCloser)
+				log.Println("load rule", *flCIDRls)
+				f2 := doa.Try(daze.OpenFile(*flCIDRls)).(io.ReadCloser)
 				defer f2.Close()
-				routerApnic := daze.NewRouterApnic(f2, "CN")
+				routerApnic := daze.NewRouterIPNet([]*net.IPNet{}, daze.RoadLocale)
+				routerApnic.FromReader(f2)
 				log.Println("find", len(routerApnic.L))
 
 				routerRight := daze.NewRouterRight(daze.RoadRemote)
@@ -124,6 +128,21 @@ func main() {
 		}
 		locale := daze.NewLocale(*flListen, aimbot)
 		doa.Nil(locale.Run())
+	case "gen":
+		flag.Parse()
+		cidr := func() []*net.IPNet {
+			switch strings.ToUpper(flag.Arg(0)) {
+			case "CN":
+				return daze.LoadApnic()["CN"]
+			}
+			return []*net.IPNet{}
+		}()
+		f := doa.Try(os.OpenFile(filepath.Join(resExec, Conf.PathRuleCIDR), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)).(*os.File)
+		defer f.Close()
+		for _, e := range cidr {
+			f.WriteString(e.String())
+			f.WriteString("\n")
+		}
 	case "ver":
 		fmt.Println("daze", Conf.Version)
 	default:
