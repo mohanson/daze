@@ -630,6 +630,21 @@ func (r *RouterIPNet) Road(ctx *Context, host string) Road {
 	return road
 }
 
+// Load a CIDR file from reader.
+func (r *RouterIPNet) FromReader(f io.Reader) error {
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		_, cidr, err := net.ParseCIDR(line)
+		doa.Nil(err)
+		r.L = append(r.L, cidr)
+	}
+	return scanner.Err()
+}
+
 // NewIPNet returns a new IPNet object.
 func NewRouterIPNet(ipnets []*net.IPNet, road Road) *RouterIPNet {
 	return &RouterIPNet{
