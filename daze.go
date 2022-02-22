@@ -93,6 +93,7 @@ type ReadWriteCloser struct {
 	io.Closer
 }
 
+// Context carries infomations for a tcp connection.
 type Context struct {
 	Cid string
 }

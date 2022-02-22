@@ -3,6 +3,7 @@
 # There are two parts per line on RULE file: mode and glob. mode are on the
 # left of the space sign and glob are on the right. mode is an char and
 # describes whether the host should go proxy, glob supported glob-style
+#
 # patterns:
 #   h?llo matches hello, hallo and hxllo
 #   h*llo matches hllo and heeeello
@@ -15,6 +16,6 @@
 #   R b.com *.b.com
 #   B c.com
 #
-# L(ocale)  means using locale network
-# R(emote)  means using remote network
-# B(anned)  means block it
+# L(ocale) means using locale network
+# R(emote) means using remote network
+# B(anned) means block it
