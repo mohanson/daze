@@ -93,6 +93,7 @@ type ReadWriteCloser struct {
 	io.Closer
 }
 
+// Context carries infomations for a tcp connection.
 type Context struct {
 	Cid string
 }
@@ -597,54 +598,67 @@ type Router interface {
 // otherwise it returns N.
 type RouterIPNet struct {
 	L []*net.IPNet
-	Y Road
-	N Road
+	R Road
 }
 
 // Road implements daze.Router.
 func (r *RouterIPNet) road(ctx *Context, host string) Road {
 	if len(r.L) == 0 {
-		return r.N
+		return RoadPuzzle
 	}
 	l, err := Conf.Dialer.Resolver.LookupIPAddr(context.Background(), host)
 	if err != nil {
+		log.Println(ctx.Cid, " error", err)
+		return RoadPuzzle
+	}
+	if len(l) == 0 {
 		return RoadPuzzle
 	}
 	a := l[0]
 	for _, e := range r.L {
 		if e.Contains(a.IP) {
-			return r.Y
+			return r.R
 		}
 	}
-	return r.N
+	return RoadPuzzle
 }
 
 // Road implements daze.Router.
 func (r *RouterIPNet) Road(ctx *Context, host string) Road {
 	road := r.road(ctx, host)
-	log.Printf("%s  route router=ipnet road=%s\n", ctx.Cid, road)
+	log.Printf("%s  route router=ipnet road=%s", ctx.Cid, road)
 	return road
 }
 
 // NewIPNet returns a new IPNet object.
-func NewRouterIPNet(ipnets []*net.IPNet, y Road, n Road) *RouterIPNet {
+func NewRouterIPNet(ipnets []*net.IPNet, road Road) *RouterIPNet {
 	return &RouterIPNet{
 		L: ipnets,
-		Y: y,
-		N: n,
+		R: road,
 	}
 }
 
+// RouterRight always returns the same road.
+type RouterRight struct {
+	R Road
+}
+
+// Road implements daze.Router.
+func (r *RouterRight) Road(ctx *Context, host string) Road {
+	log.Printf("%s  route router=right road=%s", ctx.Cid, r.R)
+	return r.R
+}
+
 // NewRouterRight.
-func NewRouterRight(road Road) *RouterIPNet {
-	return &RouterIPNet{L: []*net.IPNet{}, Y: road, N: road}
+func NewRouterRight(road Road) *RouterRight {
+	return &RouterRight{R: road}
 }
 
 // Introduction:
 //   See https://en.wikipedia.org/wiki/Reserved_IP_addresses
 func NewRouterLocal() *RouterIPNet {
 	r := []*net.IPNet{}
-	for _, entry := range [][2]string{
+	for _, e := range [][2]string{
 		// IPv4
 		{"00000000", "FF000000"},
 		{"0A000000", "FF000000"},
@@ -674,11 +688,11 @@ func NewRouterLocal() *RouterIPNet {
 		{"FE800000000000000000000000000000", "FFC00000000000000000000000000000"},
 		{"FF000000000000000000000000000000", "FF000000000000000000000000000000"},
 	} {
-		i := doa.Try(hex.DecodeString(entry[0])).([]byte)
-		m := doa.Try(hex.DecodeString(entry[1])).([]byte)
+		i := doa.Try(hex.DecodeString(e[0])).([]byte)
+		m := doa.Try(hex.DecodeString(e[1])).([]byte)
 		r = append(r, &net.IPNet{IP: i, Mask: m})
 	}
-	return NewRouterIPNet(r, RoadLocale, RoadPuzzle)
+	return NewRouterIPNet(r, RoadLocale)
 }
 
 // Cache cache routing results for next use.
@@ -703,7 +717,7 @@ func (r *RouterCache) Road(ctx *Context, host string) Road {
 	r.m.Lock()
 	defer r.m.Unlock()
 	road := r.road(ctx, host)
-	log.Printf("%s  route router=cache road=%s\n", ctx.Cid, road)
+	log.Printf("%s  route router=cache road=%s", ctx.Cid, road)
 	return road
 }
 
@@ -736,7 +750,7 @@ func (r *RouterClump) road(ctx *Context, host string) Road {
 // Road implements daze.Router.
 func (r *RouterClump) Road(ctx *Context, host string) Road {
 	road := r.road(ctx, host)
-	log.Printf("%s  route router=clump road=%s\n", ctx.Cid, road)
+	log.Printf("%s  route router=clump road=%s", ctx.Cid, road)
 	return road
 }
 
@@ -794,7 +808,7 @@ func (r *RouterRules) road(ctx *Context, host string) Road {
 // Road implements daze.Router.
 func (r *RouterRules) Road(ctx *Context, host string) Road {
 	road := r.road(ctx, host)
-	log.Printf("%s  route router=rules road=%s\n", ctx.Cid, road)
+	log.Printf("%s  route router=rules road=%s", ctx.Cid, road)
 	return road
 }
 
@@ -861,7 +875,7 @@ func NewRouterApnic(f io.Reader, region string) *RouterIPNet {
 			r = append(r, cidr)
 		}
 	}
-	return NewRouterIPNet(r, RoadLocale, RoadPuzzle)
+	return NewRouterIPNet(r, RoadLocale)
 }
 
 // Aimbot automatically distinguish whether to use a proxy or a local network.
@@ -912,6 +926,7 @@ var (
 	_ Router = (*RouterCache)(nil)
 	_ Router = (*RouterClump)(nil)
 	_ Router = (*RouterIPNet)(nil)
+	_ Router = (*RouterRight)(nil)
 	_ Router = (*RouterRules)(nil)
 )
 

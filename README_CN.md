@@ -25,11 +25,11 @@ $ ./cmd/develop.ps1
 ```sh
 # 服务端
 # 你需要一台能正确连接互联网的机器, 并输入以下命令
-$ daze server -l 0.0.0.0:1081
+$ daze server -l 0.0.0.0:1081 -k $PASSWORD
 
 # 客户端
 # 使用如下命令连接至你的服务端(将 $SERVER 替换为你的服务器地址)
-$ daze client -s $SERVER:1081 -l 127.0.0.1:1080 -dns 114.114.114.114:53
+$ daze client -s $SERVER:1081 -k $PASSWORD
 # 现在, 你即可自由地访问互联网
 $ curl -x socks5://127.0.0.1:1080 google.com
 ```
@@ -60,16 +60,12 @@ B c.com
 
 - L(ocale) 表示使用本地网络进行访问
 - R(emote) 表示使用代理进行访问
-- B(anned) 表示屏蔽该地址的流量
+- B(anned) 表示屏蔽该地址的流量, 可用于过滤广告
 
 支持通配符, 例如 `R *.google.com`.
 
 # 了解更多
 
-你可以在 `daze server -h` 和 `daze client -h` 了解到所有信息. Cli 提供了如下可配置项目
-
-- 数据加密
-- 混淆
-- 指定 DNS
+你可以在 `daze server -h` 和 `daze client -h` 了解到所有信息.
 
 玩的开心.
