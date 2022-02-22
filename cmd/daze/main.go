@@ -66,7 +66,7 @@ func main() {
 			flListen = flag.String("l", "127.0.0.1:1080", "listen address")
 			flServer = flag.String("s", "127.0.0.1:1081", "server address")
 			flCipher = flag.String("k", "daze", "password, should be same as server")
-			flFilter = flag.String("f", "ipcn", "filter {ipcn, none, full}")
+			flFilter = flag.String("f", "rule", "filter {rule, remote, locale}")
 			flRulels = flag.String("r", filepath.Join(resExec, Conf.PathRule), "rule path")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
@@ -79,11 +79,11 @@ func main() {
 		}
 		client := ashe.NewClient(*flServer, *flCipher)
 		router := func() daze.Router {
-			if *flFilter == "full" {
+			if *flFilter == "locale" {
 				routerRight := daze.NewRouterRight(daze.RoadLocale)
 				return routerRight
 			}
-			if *flFilter == "none" {
+			if *flFilter == "remote" {
 				log.Println("load rule reserved IPv4/6 CIDRs")
 				routerLocal := daze.NewRouterLocal()
 				log.Println("find", len(routerLocal.L))
@@ -92,7 +92,7 @@ func main() {
 				routerCache := daze.NewRouterCache(routerClump)
 				return routerCache
 			}
-			if *flFilter == "ipcn" {
+			if *flFilter == "rule" {
 				log.Println("load rule", *flRulels)
 				routerRules := daze.NewRouterRules()
 				f1 := doa.Try(daze.OpenFile(*flRulels)).(io.ReadCloser)
