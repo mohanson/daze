@@ -623,7 +623,7 @@ func (r *RouterIPNet) road(ctx *Context, host string) Road {
 // Road implements daze.Router.
 func (r *RouterIPNet) Road(ctx *Context, host string) Road {
 	road := r.road(ctx, host)
-	log.Printf("%s  route router=ipnet road=%s\n", ctx.Cid, road)
+	log.Printf("%s  route router=ipnet road=%s", ctx.Cid, road)
 	return road
 }
 
