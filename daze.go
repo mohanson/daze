@@ -750,6 +750,7 @@ func (r *RouterClump) road(ctx *Context, host string) Road {
 // Road implements daze.Router.
 func (r *RouterClump) Road(ctx *Context, host string) Road {
 	road := r.road(ctx, host)
+	log.Printf("%s  route router=clump road=%s", ctx.Cid, road)
 	return road
 }
 
