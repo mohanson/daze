@@ -598,14 +598,13 @@ type Router interface {
 // otherwise it returns N.
 type RouterIPNet struct {
 	L []*net.IPNet
-	Y Road
-	N Road
+	R Road
 }
 
 // Road implements daze.Router.
 func (r *RouterIPNet) road(ctx *Context, host string) Road {
 	if len(r.L) == 0 {
-		return r.N
+		return RoadPuzzle
 	}
 	l, err := Conf.Dialer.Resolver.LookupIPAddr(context.Background(), host)
 	if err != nil {
@@ -618,10 +617,10 @@ func (r *RouterIPNet) road(ctx *Context, host string) Road {
 	a := l[0]
 	for _, e := range r.L {
 		if e.Contains(a.IP) {
-			return r.Y
+			return r.R
 		}
 	}
-	return r.N
+	return RoadPuzzle
 }
 
 // Road implements daze.Router.
@@ -632,11 +631,10 @@ func (r *RouterIPNet) Road(ctx *Context, host string) Road {
 }
 
 // NewIPNet returns a new IPNet object.
-func NewRouterIPNet(ipnets []*net.IPNet, y Road, n Road) *RouterIPNet {
+func NewRouterIPNet(ipnets []*net.IPNet, road Road) *RouterIPNet {
 	return &RouterIPNet{
 		L: ipnets,
-		Y: y,
-		N: n,
+		R: road,
 	}
 }
 
@@ -694,7 +692,7 @@ func NewRouterLocal() *RouterIPNet {
 		m := doa.Try(hex.DecodeString(e[1])).([]byte)
 		r = append(r, &net.IPNet{IP: i, Mask: m})
 	}
-	return NewRouterIPNet(r, RoadLocale, RoadPuzzle)
+	return NewRouterIPNet(r, RoadLocale)
 }
 
 // Cache cache routing results for next use.
@@ -876,7 +874,7 @@ func NewRouterApnic(f io.Reader, region string) *RouterIPNet {
 			r = append(r, cidr)
 		}
 	}
-	return NewRouterIPNet(r, RoadLocale, RoadPuzzle)
+	return NewRouterIPNet(r, RoadLocale)
 }
 
 // Aimbot automatically distinguish whether to use a proxy or a local network.
