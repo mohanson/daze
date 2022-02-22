@@ -640,9 +640,20 @@ func NewRouterIPNet(ipnets []*net.IPNet, y Road, n Road) *RouterIPNet {
 	}
 }
 
+// RouterRight always returns the same road.
+type RouterRight struct {
+	R Road
+}
+
+// Road implements daze.Router.
+func (r *RouterRight) Road(ctx *Context, host string) Road {
+	log.Printf("%s  route router=right road=%s", ctx.Cid, r.R)
+	return r.R
+}
+
 // NewRouterRight.
-func NewRouterRight(road Road) *RouterIPNet {
-	return &RouterIPNet{L: []*net.IPNet{}, Y: road, N: road}
+func NewRouterRight(road Road) *RouterRight {
+	return &RouterRight{R: road}
 }
 
 // Introduction:
@@ -741,7 +752,6 @@ func (r *RouterClump) road(ctx *Context, host string) Road {
 // Road implements daze.Router.
 func (r *RouterClump) Road(ctx *Context, host string) Road {
 	road := r.road(ctx, host)
-	log.Printf("%s  route router=clump road=%s", ctx.Cid, road)
 	return road
 }
 
