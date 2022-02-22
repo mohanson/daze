@@ -25,11 +25,11 @@ Daze is dead simple to use:
 ```sh
 # server port
 # you need a machine that can access the Internet, and enter the following command:
-$ daze server -l 0.0.0.0:1081
+$ daze server -l 0.0.0.0:1081 -k $PASSWORD
 
 # client port
 # use the following command to link your server(replace $SERVER with your server ip):
-$ daze client -s $SERVER:1081 -l 127.0.0.1:1080 -dns 114.114.114.114:53
+$ daze client -s $SERVER:1081 -k $PASSWORD
 # now, you are free to visit Internet
 $ curl -x socks5://127.0.0.1:1080 google.com
 ```
@@ -57,18 +57,15 @@ L a.com
 R b.com
 B c.com
 ```
+
 - L(ocale) means using local network
 - R(emote) means using proxy
-- B(anned) means block it
+- B(anned) means block it, often used to block ads
 
 Glob is supported, such as `R *.google.com`.
 
 # More
 
-You can find all the information here by using `daze server -h` and `daze client -h`. The cli provides
-
-- Encrypted data connection
-- Confuse
-- Specify DNS
+You can find all the information here by using `daze server -h` and `daze client -h`.
 
 Have fun.
