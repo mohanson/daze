@@ -704,7 +704,7 @@ func (r *RouterCache) Road(ctx *Context, host string) Road {
 	r.m.Lock()
 	defer r.m.Unlock()
 	road := r.road(ctx, host)
-	log.Printf("%s  route router=cache road=%s\n", ctx.Cid, road)
+	log.Printf("%s  route router=cache road=%s", ctx.Cid, road)
 	return road
 }
 
@@ -737,7 +737,7 @@ func (r *RouterClump) road(ctx *Context, host string) Road {
 // Road implements daze.Router.
 func (r *RouterClump) Road(ctx *Context, host string) Road {
 	road := r.road(ctx, host)
-	log.Printf("%s  route router=clump road=%s\n", ctx.Cid, road)
+	log.Printf("%s  route router=clump road=%s", ctx.Cid, road)
 	return road
 }
 
@@ -795,7 +795,7 @@ func (r *RouterRules) road(ctx *Context, host string) Road {
 // Road implements daze.Router.
 func (r *RouterRules) Road(ctx *Context, host string) Road {
 	road := r.road(ctx, host)
-	log.Printf("%s  route router=rules road=%s\n", ctx.Cid, road)
+	log.Printf("%s  route router=rules road=%s", ctx.Cid, road)
 	return road
 }
 
