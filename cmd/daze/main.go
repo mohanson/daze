@@ -16,13 +16,13 @@ import (
 )
 
 var Conf = struct {
-	PathRule     string
-	PathRuleCIDR string
-	Version      string
+	PathRule string
+	PathCIDR string
+	Version  string
 }{
-	PathRule:     "/rule.ls",
-	PathRuleCIDR: "/rule.cidr",
-	Version:      "1.15.5",
+	PathRule: "/rule.ls",
+	PathCIDR: "/rule.cidr",
+	Version:  "1.15.6",
 }
 
 const Help = `usage: daze <command> [<args>]
@@ -70,7 +70,7 @@ func main() {
 			flCipher = flag.String("k", "daze", "password, should be same as server")
 			flFilter = flag.String("f", "rule", "filter {rule, remote, locale}")
 			flRulels = flag.String("r", filepath.Join(resExec, Conf.PathRule), "rule path")
-			flCIDRls = flag.String("c", filepath.Join(resExec, Conf.PathRuleCIDR), "cidr path")
+			flCIDRls = flag.String("c", filepath.Join(resExec, Conf.PathCIDR), "cidr path")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 		)
 		flag.Parse()
@@ -137,7 +137,7 @@ func main() {
 			}
 			return []*net.IPNet{}
 		}()
-		f := doa.Try(os.OpenFile(filepath.Join(resExec, Conf.PathRuleCIDR), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)).(*os.File)
+		f := doa.Try(os.OpenFile(filepath.Join(resExec, Conf.PathCIDR), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)).(*os.File)
 		defer f.Close()
 		for _, e := range cidr {
 			f.WriteString(e.String())
