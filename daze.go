@@ -927,6 +927,7 @@ var (
 	_ Router = (*RouterCache)(nil)
 	_ Router = (*RouterClump)(nil)
 	_ Router = (*RouterIPNet)(nil)
+	_ Router = (*RouterRight)(nil)
 	_ Router = (*RouterRules)(nil)
 )
 
