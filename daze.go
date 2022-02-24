@@ -106,6 +106,7 @@ type Dialer interface {
 // Direct is the default dialer for connecting to an address.
 type Direct struct{}
 
+// Dial implements daze.Dialer.
 func (d *Direct) Dial(ctx *Context, network string, address string) (io.ReadWriteCloser, error) {
 	return Conf.Dialer.Dial(network, address)
 }
@@ -135,55 +136,68 @@ func (l *Locale) ServeProxy(ctx *Context, app io.ReadWriteCloser) error {
 		Writer: app,
 		Closer: app,
 	}
-	r, err := http.ReadRequest(appReader)
-	if err != nil {
-		return err
-	}
+	var err error
+	for {
+		err = func() error {
+			r, err := http.ReadRequest(appReader)
+			if err != nil {
+				return err
+			}
 
-	var port string
-	if r.URL.Port() == "" {
-		port = "80"
-	} else {
-		port = r.URL.Port()
-	}
+			var port string
+			if r.URL.Port() == "" {
+				port = "80"
+			} else {
+				port = r.URL.Port()
+			}
 
-	if r.Method == "CONNECT" {
-		log.Println(ctx.Cid, " proto", "format=tunnel")
-	} else {
-		log.Println(ctx.Cid, " proto", "format=hproxy")
-	}
+			if r.Method == "CONNECT" {
+				log.Println(ctx.Cid, " proto", "format=tunnel")
+			} else {
+				log.Println(ctx.Cid, " proto", "format=hproxy")
+			}
 
-	srv, err := l.Dialer.Dial(ctx, "tcp", r.URL.Hostname()+":"+port)
-	if err != nil {
-		return err
-	}
-	defer srv.Close()
+			srv, err := l.Dialer.Dial(ctx, "tcp", r.URL.Hostname()+":"+port)
+			if err != nil {
+				return err
+			}
+			defer srv.Close()
 
-	if r.Method == "CONNECT" {
-		_, err := app.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+			if r.Method == "CONNECT" {
+				_, err := app.Write([]byte("HTTP/1.1 200 Connection Established\r\n\r\n"))
+				if err != nil {
+					return err
+				}
+				Link(app, srv)
+				return io.EOF
+			}
+			if r.Method == "GET" && strings.ToLower(r.Header.Get("Upgrade")) == "websocket" {
+				if err := r.Write(srv); err != nil {
+					return err
+				}
+				Link(app, srv)
+				return io.EOF
+			}
+
+			srvReader := bufio.NewReader(srv)
+			if err := r.Write(srv); err != nil {
+				return err
+			}
+			s, err := http.ReadResponse(srvReader, r)
+			if err != nil {
+				return err
+			}
+			return s.Write(app)
+		}()
 		if err != nil {
-			return err
+			break
 		}
-		Link(app, srv)
+	}
+	// It makes no sense to report a EOF error.
+	if err == io.EOF {
 		return nil
 	}
-	if r.Method == "GET" && r.Header.Get("Upgrade") == "websocket" {
-		if err := r.Write(srv); err != nil {
-			return err
-		}
-		Link(app, srv)
-		return nil
-	}
-
-	srvReader := bufio.NewReader(srv)
-	if err := r.Write(srv); err != nil {
-		return err
-	}
-	s, err := http.ReadResponse(srvReader, r)
-	if err != nil {
-		return err
-	}
-	return s.Write(app)
+	return err
 }
 
 // Serve traffic in SOCKS4/SOCKS4a format.
