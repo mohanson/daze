@@ -25,7 +25,7 @@ var Conf = struct {
 	Version:  "1.15.6",
 }
 
-const Help = `usage: daze <command> [<args>]
+const HelpMsg = `Usage: daze <command> [<args>]
 
 The most commonly used daze commands are:
   server     Start daze server
@@ -35,9 +35,17 @@ The most commonly used daze commands are:
 
 Run 'daze <command> -h' for more information on a command.`
 
+const HelpGen = `Usage: daze gen <region>
+
+Supported region:
+  CN         China
+
+If no region is specified, an empty cidr list is generated.
+`
+
 func main() {
 	if len(os.Args) <= 1 {
-		fmt.Println(Help)
+		fmt.Println(HelpMsg)
 		os.Exit(0)
 	}
 	// If daze runs in Android through termux, then we set a default dns for it. See:
@@ -129,6 +137,10 @@ func main() {
 		locale := daze.NewLocale(*flListen, aimbot)
 		doa.Nil(locale.Run())
 	case "gen":
+		flag.Usage = func() {
+			fmt.Fprint(flag.CommandLine.Output(), HelpGen)
+			flag.PrintDefaults()
+		}
 		flag.Parse()
 		cidr := func() []*net.IPNet {
 			switch strings.ToUpper(flag.Arg(0)) {
@@ -146,7 +158,7 @@ func main() {
 	case "ver":
 		fmt.Println("daze", Conf.Version)
 	default:
-		fmt.Println(Help)
+		fmt.Println(HelpMsg)
 		os.Exit(0)
 	}
 }
