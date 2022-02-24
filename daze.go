@@ -171,7 +171,7 @@ func (l *Locale) ServeProxy(ctx *Context, app io.ReadWriteCloser) error {
 				Link(app, srv)
 				return io.EOF
 			}
-			if r.Method == "GET" && strings.ToLower(r.Header.Get("Upgrade")) == "websocket" {
+			if r.Method == "GET" && r.Header.Get("Upgrade") == "websocket" {
 				if err := r.Write(srv); err != nil {
 					return err
 				}
