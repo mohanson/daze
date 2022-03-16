@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"os"
@@ -53,7 +52,7 @@ func main() {
 	if os.Getenv("ANDROID_ROOT") != "" {
 		net.DefaultResolver = daze.Resolver("8.8.8.8:53")
 	}
-	resExec := filepath.Dir(doa.Try(os.Executable()).(string))
+	resExec := filepath.Dir(doa.Try(os.Executable()))
 	subCommand := os.Args[1]
 	os.Args = os.Args[1:len(os.Args)]
 	switch subCommand {
@@ -106,7 +105,7 @@ func main() {
 			if *flFilter == "rule" {
 				log.Println("load rule", *flRulels)
 				routerRules := daze.NewRouterRules()
-				f1 := doa.Try(daze.OpenFile(*flRulels)).(io.ReadCloser)
+				f1 := doa.Try(daze.OpenFile(*flRulels))
 				defer f1.Close()
 				doa.Nil(routerRules.FromReader(f1))
 				log.Println("find", len(routerRules.L)+len(routerRules.R)+len(routerRules.B))
@@ -116,7 +115,7 @@ func main() {
 				log.Println("find", len(routerLocal.L))
 
 				log.Println("load rule", *flCIDRls)
-				f2 := doa.Try(daze.OpenFile(*flCIDRls)).(io.ReadCloser)
+				f2 := doa.Try(daze.OpenFile(*flCIDRls))
 				defer f2.Close()
 				routerApnic := daze.NewRouterIPNet([]*net.IPNet{}, daze.RoadLocale)
 				routerApnic.FromReader(f2)
@@ -149,7 +148,7 @@ func main() {
 			}
 			return []*net.IPNet{}
 		}()
-		f := doa.Try(os.OpenFile(filepath.Join(resExec, Conf.PathCIDR), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)).(*os.File)
+		f := doa.Try(os.OpenFile(filepath.Join(resExec, Conf.PathCIDR), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644))
 		defer f.Close()
 		for _, e := range cidr {
 			f.WriteString(e.String())

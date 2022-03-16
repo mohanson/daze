@@ -355,8 +355,8 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 		buf                = make([]byte, 2048)
 		err         error
 	)
-	bndAddr = doa.Try(net.ResolveUDPAddr("udp", "127.0.0.1:0")).(*net.UDPAddr)
-	bnd = doa.Try(net.ListenUDP("udp", bndAddr)).(*net.UDPConn)
+	bndAddr = doa.Try(net.ResolveUDPAddr("udp", "127.0.0.1:0"))
+	bnd = doa.Try(net.ListenUDP("udp", bndAddr))
 	defer bnd.Close()
 	bndPort = uint16(bnd.LocalAddr().(*net.UDPAddr).Port)
 	copy(buf, []byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
@@ -711,8 +711,8 @@ func NewRouterLocal() *RouterIPNet {
 		{"FE800000000000000000000000000000", "FFC00000000000000000000000000000"},
 		{"FF000000000000000000000000000000", "FF000000000000000000000000000000"},
 	} {
-		i := doa.Try(hex.DecodeString(e[0])).([]byte)
-		m := doa.Try(hex.DecodeString(e[1])).([]byte)
+		i := doa.Try(hex.DecodeString(e[0]))
+		m := doa.Try(hex.DecodeString(e[1]))
 		r = append(r, &net.IPNet{IP: i, Mask: m})
 	}
 	return NewRouterIPNet(r, RoadLocale)
@@ -811,17 +811,17 @@ type RouterRules struct {
 // Road implements daze.Router.
 func (r *RouterRules) road(ctx *Context, host string) Road {
 	for _, e := range r.L {
-		if doa.Try(filepath.Match(e, host)).(bool) {
+		if doa.Try(filepath.Match(e, host)) {
 			return RoadLocale
 		}
 	}
 	for _, e := range r.R {
-		if doa.Try(filepath.Match(e, host)).(bool) {
+		if doa.Try(filepath.Match(e, host)) {
 			return RoadRemote
 		}
 	}
 	for _, e := range r.B {
-		if doa.Try(filepath.Match(e, host)).(bool) {
+		if doa.Try(filepath.Match(e, host)) {
 			return RoadFucked
 		}
 	}
@@ -920,20 +920,20 @@ var (
 
 // GravityReader wraps an io.Reader with RC4 crypto.
 func GravityReader(r io.Reader, k []byte) io.Reader {
-	cr := doa.Try(rc4.NewCipher(k)).(*rc4.Cipher)
+	cr := doa.Try(rc4.NewCipher(k))
 	return cipher.StreamReader{S: cr, R: r}
 }
 
 // GravityWriter wraps an io.Writer with RC4 crypto.
 func GravityWriter(w io.Writer, k []byte) io.Writer {
-	cw := doa.Try(rc4.NewCipher(k)).(*rc4.Cipher)
+	cw := doa.Try(rc4.NewCipher(k))
 	return cipher.StreamWriter{S: cw, W: w}
 }
 
 // Double gravity, double happiness.
 func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
-	cr := doa.Try(rc4.NewCipher(k)).(*rc4.Cipher)
-	cw := doa.Try(rc4.NewCipher(k)).(*rc4.Cipher)
+	cr := doa.Try(rc4.NewCipher(k))
+	cw := doa.Try(rc4.NewCipher(k))
 	return &ReadWriteCloser{
 		Reader: cipher.StreamReader{S: cr, R: conn},
 		Writer: cipher.StreamWriter{S: cw, W: conn},
@@ -974,7 +974,7 @@ func OpenFile(name string) (io.ReadCloser, error) {
 
 // Load remote resource. APNIC is the Regional Internet Registry administering IP addresses for the Asia Pacific.
 func LoadApnic() map[string][]*net.IPNet {
-	f := doa.Try(OpenFile("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")).(io.ReadCloser)
+	f := doa.Try(OpenFile("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest"))
 	defer f.Close()
 	r := map[string][]*net.IPNet{}
 	s := bufio.NewScanner(f)
@@ -989,7 +989,7 @@ func LoadApnic() map[string][]*net.IPNet {
 		}
 		switch seps[2] {
 		case "ipv4":
-			sep4 := doa.Try(strconv.ParseUint(seps[4], 0, 32)).(uint64)
+			sep4 := doa.Try(strconv.ParseUint(seps[4], 0, 32))
 			// Determine whether it is a power of 2
 			doa.Doa(sep4&(sep4-1) == 0)
 			mask := bits.LeadingZeros64(sep4) - 31
