@@ -390,10 +390,7 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 				delete(cpl, e)
 			}
 		}
-		if len(cpl) != len(cll) {
-			panic("unreachable")
-		}
-
+		doa.Doa(len(cpl) == len(cll))
 		appSize, appAddr, err = bnd.ReadFromUDP(buf)
 		if err != nil {
 			break

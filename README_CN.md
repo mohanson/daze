@@ -12,7 +12,7 @@ Daze 是一款帮助你连接至**互联网**的工具.
 $ git clone https://github.com/mohanson/daze
 $ cd daze
 
-# On Linux
+# On Linux or macOS
 $ ./cmd/develop.sh
 # On Windows
 $ ./cmd/develop.ps1
