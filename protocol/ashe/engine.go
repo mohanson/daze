@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/godump/doa"
 	"github.com/mohanson/daze"
 )
 
@@ -63,6 +64,10 @@ func (c *UDPConn) Read(p []byte) (int, error) {
 
 // Write implements the Conn Write method.
 func (c *UDPConn) Write(p []byte) (int, error) {
+	// Maximum UDP packet size is 2^16 bytes in theoretically.
+	// But every packet lives in an Ethernet frame. Ethernet frames can only contain 1500 bytes of data. This is called
+	// the "maximum transmission unit" or "MTU".
+	doa.Doa(len(p) <= math.MaxUint16)
 	b := make([]byte, 2)
 	binary.BigEndian.PutUint16(b, uint16(len(p)))
 	_, err := c.ReadWriteCloser.Write(b)
