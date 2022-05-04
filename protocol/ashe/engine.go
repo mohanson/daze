@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/godump/doa"
 	"github.com/mohanson/daze"
 )
 
@@ -34,17 +35,6 @@ import (
 // - Net: tcp(0x01), udp(0x03)
 // - DST.Len: len of DST. If DST is https://google.com, DST.Len is 0x12
 // - DST: desired destination address
-//
-// The server returns:
-//
-// +------+
-// | Code |
-// +------+
-// |  1   |
-// +------+
-//
-// - Code 0x00: request granted
-// - Code 0x01: general failure
 
 var Conf = struct {
 	LifeExpired int
@@ -64,21 +54,22 @@ type UDPConn struct {
 
 // Read implements the Conn Read method.
 func (c *UDPConn) Read(p []byte) (int, error) {
-	_, err := io.ReadFull(c.ReadWriteCloser, p[:4])
+	_, err := io.ReadFull(c.ReadWriteCloser, p[:2])
 	if err != nil {
 		return 0, err
 	}
-	n := binary.BigEndian.Uint32(p[:4])
+	n := binary.BigEndian.Uint16(p[:2])
 	return io.ReadFull(c.ReadWriteCloser, p[:n])
 }
 
 // Write implements the Conn Write method.
 func (c *UDPConn) Write(p []byte) (int, error) {
-	if len(p) > math.MaxUint16 {
-		panic("unreachable")
-	}
-	b := make([]byte, 4)
-	binary.BigEndian.PutUint32(b, uint32(len(p)))
+	// Maximum UDP packet size is 2^16 bytes in theoretically.
+	// But every packet lives in an Ethernet frame. Ethernet frames can only contain 1500 bytes of data. This is called
+	// the "maximum transmission unit" or "MTU".
+	doa.Doa(len(p) <= math.MaxUint16)
+	b := make([]byte, 2)
+	binary.BigEndian.PutUint16(b, uint16(len(p)))
 	_, err := c.ReadWriteCloser.Write(b)
 	if err != nil {
 		return 0, err
@@ -96,11 +87,13 @@ type Server struct {
 // Serve.
 func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	var (
-		buf = make([]byte, 1024)
-		cli io.ReadWriteCloser
-		dst string
-		srv io.ReadWriteCloser
-		err error
+		buf    = make([]byte, 256)
+		cli    io.ReadWriteCloser
+		dst    string
+		dstLen uint8
+		dstNet uint8
+		srv    io.ReadWriteCloser
+		err    error
 	)
 	_, err = io.ReadFull(raw, buf[:128])
 	if err != nil {
@@ -120,12 +113,14 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	if d^y-y > int64(Conf.LifeExpired) {
 		return fmt.Errorf("daze: expired: %v", time.Unix(d, 0))
 	}
-	_, err = io.ReadFull(cli, buf[12:12+buf[11]])
+	dstNet = buf[10]
+	dstLen = buf[11]
+	_, err = io.ReadFull(cli, buf[:dstLen])
 	if err != nil {
 		return err
 	}
-	dst = string(buf[12 : 12+buf[11]])
-	switch buf[10] {
+	dst = string(buf[:dstLen])
+	switch dstNet {
 	case 0x01:
 		log.Printf("%s   dial network=tcp address=%s", ctx.Cid, dst)
 		srv, err = daze.Conf.Dialer.Dial("tcp", dst)
@@ -194,7 +189,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	var (
 		srv io.ReadWriteCloser
 		n   = len(address)
-		buf = make([]byte, 512)
+		buf = make([]byte, 128)
 		err error
 	)
 	if n > 255 {
@@ -220,8 +215,8 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		buf[0x0a] = 0x03
 	}
 	buf[0x0b] = uint8(n)
-	copy(buf[12:], []byte(address))
-	_, err = srv.Write(buf[:12+n])
+	srv.Write(buf[:12])
+	_, err = srv.Write([]byte(address))
 	if err != nil {
 		return nil, err
 	}

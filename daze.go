@@ -390,22 +390,16 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 				delete(cpl, e)
 			}
 		}
-		if len(cpl) != len(cll) {
-			panic("unreachable")
-		}
-
+		doa.Doa(len(cpl) == len(cll))
 		appSize, appAddr, err = bnd.ReadFromUDP(buf)
 		if err != nil {
 			break
 		}
-		if buf[0] != 0x00 || buf[1] != 0x00 {
-			panic("unreachable")
-		}
+		doa.Doa(buf[0] == 0x00)
+		doa.Doa(buf[1] == 0x00)
 		// Implementation of fragmentation is optional; an implementation that does not support fragmentation MUST drop
 		// any datagram whose FRAG field is other than X'00'.
-		if buf[2] != 0x00 {
-			panic("unreachable")
-		}
+		doa.Doa(buf[2] == 0x00)
 		switch buf[3] {
 		case 0x01:
 			appHeadSize = 10

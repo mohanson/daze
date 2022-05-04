@@ -12,7 +12,7 @@ Compile or [Download](https://github.com/mohanson/daze/releases) daze:
 $ git clone https://github.com/mohanson/daze
 $ cd daze
 
-# On Linux
+# On Linux or macOS
 $ ./cmd/develop.sh
 # On Windows
 $ ./cmd/develop.ps1
