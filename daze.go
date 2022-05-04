@@ -349,10 +349,8 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 		dst         string
 		srv         io.ReadWriteCloser
 		b           bool
-		c           uint32 = 0
-		cpl                = map[string]io.ReadWriteCloser{}
-		cll                = map[string]time.Time{}
-		buf                = make([]byte, 2048)
+		cpl         = map[string]io.ReadWriteCloser{}
+		buf         = make([]byte, 2048)
 		err         error
 	)
 	bndAddr = doa.Try(net.ResolveUDPAddr("udp", "127.0.0.1:0"))
@@ -374,23 +372,6 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 	}()
 
 	for {
-		// Close connections that have not been used.
-		c += 1
-		if c&0x0FFF == 0x00 {
-			n := time.Now()
-			s := []string{}
-			for k, v := range cll {
-				if n.After(v) {
-					s = append(s, k)
-				}
-			}
-			for _, e := range s {
-				delete(cll, e)
-				cpl[e].Close()
-				delete(cpl, e)
-			}
-		}
-		doa.Doa(len(cpl) == len(cll))
 		appSize, appAddr, err = bnd.ReadFromUDP(buf)
 		if err != nil {
 			break
@@ -455,7 +436,6 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 			continue
 		}
 		cpl[dst] = srv
-		cll[dst] = time.Now().Add(Conf.IdleTime)
 
 		go func(srv io.ReadWriteCloser, appHead []byte, appAddr *net.UDPAddr) {
 			var (
@@ -481,12 +461,10 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 		_, err = srv.Write(buf[appHeadSize:appSize])
 		if err != nil {
 			log.Println(ctx.Cid, " error", err)
-			delete(cll, dst)
 			cpl[dst].Close()
 			delete(cpl, dst)
 			continue
 		}
-		cll[dst] = time.Now().Add(Conf.IdleTime)
 	}
 	for _, e := range cpl {
 		e.Close()
