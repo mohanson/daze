@@ -366,8 +366,8 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 		return err
 	}
 
-	// The life of app and bnd are bound together. This means that when the app is disconnected, bnd should also be
-	// destroyed.
+	// https://datatracker.ietf.org/doc/html/rfc1928, Page 7, UDP ASSOCIATE:
+	// A UDP association terminates when the TCP connection that the UDP ASSOCIATE request arrived on terminates.
 	go func() {
 		io.Copy(ioutil.Discard, app)
 		bnd.Close()
@@ -395,6 +395,21 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 		if err != nil {
 			break
 		}
+		// 	+----+------+------+----------+----------+----------+
+		// 	|RSV | FRAG | ATYP | DST.ADDR | DST.PORT |   DATA   |
+		// 	+----+------+------+----------+----------+----------+
+		// 	| 2  |  1   |  1   | Variable |    2     | Variable |
+		// 	+----+------+------+----------+----------+----------+
+		//    The fields in the UDP request header are:
+		// 		*  RSV  Reserved X'0000'
+		// 		*  FRAG    Current fragment number
+		// 		*  ATYP    address type of following addresses:
+		// 		   *  IP V4 address: X'01'
+		// 		   *  DOMAINNAME: X'03'
+		// 		   *  IP V6 address: X'04'
+		// 		*  DST.ADDR       desired destination address
+		// 		*  DST.PORT       desired destination port
+		// 		*  DATA     user data
 		doa.Doa(buf[0] == 0x00)
 		doa.Doa(buf[1] == 0x00)
 		// Implementation of fragmentation is optional; an implementation that does not support fragmentation MUST drop
