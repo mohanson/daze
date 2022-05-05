@@ -349,10 +349,8 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 		dst         string
 		srv         io.ReadWriteCloser
 		b           bool
-		c           uint32 = 0
-		cpl                = map[string]io.ReadWriteCloser{}
-		cll                = map[string]time.Time{}
-		buf                = make([]byte, 2048)
+		cpl         = map[string]io.ReadWriteCloser{}
+		buf         = make([]byte, 2048)
 		err         error
 	)
 	bndAddr = doa.Try(net.ResolveUDPAddr("udp", "127.0.0.1:0"))
@@ -366,35 +364,33 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 		return err
 	}
 
-	// The life of app and bnd are bound together. This means that when the app is disconnected, bnd should also be
-	// destroyed.
+	// https://datatracker.ietf.org/doc/html/rfc1928, Page 7, UDP ASSOCIATE:
+	// A UDP association terminates when the TCP connection that the UDP ASSOCIATE request arrived on terminates.
 	go func() {
 		io.Copy(ioutil.Discard, app)
 		bnd.Close()
 	}()
 
 	for {
-		// Close connections that have not been used.
-		c += 1
-		if c&0x0FFF == 0x00 {
-			n := time.Now()
-			s := []string{}
-			for k, v := range cll {
-				if n.After(v) {
-					s = append(s, k)
-				}
-			}
-			for _, e := range s {
-				delete(cll, e)
-				cpl[e].Close()
-				delete(cpl, e)
-			}
-		}
-		doa.Doa(len(cpl) == len(cll))
 		appSize, appAddr, err = bnd.ReadFromUDP(buf)
 		if err != nil {
 			break
 		}
+		// 	+----+------+------+----------+----------+----------+
+		// 	|RSV | FRAG | ATYP | DST.ADDR | DST.PORT |   DATA   |
+		// 	+----+------+------+----------+----------+----------+
+		// 	| 2  |  1   |  1   | Variable |    2     | Variable |
+		// 	+----+------+------+----------+----------+----------+
+		//    The fields in the UDP request header are:
+		// 		*  RSV  Reserved X'0000'
+		// 		*  FRAG    Current fragment number
+		// 		*  ATYP    address type of following addresses:
+		// 		   *  IP V4 address: X'01'
+		// 		   *  DOMAINNAME: X'03'
+		// 		   *  IP V6 address: X'04'
+		// 		*  DST.ADDR       desired destination address
+		// 		*  DST.PORT       desired destination port
+		// 		*  DATA     user data
 		doa.Doa(buf[0] == 0x00)
 		doa.Doa(buf[1] == 0x00)
 		// Implementation of fragmentation is optional; an implementation that does not support fragmentation MUST drop
@@ -440,9 +436,7 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 			continue
 		}
 		cpl[dst] = srv
-		cll[dst] = time.Now().Add(Conf.IdleTime)
-
-		go func(srv io.ReadWriteCloser, appHead []byte, appAddr *net.UDPAddr) {
+		go func(srv io.ReadWriteCloser, appHead []byte, appAddr *net.UDPAddr) error {
 			var (
 				buf = make([]byte, 2048)
 				l   = len(appHead)
@@ -460,18 +454,14 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 					break
 				}
 			}
-			srv.Close()
+			return err
 		}(srv, appHead, appAddr)
 	send:
 		_, err = srv.Write(buf[appHeadSize:appSize])
 		if err != nil {
 			log.Println(ctx.Cid, " error", err)
-			delete(cll, dst)
-			cpl[dst].Close()
-			delete(cpl, dst)
 			continue
 		}
-		cll[dst] = time.Now().Add(Conf.IdleTime)
 	}
 	for _, e := range cpl {
 		e.Close()
