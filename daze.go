@@ -334,6 +334,26 @@ func (l *Locale) ServeSocks5TCP(ctx *Context, app io.ReadWriteCloser, dst string
 	}
 }
 
+func (l *Locale) ServeSocks5UDPSrv(srv io.ReadWriteCloser, bnd *net.UDPConn, head []byte, addr *net.UDPAddr) error {
+	var (
+		buf = make([]byte, 2048)
+		n   int
+		err error
+	)
+	copy(buf, head)
+	for {
+		n, err = srv.Read(buf[len(head):])
+		if err != nil {
+			break
+		}
+		_, err = bnd.WriteToUDP(buf[:len(head)+n], addr)
+		if err != nil {
+			break
+		}
+	}
+	return err
+}
+
 // Socks5 UDP protocol.
 func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 	var (
@@ -436,33 +456,11 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 			continue
 		}
 		cpl[dst] = srv
-
-		go func(srv io.ReadWriteCloser, appHead []byte, appAddr *net.UDPAddr) {
-			var (
-				buf = make([]byte, 2048)
-				l   = len(appHead)
-				n   int
-				err error
-			)
-			copy(buf, appHead)
-			for {
-				n, err = srv.Read(buf[l:])
-				if err != nil {
-					break
-				}
-				_, err = bnd.WriteToUDP(buf[:l+n], appAddr)
-				if err != nil {
-					break
-				}
-			}
-			srv.Close()
-		}(srv, appHead, appAddr)
+		go l.ServeSocks5UDPSrv(srv, bnd, appHead, appAddr)
 	send:
 		_, err = srv.Write(buf[appHeadSize:appSize])
 		if err != nil {
 			log.Println(ctx.Cid, " error", err)
-			cpl[dst].Close()
-			delete(cpl, dst)
 			continue
 		}
 	}
