@@ -436,19 +436,20 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 			continue
 		}
 		cpl[dst] = srv
-		go func(srv io.ReadWriteCloser, head []byte, addr *net.UDPAddr) error {
+		go func(srv io.ReadWriteCloser, appHead []byte, appAddr *net.UDPAddr) error {
 			var (
 				buf = make([]byte, 2048)
+				l   = len(appHead)
 				n   int
 				err error
 			)
-			copy(buf, head)
+			copy(buf, appHead)
 			for {
-				n, err = srv.Read(buf[len(head):])
+				n, err = srv.Read(buf[l:])
 				if err != nil {
 					break
 				}
-				_, err = bnd.WriteToUDP(buf[:len(head)+n], addr)
+				_, err = bnd.WriteToUDP(buf[:l+n], appAddr)
 				if err != nil {
 					break
 				}
