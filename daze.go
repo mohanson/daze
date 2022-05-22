@@ -45,14 +45,12 @@ import (
 // Conf is acting as package level configuration.
 var Conf = struct {
 	Dialer      net.Dialer
-	IdleTime    time.Duration
 	RouterCache int
 }{
 	Dialer: net.Dialer{
 		Resolver: net.DefaultResolver,
 		Timeout:  time.Second * 8,
 	},
-	IdleTime:    time.Minute * 2,
 	RouterCache: 64,
 }
 
