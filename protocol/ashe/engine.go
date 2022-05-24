@@ -45,8 +45,8 @@ import (
 // |  1   |
 // +------+
 //
-// - Code: 0x00: request granted
-//         0x01: general failure
+// - Code: 0x00: succeed
+//         0x01: general server failure
 
 var Conf = struct {
 	LifeExpired int
@@ -243,7 +243,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		return nil, err
 	}
 	if buf[0] != 0 {
-		return nil, errors.New("daze: general failure")
+		return nil, errors.New("daze: general server failure")
 	}
 	switch network {
 	case "tcp":
