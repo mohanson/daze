@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -35,6 +36,17 @@ import (
 // - Net: tcp(0x01), udp(0x03)
 // - DST.Len: len of DST. If DST is https://google.com, DST.Len is 0x12
 // - DST: desired destination address
+//
+// The server returns:
+//
+// +------+
+// | Code |
+// +------+
+// |  1   |
+// +------+
+//
+// - Code: 0x00: request granted
+//         0x01: general failure
 
 var Conf = struct {
 	LifeExpired int
@@ -106,12 +118,12 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		return err
 	}
 	if buf[0] != 0xff || buf[1] != 0xff {
-		return fmt.Errorf("daze: malformed request: [%# 02x]", buf[0:2])
+		return errors.New("daze: malformed request")
 	}
 	d := time.Now().Unix() - int64(binary.BigEndian.Uint64(buf[2:10]))
 	y := d >> 63
 	if d^y-y > int64(Conf.LifeExpired) {
-		return fmt.Errorf("daze: expired: %v", time.Unix(d, 0))
+		return errors.New("daze: malformed request")
 	}
 	dstNet = buf[10]
 	dstLen = buf[11]
@@ -124,14 +136,20 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	case 0x01:
 		log.Printf("%s   dial network=tcp address=%s", ctx.Cid, dst)
 		srv, err = daze.Conf.Dialer.Dial("tcp", dst)
-		cli = &TCPConn{cli}
 	case 0x03:
 		log.Printf("%s   dial network=udp address=%s", ctx.Cid, dst)
 		srv, err = daze.Conf.Dialer.Dial("udp", dst)
-		cli = &UDPConn{cli}
 	}
 	if err != nil {
+		cli.Write([]byte{1})
 		return err
+	}
+	cli.Write([]byte{0})
+	switch dstNet {
+	case 0x01:
+		cli = &TCPConn{cli}
+	case 0x03:
+		cli = &UDPConn{cli}
 	}
 	defer srv.Close()
 	daze.Link(cli, srv)
@@ -193,7 +211,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		err error
 	)
 	if n > 255 {
-		return nil, fmt.Errorf("daze: destination address too long: %s", address)
+		return nil, fmt.Errorf("daze: destination address is too long %s", address)
 	}
 	if network != "tcp" && network != "udp" {
 		return nil, fmt.Errorf("daze: network must be tcp or udp")
@@ -219,6 +237,13 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	_, err = srv.Write([]byte(address))
 	if err != nil {
 		return nil, err
+	}
+	_, err = io.ReadFull(srv, buf[:1])
+	if err != nil {
+		return nil, err
+	}
+	if buf[0] != 0 {
+		return nil, fmt.Errorf("daze: general failure")
 	}
 	switch network {
 	case "tcp":
