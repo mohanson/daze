@@ -118,12 +118,12 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		return err
 	}
 	if buf[0] != 0xff || buf[1] != 0xff {
-		return errors.New("daze: malformed request")
+		return errors.New("daze: request malformed")
 	}
 	d := time.Now().Unix() - int64(binary.BigEndian.Uint64(buf[2:10]))
 	y := d >> 63
 	if d^y-y > int64(Conf.LifeExpired) {
-		return errors.New("daze: malformed request")
+		return errors.New("daze: request expired")
 	}
 	dstNet = buf[10]
 	dstLen = buf[11]
@@ -211,7 +211,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		err error
 	)
 	if n > 255 {
-		return nil, fmt.Errorf("daze: destination address is too long %s", address)
+		return nil, fmt.Errorf("daze: destination address too long %s", address)
 	}
 	if network != "tcp" && network != "udp" {
 		return nil, fmt.Errorf("daze: network must be tcp or udp")
