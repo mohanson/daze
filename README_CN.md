@@ -50,7 +50,7 @@ Daze 可以在 **Windows**, **Linux** 和 **macOS** 下正常工作. 另外, 它
 
 # 启用用户规则
 
-daze 使用一份名叫 RULE 的文件来管理用户自定义的过滤规则(可选的). RULE 在流量过滤器中拥有最高优先级, 因此你应该小心的使用它. 这是一份合法的 RULE 文件, 并且位于 "./rule.ls". 使用 `daze client -r ./rule.ls` 来应用它.
+Daze 使用一份名叫 RULE 的文件来管理用户自定义的过滤规则(可选的). RULE 在流量过滤器中拥有最高优先级, 因此你应该小心的使用它. 这是一份合法的 RULE 文件, 并且位于 "./rule.ls". 使用 `daze client -r ./rule.ls` 来应用它.
 
 ```
 L a.com
