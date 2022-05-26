@@ -50,7 +50,7 @@ Daze can work well on **Windows**, **Linux** and **macOS**. In additional, it ca
 
 # Use custom rules
 
-Daze use a RULE file to custom your own rules(optional). RULE has the highest priority in filters, so that you should carefully maintain it. This is a RULE document located at "./rule.ls", use `daze client -r ./rule.ls` to apply it.
+Daze use a RULE file to custom your own rules(optional). RULE has the highest priority in routers, so that you should carefully maintain it. This is a RULE document located at "./rule.ls", use `daze client -r ./rule.ls` to apply it.
 
 ```
 L a.com
@@ -63,6 +63,10 @@ B c.com
 - B(anned) means block it, often used to block ads
 
 Glob is supported, such as `R *.google.com`.
+
+# Use CIDRs
+
+Daze also use a CIDR(Classless Inter-Domain Routing) file to routing addresses. CIDR file has lower priority than RULE files, located at "./rule.cidr". When a IP address is in the CIDR file, daze will use the local network to establish the connection instead of using a proxy.
 
 # More
 
