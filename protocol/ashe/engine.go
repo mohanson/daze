@@ -96,7 +96,7 @@ type Server struct {
 	Cipher [16]byte
 }
 
-// Serve.
+// Serve. Parameter raw will be closed automatically when the function exits.
 func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	var (
 		buf    = make([]byte, 256)
@@ -151,7 +151,6 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	case 0x03:
 		cli = &UDPConn{cli}
 	}
-	defer srv.Close()
 	daze.Link(cli, srv)
 	return nil
 }
@@ -200,12 +199,9 @@ type Client struct {
 	Cipher [16]byte
 }
 
-// Dial. It is similar to the server, the only difference is that it constructs the data and the server parses the
-// data. This code I refer to the golang socks5 official library. That is a good code which is opened with expectation,
-// and closed with delight and profit.
-func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.ReadWriteCloser, error) {
+// Deal with ashe protocol. It is the caller's responsibility to close the srv.
+func (c *Client) Deal(ctx *daze.Context, srv io.ReadWriteCloser, network string, address string) (io.ReadWriteCloser, error) {
 	var (
-		srv io.ReadWriteCloser
 		n   = len(address)
 		buf = make([]byte, 128)
 		err error
@@ -215,10 +211,6 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	}
 	if network != "tcp" && network != "udp" {
 		return nil, fmt.Errorf("daze: network must be tcp or udp")
-	}
-	srv, err = daze.Conf.Dialer.Dial("tcp", c.Server)
-	if err != nil {
-		return nil, err
 	}
 	rand.Read(buf[:128])
 	srv.Write(buf[:128])
@@ -251,7 +243,20 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	case "udp":
 		return &UDPConn{srv}, nil
 	}
-	return nil, nil
+	panic("unreachable")
+}
+
+// Dial connects to the address on the named network.
+func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.ReadWriteCloser, error) {
+	srv, err := daze.Conf.Dialer.Dial("tcp", c.Server)
+	if err != nil {
+		return nil, err
+	}
+	ret, err := c.Deal(ctx, srv, network, address)
+	if err != nil {
+		srv.Close()
+	}
+	return ret, err
 }
 
 // NewClient returns a new Client. A secret data needs to be passed in Cipher, as a sign to interface with the Server.
