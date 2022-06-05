@@ -12,6 +12,7 @@ import (
 	"github.com/godump/doa"
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/protocol/ashe"
+	"github.com/mohanson/daze/protocol/baboon"
 )
 
 var Conf = struct {
@@ -61,15 +62,28 @@ func main() {
 			flListen = flag.String("l", "0.0.0.0:1081", "listen address")
 			flCipher = flag.String("k", "daze", "password, should be same as client")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
+			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon}")
+			flExtend = flag.String("e", "", "extend data for different protocols")
 		)
 		flag.Parse()
 		log.Println("server cipher is", *flCipher)
+		log.Println("protocol is used", *flProtoc)
 		if *flDnserv != "" {
 			daze.Conf.Dialer.Resolver = daze.Resolver(*flDnserv)
 			log.Println("domain server is", *flDnserv)
 		}
-		server := ashe.NewServer(*flListen, *flCipher)
-		doa.Nil(server.Run())
+		switch *flProtoc {
+		case "ashe":
+			server := ashe.NewServer(*flListen, *flCipher)
+			doa.Nil(server.Run())
+		case "baboon":
+			server := baboon.NewServer(*flListen, *flCipher)
+			if *flExtend != "" {
+				server.Masker = *flExtend
+			}
+			doa.Nil(server.Run())
+		}
+		panic("unreachable")
 	case "client":
 		var (
 			flListen = flag.String("l", "127.0.0.1:1080", "listen address")
@@ -79,15 +93,25 @@ func main() {
 			flRulels = flag.String("r", filepath.Join(resExec, Conf.PathRule), "rule path")
 			flCIDRls = flag.String("c", filepath.Join(resExec, Conf.PathCIDR), "cidr path")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
+			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon}")
 		)
 		flag.Parse()
 		log.Println("remote server is", *flServer)
 		log.Println("client cipher is", *flCipher)
+		log.Println("protocol is used", *flProtoc)
 		if *flDnserv != "" {
 			daze.Conf.Dialer.Resolver = daze.Resolver(*flDnserv)
 			log.Println("domain server is", *flDnserv)
 		}
-		client := ashe.NewClient(*flServer, *flCipher)
+		client := func() daze.Dialer {
+			switch *flProtoc {
+			case "ashe":
+				return ashe.NewClient(*flServer, *flCipher)
+			case "baboon":
+				return baboon.NewClient(*flServer, *flCipher)
+			}
+			panic("unreachable")
+		}()
 		router := func() daze.Router {
 			if *flFilter == "locale" {
 				routerRight := daze.NewRouterRight(daze.RoadLocale)
