@@ -177,7 +177,7 @@ func (s *Server) Run() error {
 	for {
 		cli, err := ln.Accept()
 		if err != nil {
-			continue
+			return err
 		}
 		go func(cli net.Conn) {
 			defer cli.Close()
