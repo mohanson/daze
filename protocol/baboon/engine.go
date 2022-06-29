@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -30,6 +31,7 @@ var Conf = struct {
 type Server struct {
 	Listen string
 	Cipher [16]byte
+	Closer io.Closer
 	Masker string
 	ID     uint32
 }
@@ -118,10 +120,24 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Close listener.
+func (s *Server) Close() error {
+	if s.Closer != nil {
+		return s.Closer.Close()
+	}
+	return nil
+}
+
 // Run.
 func (s *Server) Run() error {
 	log.Println("listen and serve on", s.Listen)
-	return http.ListenAndServe(s.Listen, s)
+	srv := &http.Server{Addr: s.Listen, Handler: s}
+	s.Closer = srv
+	err := srv.ListenAndServe()
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+	return err
 }
 
 // NewServer returns a new Server. A secret data needs to be passed in Cipher, as a sign to interface with the Client.

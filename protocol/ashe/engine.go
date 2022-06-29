@@ -94,6 +94,7 @@ func (c *UDPConn) Write(p []byte) (int, error) {
 type Server struct {
 	Listen string
 	Cipher [16]byte
+	Closer io.Closer
 }
 
 // Serve. Parameter raw will be closed automatically when the function exits.
@@ -155,20 +156,31 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	return nil
 }
 
+// Close listener.
+func (s *Server) Close() error {
+	if s.Closer != nil {
+		return s.Closer.Close()
+	}
+	return nil
+}
+
 // Run.
 func (s *Server) Run() error {
 	ln, err := net.Listen("tcp", s.Listen)
 	if err != nil {
 		return err
 	}
-	defer ln.Close()
+	s.Closer = ln
 	log.Println("listen and serve on", s.Listen)
 
 	i := uint32(math.MaxUint32)
 	for {
 		cli, err := ln.Accept()
 		if err != nil {
-			continue
+			if !errors.Is(err, net.ErrClosed) {
+				log.Println(err)
+			}
+			break
 		}
 		go func(cli net.Conn) {
 			defer cli.Close()
@@ -183,6 +195,7 @@ func (s *Server) Run() error {
 			log.Println(cid, "closed")
 		}(cli)
 	}
+	return nil
 }
 
 // NewServer returns a new Server. A secret data needs to be passed in Cipher, as a sign to interface with the Client.

@@ -2,13 +2,14 @@ package ashe
 
 import (
 	"bytes"
+	"errors"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"testing"
 	"time"
 
+	"github.com/godump/doa"
 	"github.com/mohanson/daze"
 )
 
@@ -19,64 +20,79 @@ const (
 )
 
 func TestProtocolAsheTCP(t *testing.T) {
-	log.SetOutput(ioutil.Discard)
+	defer time.Sleep(time.Second)
 
-	echoListener, _ := net.Listen("tcp", EchoServerListenOn)
+	echoListener := doa.Try(net.Listen("tcp", EchoServerListenOn))
 	defer echoListener.Close()
 	go func() {
-		c, _ := echoListener.Accept()
-		io.Copy(c, c)
-		c.Close()
+		for {
+			c, err := echoListener.Accept()
+			if err != nil {
+				if !errors.Is(err, net.ErrClosed) {
+					log.Println(err)
+				}
+				break
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				io.Copy(c, c)
+			}(c)
+		}
 	}()
 
 	dazeServer := NewServer(DazeServerListenOn, Password)
+	defer dazeServer.Close()
 	go dazeServer.Run()
 
 	time.Sleep(time.Second)
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
 	ctx := &daze.Context{Cid: "00000000"}
-	c, _ := dazeClient.Dial(ctx, "tcp", EchoServerListenOn)
-	defer c.Close()
+	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
+	defer cli.Close()
 
 	buf0 := []byte("Hello World!")
-	c.Write(buf0)
+	cli.Write(buf0)
 	buf1 := make([]byte, 12)
-	io.ReadFull(c, buf1)
+	io.ReadFull(cli, buf1)
 	if !bytes.Equal(buf0, buf1) {
 		t.FailNow()
 	}
 }
 
 func TestProtocolAsheUDP(t *testing.T) {
-	log.SetOutput(ioutil.Discard)
+	defer time.Sleep(time.Second)
 
-	echoAddr, _ := net.ResolveUDPAddr("udp", EchoServerListenOn)
-	echoServer, _ := net.ListenUDP("udp", echoAddr)
+	echoAddr := doa.Try(net.ResolveUDPAddr("udp", EchoServerListenOn))
+	echoServer := doa.Try(net.ListenUDP("udp", echoAddr))
 	defer echoServer.Close()
-
 	go func() {
+		b := make([]byte, 1024)
 		for {
-			b := make([]byte, 12)
-			n, addr, _ := echoServer.ReadFromUDP(b)
-			echoServer.WriteToUDP(b[:n], addr)
+			n, addr, err := echoServer.ReadFromUDP(b)
+			if err != nil {
+				break
+			}
+			m := doa.Try(echoServer.WriteToUDP(b[:n], addr))
+			doa.Doa(n == m)
 		}
 	}()
 
 	dazeServer := NewServer(DazeServerListenOn, Password)
+	defer dazeServer.Close()
 	go dazeServer.Run()
 
 	time.Sleep(time.Second)
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
 	ctx := &daze.Context{Cid: "00000000"}
-	c, _ := dazeClient.Dial(ctx, "udp", EchoServerListenOn)
-	defer c.Close()
+	cli := doa.Try(dazeClient.Dial(ctx, "udp", EchoServerListenOn))
+	defer cli.Close()
 
 	buf0 := []byte("Hello World!")
-	c.Write(buf0)
+	cli.Write(buf0)
 	buf1 := make([]byte, 12)
-	io.ReadFull(c, buf1)
+	io.ReadFull(cli, buf1)
 	if !bytes.Equal(buf0, buf1) {
 		t.FailNow()
 	}

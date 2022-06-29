@@ -75,6 +75,7 @@ func main() {
 		switch *flProtoc {
 		case "ashe":
 			server := ashe.NewServer(*flListen, *flCipher)
+			defer server.Close()
 			doa.Nil(server.Run())
 		case "baboon":
 			server := baboon.NewServer(*flListen, *flCipher)
@@ -158,6 +159,7 @@ func main() {
 			Router: router,
 		}
 		locale := daze.NewLocale(*flListen, aimbot)
+		defer locale.Close()
 		doa.Nil(locale.Run())
 	case "gen":
 		flag.Usage = func() {
