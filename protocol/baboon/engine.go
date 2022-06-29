@@ -2,7 +2,6 @@ package baboon
 
 import (
 	"crypto/md5"
-	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -168,7 +167,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	if err != nil {
 		return nil, err
 	}
-	rand.Read(buf[:16])
+	daze.Conf.Random.Read(buf[:16])
 	copy(buf[16:], c.Cipher[:])
 	sign := md5.Sum(buf)
 	copy(buf[16:], sign[:])

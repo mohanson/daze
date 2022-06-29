@@ -2,7 +2,6 @@ package ashe
 
 import (
 	"crypto/md5"
-	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -225,7 +224,7 @@ func (c *Client) Deal(ctx *daze.Context, srv io.ReadWriteCloser, network string,
 	if network != "tcp" && network != "udp" {
 		return nil, fmt.Errorf("daze: network must be tcp or udp")
 	}
-	rand.Read(buf[:128])
+	daze.Conf.Random.Read(buf[:128])
 	srv.Write(buf[:128])
 	srv = daze.Gravity(srv, append(buf[:128], c.Cipher[:]...))
 	buf[0x00] = 0xff
