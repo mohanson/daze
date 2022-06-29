@@ -79,7 +79,6 @@ func main() {
 			doa.Nil(server.Run())
 		case "baboon":
 			server := baboon.NewServer(*flListen, *flCipher)
-			defer server.Close()
 			if *flExtend != "" {
 				server.Masker = *flExtend
 			}
