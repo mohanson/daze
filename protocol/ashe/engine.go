@@ -211,8 +211,8 @@ type Client struct {
 	Cipher [16]byte
 }
 
-// Deal with ashe protocol. It is the caller's responsibility to close the srv.
-func (c *Client) Deal(ctx *daze.Context, srv io.ReadWriteCloser, network string, address string) (io.ReadWriteCloser, error) {
+// Dial with ashe protocol. It is the caller's responsibility to close the srv.
+func (c *Client) DialDaze(ctx *daze.Context, srv io.ReadWriteCloser, network string, address string) (io.ReadWriteCloser, error) {
 	var (
 		n   = len(address)
 		buf = make([]byte, 128)
@@ -264,7 +264,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	if err != nil {
 		return nil, err
 	}
-	ret, err := c.Deal(ctx, srv, network, address)
+	ret, err := c.DialDaze(ctx, srv, network, address)
 	if err != nil {
 		srv.Close()
 	}
