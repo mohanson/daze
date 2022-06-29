@@ -75,6 +75,7 @@ func main() {
 		switch *flProtoc {
 		case "ashe":
 			server := ashe.NewServer(*flListen, *flCipher)
+			defer server.Close()
 			doa.Nil(server.Run())
 		case "baboon":
 			server := baboon.NewServer(*flListen, *flCipher)

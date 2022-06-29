@@ -2,13 +2,13 @@ package ashe
 
 import (
 	"bytes"
+	"errors"
 	"io"
-	"io/ioutil"
-	"log"
 	"net"
 	"testing"
 	"time"
 
+	"github.com/godump/doa"
 	"github.com/mohanson/daze"
 )
 
@@ -19,17 +19,26 @@ const (
 )
 
 func TestProtocolAsheTCP(t *testing.T) {
-	log.SetOutput(ioutil.Discard)
-
-	echoListener, _ := net.Listen("tcp", EchoServerListenOn)
+	echoListener := doa.Try(net.Listen("tcp", EchoServerListenOn))
 	defer echoListener.Close()
 	go func() {
-		c, _ := echoListener.Accept()
-		io.Copy(c, c)
-		c.Close()
+		for {
+			c, err := echoListener.Accept()
+			if err != nil {
+				if errors.Is(err, net.ErrClosed) {
+					break
+				}
+				continue
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				io.Copy(c, c)
+			}(c)
+		}
 	}()
 
 	dazeServer := NewServer(DazeServerListenOn, Password)
+	defer dazeServer.Close()
 	go dazeServer.Run()
 
 	time.Sleep(time.Second)
@@ -49,8 +58,6 @@ func TestProtocolAsheTCP(t *testing.T) {
 }
 
 func TestProtocolAsheUDP(t *testing.T) {
-	log.SetOutput(ioutil.Discard)
-
 	echoAddr, _ := net.ResolveUDPAddr("udp", EchoServerListenOn)
 	echoServer, _ := net.ListenUDP("udp", echoAddr)
 	defer echoServer.Close()
@@ -64,6 +71,7 @@ func TestProtocolAsheUDP(t *testing.T) {
 	}()
 
 	dazeServer := NewServer(DazeServerListenOn, Password)
+	defer dazeServer.Close()
 	go dazeServer.Run()
 
 	time.Sleep(time.Second)
