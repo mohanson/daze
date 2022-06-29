@@ -2,7 +2,9 @@ package ashe
 
 import (
 	"bytes"
+	"errors"
 	"io"
+	"log"
 	"net"
 	"testing"
 	"time"
@@ -26,6 +28,9 @@ func TestProtocolAsheTCP(t *testing.T) {
 		for {
 			c, err := echoListener.Accept()
 			if err != nil {
+				if !errors.Is(err, net.ErrClosed) {
+					log.Println(err)
+				}
 				break
 			}
 			go func(c net.Conn) {

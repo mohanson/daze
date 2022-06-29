@@ -8,6 +8,7 @@ import (
 	"crypto/rc4"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -520,6 +521,9 @@ func (l *Locale) Run() error {
 	for {
 		c, err := s.Accept()
 		if err != nil {
+			if !errors.Is(err, net.ErrClosed) {
+				log.Println(err)
+			}
 			break
 		}
 		go func(c net.Conn) {

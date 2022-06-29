@@ -177,6 +177,9 @@ func (s *Server) Run() error {
 	for {
 		cli, err := ln.Accept()
 		if err != nil {
+			if !errors.Is(err, net.ErrClosed) {
+				log.Println(err)
+			}
 			break
 		}
 		go func(cli net.Conn) {
