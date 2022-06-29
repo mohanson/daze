@@ -79,6 +79,7 @@ func main() {
 			doa.Nil(server.Run())
 		case "baboon":
 			server := baboon.NewServer(*flListen, *flCipher)
+			defer server.Close()
 			if *flExtend != "" {
 				server.Masker = *flExtend
 			}
@@ -159,6 +160,7 @@ func main() {
 			Router: router,
 		}
 		locale := daze.NewLocale(*flListen, aimbot)
+		defer locale.Close()
 		doa.Nil(locale.Run())
 	case "gen":
 		flag.Usage = func() {

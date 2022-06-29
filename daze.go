@@ -8,6 +8,7 @@ import (
 	"crypto/rc4"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -113,6 +114,7 @@ func (d *Direct) Dial(ctx *Context, network string, address string) (io.ReadWrit
 type Locale struct {
 	Listen string
 	Dialer Dialer
+	Closer io.Closer
 }
 
 // Serve traffic in HTTP Proxy/Tunnel format.
@@ -498,19 +500,30 @@ func (l *Locale) Serve(ctx *Context, app io.ReadWriteCloser) error {
 	return l.ServeProxy(ctx, app)
 }
 
+// Close listener.
+func (l *Locale) Close() error {
+	if l.Closer != nil {
+		return l.Closer.Close()
+	}
+	return nil
+}
+
 // Run.
 func (l *Locale) Run() error {
 	s, err := net.Listen("tcp", l.Listen)
 	if err != nil {
 		return err
 	}
-	defer s.Close()
+	l.Closer = s
 	log.Println("listen and serve on", l.Listen)
 
 	i := uint32(math.MaxUint32)
 	for {
 		c, err := s.Accept()
 		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				break
+			}
 			log.Println(err)
 			continue
 		}
@@ -527,6 +540,7 @@ func (l *Locale) Run() error {
 			log.Println(cid, "closed")
 		}(c)
 	}
+	return nil
 }
 
 // NewLocale returns a Locale.
