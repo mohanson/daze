@@ -18,6 +18,8 @@ const (
 )
 
 func TestProtocolAsheTCP(t *testing.T) {
+	defer time.Sleep(time.Second)
+
 	echoListener := doa.Try(net.Listen("tcp", EchoServerListenOn))
 	defer echoListener.Close()
 	go func() {
@@ -54,6 +56,8 @@ func TestProtocolAsheTCP(t *testing.T) {
 }
 
 func TestProtocolAsheUDP(t *testing.T) {
+	defer time.Sleep(time.Second)
+
 	echoAddr := doa.Try(net.ResolveUDPAddr("udp", EchoServerListenOn))
 	echoServer := doa.Try(net.ListenUDP("udp", echoAddr))
 	defer echoServer.Close()

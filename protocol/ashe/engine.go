@@ -177,7 +177,11 @@ func (s *Server) Run() error {
 	for {
 		cli, err := ln.Accept()
 		if err != nil {
-			return err
+			if errors.Is(err, net.ErrClosed) {
+				break
+			}
+			log.Println(err)
+			continue
 		}
 		go func(cli net.Conn) {
 			defer cli.Close()
@@ -192,6 +196,7 @@ func (s *Server) Run() error {
 			log.Println(cid, "closed")
 		}(cli)
 	}
+	return nil
 }
 
 // NewServer returns a new Server. A secret data needs to be passed in Cipher, as a sign to interface with the Client.
