@@ -68,7 +68,8 @@ func TestProtocolAsheUDP(t *testing.T) {
 			if err != nil {
 				break
 			}
-			echoServer.WriteToUDP(b[:n], addr)
+			m := doa.Try(echoServer.WriteToUDP(b[:n], addr))
+			doa.Doa(n == m)
 		}
 	}()
 
