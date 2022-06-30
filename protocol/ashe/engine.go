@@ -100,7 +100,7 @@ type Server struct {
 // Serve. Parameter raw will be closed automatically when the function exits.
 func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	var (
-		buf    = make([]byte, 256)
+		buf    = *daze.Conf.BufferPool.Get().(*[]byte)
 		cli    io.ReadWriteCloser
 		dst    string
 		dstLen uint8
@@ -133,6 +133,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		return err
 	}
 	dst = string(buf[:dstLen])
+	daze.Conf.BufferPool.Put(&buf)
 	switch dstNet {
 	case 0x01:
 		log.Printf("%s   dial network=tcp address=%s", ctx.Cid, dst)
@@ -184,9 +185,10 @@ func (s *Server) Run() error {
 		}
 		go func(cli net.Conn) {
 			defer cli.Close()
-			buf := make([]byte, 4)
+			buf := *daze.Conf.BufferPool.Get().(*[]byte)
 			binary.BigEndian.PutUint32(buf, atomic.AddUint32(&i, 1))
-			cid := hex.EncodeToString(buf)
+			cid := hex.EncodeToString(buf[:4])
+			daze.Conf.BufferPool.Put(&buf)
 			ctx := &daze.Context{Cid: cid}
 			log.Printf("%s accept remote=%s", cid, cli.RemoteAddr())
 			if err := s.Serve(ctx, cli); err != nil {
@@ -216,7 +218,7 @@ type Client struct {
 func (c *Client) DialDaze(ctx *daze.Context, srv io.ReadWriteCloser, network string, address string) (io.ReadWriteCloser, error) {
 	var (
 		n   = len(address)
-		buf = make([]byte, 128)
+		buf = *daze.Conf.BufferPool.Get().(*[]byte)
 		err error
 	)
 	if n > 255 {
@@ -250,6 +252,7 @@ func (c *Client) DialDaze(ctx *daze.Context, srv io.ReadWriteCloser, network str
 	if buf[0] != 0 {
 		return nil, errors.New("daze: general server failure")
 	}
+	daze.Conf.BufferPool.Put(&buf)
 	switch network {
 	case "tcp":
 		return &TCPConn{srv}, nil
