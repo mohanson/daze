@@ -15,6 +15,7 @@ import (
 	"log"
 	"math"
 	"math/bits"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -46,12 +47,14 @@ import (
 // Conf is acting as package level configuration.
 var Conf = struct {
 	Dialer      net.Dialer
+	Random      *rand.Rand
 	RouterCache int
 }{
 	Dialer: net.Dialer{
 		Resolver: net.DefaultResolver,
 		Timeout:  time.Second * 8,
 	},
+	Random:      rand.New(rand.NewSource(time.Now().Unix())),
 	RouterCache: 64,
 }
 

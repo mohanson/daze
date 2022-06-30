@@ -2,7 +2,6 @@ package ashe
 
 import (
 	"crypto/md5"
-	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -212,8 +211,8 @@ type Client struct {
 	Cipher [16]byte
 }
 
-// Deal with ashe protocol. It is the caller's responsibility to close the srv.
-func (c *Client) Deal(ctx *daze.Context, srv io.ReadWriteCloser, network string, address string) (io.ReadWriteCloser, error) {
+// Dial with ashe protocol. It is the caller's responsibility to close the srv.
+func (c *Client) DialDaze(ctx *daze.Context, srv io.ReadWriteCloser, network string, address string) (io.ReadWriteCloser, error) {
 	var (
 		n   = len(address)
 		buf = make([]byte, 128)
@@ -225,7 +224,7 @@ func (c *Client) Deal(ctx *daze.Context, srv io.ReadWriteCloser, network string,
 	if network != "tcp" && network != "udp" {
 		return nil, fmt.Errorf("daze: network must be tcp or udp")
 	}
-	rand.Read(buf[:128])
+	daze.Conf.Random.Read(buf[:128])
 	srv.Write(buf[:128])
 	srv = daze.Gravity(srv, append(buf[:128], c.Cipher[:]...))
 	buf[0x00] = 0xff
@@ -265,7 +264,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	if err != nil {
 		return nil, err
 	}
-	ret, err := c.Deal(ctx, srv, network, address)
+	ret, err := c.DialDaze(ctx, srv, network, address)
 	if err != nil {
 		srv.Close()
 	}
