@@ -79,9 +79,10 @@ func (c *UDPConn) Write(p []byte) (int, error) {
 	// But every packet lives in an Ethernet frame. Ethernet frames can only contain 1500 bytes of data. This is called
 	// the "maximum transmission unit" or "MTU".
 	doa.Doa(len(p) <= math.MaxUint16)
-	b := make([]byte, 2)
+	b := *daze.Conf.BufferPool.Get().(*[]byte)
 	binary.BigEndian.PutUint16(b, uint16(len(p)))
-	_, err := c.ReadWriteCloser.Write(b)
+	_, err := c.ReadWriteCloser.Write(b[:2])
+	daze.Conf.BufferPool.Put(&b)
 	if err != nil {
 		return 0, err
 	}
