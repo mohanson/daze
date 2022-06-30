@@ -533,7 +533,7 @@ func (l *Locale) Run() error {
 			defer c.Close()
 			buf := make([]byte, 4)
 			binary.BigEndian.PutUint32(buf, atomic.AddUint32(&i, 1))
-			cid := hex.EncodeToString(buf)
+			cid := hex.EncodeToString(buf[:4])
 			ctx := &Context{Cid: cid}
 			log.Printf("%s accept remote=%s", cid, c.RemoteAddr())
 			if err := l.Serve(ctx, c); err != nil {

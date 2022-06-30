@@ -185,7 +185,7 @@ func (s *Server) Run() error {
 			defer cli.Close()
 			buf := make([]byte, 4)
 			binary.BigEndian.PutUint32(buf, atomic.AddUint32(&i, 1))
-			cid := hex.EncodeToString(buf)
+			cid := hex.EncodeToString(buf[:4])
 			ctx := &daze.Context{Cid: cid}
 			log.Printf("%s accept remote=%s", cid, cli.RemoteAddr())
 			if err := s.Serve(ctx, cli); err != nil {

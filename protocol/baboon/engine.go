@@ -78,7 +78,7 @@ func (s *Server) ServeDaze(w http.ResponseWriter, r *http.Request) {
 	}
 	buf := make([]byte, 4)
 	binary.BigEndian.PutUint32(buf, atomic.AddUint32(&s.ID, 1))
-	cid := hex.EncodeToString(buf)
+	cid := hex.EncodeToString(buf[:4])
 	ctx := &daze.Context{Cid: cid}
 	log.Printf("%s accept remote=%s", cid, cc.RemoteAddr())
 	if err := srv.Serve(ctx, app); err != nil {
@@ -168,11 +168,11 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		return nil, err
 	}
 	daze.Conf.Random.Read(buf[:16])
-	copy(buf[16:], c.Cipher[:])
-	sign := md5.Sum(buf)
-	copy(buf[16:], sign[:])
+	copy(buf[16:32], c.Cipher[:])
+	sign := md5.Sum(buf[:32])
+	copy(buf[16:32], sign[:])
 	req = doa.Try(http.NewRequest("POST", "http://"+c.Server+"/sync", http.NoBody))
-	req.Header.Set("Authorization", hex.EncodeToString(buf))
+	req.Header.Set("Authorization", hex.EncodeToString(buf[:32]))
 	req.Write(srv)
 	io.CopyN(io.Discard, srv, 147)
 	cli := &ashe.Client{
