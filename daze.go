@@ -452,11 +452,12 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 		cpl[dst] = srv
 		go func(srv io.ReadWriteCloser, appHead []byte, appAddr *net.UDPAddr) error {
 			var (
-				buf = make([]byte, 2048)
+				buf = *Conf.BufferPool.Get().(*[]byte)
 				l   = len(appHead)
 				n   int
 				err error
 			)
+			defer Conf.BufferPool.Put(&buf)
 			copy(buf, appHead)
 			for {
 				n, err = srv.Read(buf[l:])
