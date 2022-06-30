@@ -46,10 +46,17 @@ import (
 
 // Conf is acting as package level configuration.
 var Conf = struct {
+	BufferPool  *sync.Pool
 	Dialer      net.Dialer
 	Random      *rand.Rand
 	RouterCache int
 }{
+	BufferPool: &sync.Pool{
+		New: func() any {
+			p := make([]byte, 64*1024)
+			return &p
+		},
+	},
 	Dialer: net.Dialer{
 		Resolver: net.DefaultResolver,
 		Timeout:  time.Second * 8,
@@ -79,11 +86,15 @@ func Resolver(addr string) *net.Resolver {
 // Link copies from src to dst and dst to src until either EOF is reached.
 func Link(a, b io.ReadWriteCloser) {
 	go func() {
-		io.Copy(b, a)
+		p := *Conf.BufferPool.Get().(*[]byte)
+		defer Conf.BufferPool.Put(&p)
+		io.CopyBuffer(b, a, p)
 		a.Close()
 		b.Close()
 	}()
-	io.Copy(a, b)
+	p := *Conf.BufferPool.Get().(*[]byte)
+	defer Conf.BufferPool.Put(&p)
+	io.CopyBuffer(a, b, p)
 	b.Close()
 	a.Close()
 }
