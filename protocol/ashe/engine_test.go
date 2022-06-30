@@ -67,7 +67,8 @@ func TestProtocolAsheUDP(t *testing.T) {
 	echoServer := doa.Try(net.ListenUDP("udp", echoAddr))
 	defer echoServer.Close()
 	go func() {
-		b := make([]byte, 1024)
+		b := *daze.Conf.BufferPool.Get().(*[]byte)
+		defer daze.Conf.BufferPool.Put(&b)
 		for {
 			n, addr, err := echoServer.ReadFromUDP(b)
 			if err != nil {
