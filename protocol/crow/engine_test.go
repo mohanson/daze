@@ -1,11 +1,9 @@
 package crow
 
 import (
+	"io"
 	"testing"
 	"time"
-
-	"github.com/godump/doa"
-	"github.com/mohanson/daze"
 )
 
 const (
@@ -24,10 +22,17 @@ func TestProtocolAsheTCP(t *testing.T) {
 	time.Sleep(time.Second)
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
-	ctx := &daze.Context{Cid: "00000000"}
-	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
-	defer cli.Close()
+	dazeClient.Conn.Write([]byte{0x01, 0x08, 0x00})
+	buf := make([]byte, 2048)
+	n, _ := io.ReadFull(dazeClient.Conn, buf)
+	if n != 2048 {
+		t.FailNow()
+	}
 
-	buf0 := []byte("Hello World!")
-	cli.Write(buf0)
+	// ctx := &daze.Context{Cid: "00000000"}
+	// cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
+	// defer cli.Close()
+
+	// buf0 := []byte("Hello World!")
+	// cli.Write(buf0)
 }

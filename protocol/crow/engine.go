@@ -10,7 +10,6 @@ import (
 	"log"
 	"math"
 	"net"
-	"os"
 	"sync/atomic"
 
 	"github.com/mohanson/daze"
@@ -73,8 +72,9 @@ type Server struct {
 // Serve. Parameter raw will be closed automatically when the function exits.
 func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	var (
-		buf = make([]byte, 256)
+		buf = make([]byte, 128)
 		cli io.ReadWriteCloser
+		len uint16
 		err error
 	)
 	_, err = io.ReadFull(raw, buf[:128])
@@ -83,7 +83,21 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	}
 	cli = daze.Gravity(raw, append(buf[:128], s.Cipher[:]...))
 
-	io.Copy(os.Stdout, cli)
+	for {
+		_, err = cli.Read(buf[:1])
+		if err != nil {
+			break
+		}
+		switch buf[0] {
+		case 1:
+			cli.Read(buf[:2])
+			len = binary.BigEndian.Uint16(buf[:2])
+			io.CopyN(cli, daze.Conf.Random, int64(len))
+		case 2:
+		case 3:
+		case 4:
+		}
+	}
 	return nil
 }
 
@@ -141,6 +155,7 @@ func NewServer(listen string, cipher string) *Server {
 type Client struct {
 	Server string
 	Cipher [16]byte
+	Conn   io.ReadWriteCloser
 }
 
 // Deal with crow protocol. It is the caller's responsibility to close the srv.
@@ -176,8 +191,17 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 
 // NewClient returns a new Client. A secret data needs to be passed in Cipher, as a sign to interface with the Server.
 func NewClient(server, cipher string) *Client {
-	return &Client{
+	c := &Client{
 		Server: server,
 		Cipher: md5.Sum([]byte(cipher)),
 	}
+	buf := make([]byte, 128)
+	srv, err := daze.Conf.Dialer.Dial("tcp", c.Server)
+	if err != nil {
+		return nil
+	}
+	daze.Conf.Random.Read(buf[:128])
+	srv.Write(buf[:128])
+	c.Conn = daze.Gravity(srv, append(buf[:128], c.Cipher[:]...))
+	return c
 }
