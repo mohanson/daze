@@ -23,8 +23,12 @@ func TestProtocolAsheTCP(t *testing.T) {
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
 	dazeClient.Conn.Write([]byte{0x01, 0x08, 0x00})
-	buf := make([]byte, 2048)
-	n, _ := io.ReadFull(dazeClient.Conn, buf)
+	buf := make([]byte, 4096)
+	io.ReadFull(dazeClient.Conn, buf[:3])
+	if buf[0] != 0x00 || buf[1] != 0x08 || buf[2] != 0x00 {
+		t.FailNow()
+	}
+	n, _ := io.ReadFull(dazeClient.Conn, buf[:2048])
 	if n != 2048 {
 		t.FailNow()
 	}

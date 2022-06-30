@@ -92,6 +92,8 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		case 1:
 			cli.Read(buf[:2])
 			len = binary.BigEndian.Uint16(buf[:2])
+			cli.Write([]byte{0x00})
+			cli.Write(buf[:2])
 			io.CopyN(cli, daze.Conf.Random, int64(len))
 		case 2:
 		case 3:
