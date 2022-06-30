@@ -76,9 +76,10 @@ func (s *Server) ServeDaze(w http.ResponseWriter, r *http.Request) {
 		Listen: s.Listen,
 		Cipher: s.Cipher,
 	}
-	buf := make([]byte, 4)
+	buf := *daze.Conf.BufferPool.Get().(*[]byte)
 	binary.BigEndian.PutUint32(buf, atomic.AddUint32(&s.ID, 1))
-	cid := hex.EncodeToString(buf)
+	cid := hex.EncodeToString(buf[:4])
+	daze.Conf.BufferPool.Put(&buf)
 	ctx := &daze.Context{Cid: cid}
 	log.Printf("%s accept remote=%s", cid, cc.RemoteAddr())
 	if err := srv.Serve(ctx, app); err != nil {
@@ -159,7 +160,7 @@ type Client struct {
 func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.ReadWriteCloser, error) {
 	var (
 		srv io.ReadWriteCloser
-		buf = make([]byte, 32)
+		buf = *daze.Conf.BufferPool.Get().(*[]byte)
 		req *http.Request
 		err error
 	)
@@ -168,11 +169,12 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		return nil, err
 	}
 	daze.Conf.Random.Read(buf[:16])
-	copy(buf[16:], c.Cipher[:])
-	sign := md5.Sum(buf)
-	copy(buf[16:], sign[:])
+	copy(buf[16:32], c.Cipher[:])
+	sign := md5.Sum(buf[:32])
+	copy(buf[16:32], sign[:])
 	req = doa.Try(http.NewRequest("POST", "http://"+c.Server+"/sync", http.NoBody))
-	req.Header.Set("Authorization", hex.EncodeToString(buf))
+	req.Header.Set("Authorization", hex.EncodeToString(buf[:32]))
+	daze.Conf.BufferPool.Put(&buf)
 	req.Write(srv)
 	io.CopyN(io.Discard, srv, 147)
 	cli := &ashe.Client{
