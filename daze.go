@@ -542,9 +542,10 @@ func (l *Locale) Run() error {
 		}
 		go func(c net.Conn) {
 			defer c.Close()
-			buf := make([]byte, 4)
+			buf := *Conf.BufferPool.Get().(*[]byte)
 			binary.BigEndian.PutUint32(buf, atomic.AddUint32(&i, 1))
-			cid := hex.EncodeToString(buf)
+			cid := hex.EncodeToString(buf[:4])
+			Conf.BufferPool.Put(&buf)
 			ctx := &Context{Cid: cid}
 			log.Printf("%s accept remote=%s", cid, c.RemoteAddr())
 			if err := l.Serve(ctx, c); err != nil {
