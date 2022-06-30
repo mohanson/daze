@@ -16,6 +16,53 @@ import (
 	"github.com/mohanson/daze"
 )
 
+// The crow protocol is a proxy protocol built on TCP multiplexing technology. It eliminates some common characteristics
+// of proxy software, such as frequent connection establishment and disconnection when browsing websites. It makes it
+// more difficult to be detected by firewalls.
+//
+// When the client is initialized, it needs to establish and maintain a connection with the server. After that, the
+// client and server communicate through the following commands.
+//
+// The server and client can request each other to send random data of a specified size and simply discarded.
+// The purpose of this command is to shape traffic to avoid being identified.
+//
+// +-----+-----+    +-----+-----+-----+
+// |  1  | Len |    | Rsv | Len | Msg |
+// +-----+-----+    +-----+-----+-----+
+// |  1  |  2  |    |  1  |  2  |  N  |
+// +-----+-----+    +-----+-----+-----+
+//
+// Both server and client can push data to each other. The ID in command can be obtained in next command.
+//
+// +-----+-----+-----+-----+
+// |  2  | ID  | Len | Msg |
+// +-----+-----+-----+-----+
+// |  1  |  2  |  2  |  N  |
+// +-----+-----+-----+-----+
+//
+// Client wishes to establish a connection. The client needs to transmit two network and destination address. The server
+// will typically evaluate the request based on network and destination addresses, and return one reply messages, as
+// appropriate for the request type.
+//
+// +-----+-----+-----+-----+    +-----+-----+
+// |  3  | Net | Len | Dst |    | Rep | ID  |
+// +-----+-----+-----+-----+    +-----+-----+
+// |  1  |  1  |  2  |  N  |    |  1  |  2  |
+// +-----+-----+-----+-----+    +-----+-----+
+//
+// Net: 0x01 TCP
+//      0x02 UDP
+// Rep: 0x00 succeeded
+//      0x01 general failure
+//
+// Close the specified connection.
+//
+// +-----+-----+
+// |  4  | ID  |
+// +-----+-----+
+// |  1  |  2  |
+// +-----+-----+
+
 // Server implemented the crow protocol.
 type Server struct {
 	Listen string
