@@ -12,6 +12,7 @@ import (
 	"net"
 	"sync/atomic"
 
+	"github.com/godump/doa"
 	"github.com/mohanson/daze"
 )
 
@@ -46,11 +47,11 @@ import (
 // +-----+-----+-----+-----+    +-----+-----+
 // |  3  | Net | Len | Dst |    | Rep | ID  |
 // +-----+-----+-----+-----+    +-----+-----+
-// |  1  |  1  |  2  |  N  |    |  1  |  2  |
+// |  1  |  1  |  1  |  N  |    |  1  |  2  |
 // +-----+-----+-----+-----+    +-----+-----+
 //
 // Net: 0x01 TCP
-//      0x02 UDP
+//      0x03 UDP
 // Rep: 0x00 succeeded
 //      0x01 general failure
 //
@@ -72,10 +73,11 @@ type Server struct {
 // Serve. Parameter raw will be closed automatically when the function exits.
 func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	var (
-		buf = make([]byte, 128)
+		buf = make([]byte, 2048)
 		cli io.ReadWriteCloser
 		len uint16
 		err error
+		lot [256]net.Conn = [256]net.Conn{}
 	)
 	_, err = io.ReadFull(raw, buf[:128])
 	if err != nil {
@@ -96,8 +98,36 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			cli.Write(buf[:2])
 			io.CopyN(cli, daze.Conf.Random, int64(len))
 		case 2:
+			cli.Read(buf[:2])
+			cli.Read(buf[:2])
+			len = binary.BigEndian.Uint16(buf[:2])
+			io.ReadFull(cli, buf[:len])
+			log.Println("recv", len)
+			lot[0].Write(buf[:len])
 		case 3:
+			cli.Read(buf[:1])
+			cli.Read(buf[:2])
+			len = binary.BigEndian.Uint16(buf[:2])
+			io.ReadFull(cli, buf[:len])
+			dst := string(buf[:len])
+			log.Println("dial", dst)
+			c := doa.Try(daze.Conf.Dialer.Dial("tcp", dst))
+			lot[0] = c
+			cli.Write([]byte{0x00, 0x00, 0x00})
+			go func() {
+				for {
+					buf := make([]byte, 2048)
+					n, err := c.Read(buf)
+					if err != nil {
+						break
+					}
+					lot[0].Write(buf[:n])
+				}
+			}()
 		case 4:
+			id, _ := cli.Read(buf[:2])
+			log.Println("close", id)
+			lot[0].Close()
 		}
 	}
 	return nil
@@ -180,15 +210,13 @@ func (c *Client) DialDaze(ctx *daze.Context, srv io.ReadWriteCloser, network str
 
 // Dial connects to the address on the named network.
 func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.ReadWriteCloser, error) {
-	srv, err := daze.Conf.Dialer.Dial("tcp", c.Server)
-	if err != nil {
-		return nil, err
-	}
-	ret, err := c.DialDaze(ctx, srv, network, address)
-	if err != nil {
-		srv.Close()
-	}
-	return ret, err
+	// c.Conn.Write([]byte{0x03, 0x01, uint8(len(address))})
+	// c.Conn.Write([]byte(address))
+	// buf := make([]byte, 128)
+	// io.ReadFull(c.Conn, buf[:3])
+	// rep := buf[0]
+	// id := binary.BigEndian.Uint16(buf[1:3])
+	return nil, nil
 }
 
 // NewClient returns a new Client. A secret data needs to be passed in Cipher, as a sign to interface with the Server.
