@@ -46,16 +46,10 @@ import (
 
 // Conf is acting as package level configuration.
 var Conf = struct {
-	BufferPool  *sync.Pool
 	Dialer      net.Dialer
 	Random      *rand.Rand
 	RouterCache int
 }{
-	BufferPool: &sync.Pool{
-		New: func() any {
-			return make([]byte, 64*1024)
-		},
-	},
 	Dialer: net.Dialer{
 		Resolver: net.DefaultResolver,
 		Timeout:  time.Second * 8,
