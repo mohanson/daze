@@ -2,7 +2,6 @@ package baboon
 
 import (
 	"crypto/md5"
-	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -32,7 +31,7 @@ type Server struct {
 	Cipher [16]byte
 	Closer io.Closer
 	Masker string
-	ID     uint32
+	NextID uint32
 }
 
 // ServeMask forward the request to a fake website. From the outside, the daze server looks like a normal website.
@@ -76,15 +75,12 @@ func (s *Server) ServeDaze(w http.ResponseWriter, r *http.Request) {
 		Listen: s.Listen,
 		Cipher: s.Cipher,
 	}
-	buf := make([]byte, 4)
-	binary.BigEndian.PutUint32(buf, atomic.AddUint32(&s.ID, 1))
-	cid := hex.EncodeToString(buf[:4])
-	ctx := &daze.Context{Cid: cid}
-	log.Printf("%s accept remote=%s", cid, cc.RemoteAddr())
+	ctx := &daze.Context{Cid: daze.Hu32(atomic.AddUint32(&s.NextID, 1))}
+	log.Printf("%s accept remote=%s", ctx.Cid, cc.RemoteAddr())
 	if err := srv.Serve(ctx, app); err != nil {
-		log.Println(cid, " error", err)
+		log.Println(ctx.Cid, " error", err)
 	}
-	log.Println(cid, "closed")
+	log.Println(ctx.Cid, "closed")
 }
 
 // Route check the type of a HTTP request.
@@ -145,7 +141,7 @@ func NewServer(listen string, cipher string) *Server {
 		Listen: listen,
 		Cipher: md5.Sum([]byte(cipher)),
 		Masker: Conf.Masker,
-		ID:     uint32(math.MaxUint32),
+		NextID: uint32(math.MaxUint32),
 	}
 }
 

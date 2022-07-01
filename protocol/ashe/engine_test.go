@@ -67,7 +67,7 @@ func TestProtocolAsheUDP(t *testing.T) {
 	echoServer := doa.Try(net.ListenUDP("udp", echoAddr))
 	defer echoServer.Close()
 	go func() {
-		b := make([]byte, 1024)
+		b := make([]byte, 2048)
 		for {
 			n, addr, err := echoServer.ReadFromUDP(b)
 			if err != nil {

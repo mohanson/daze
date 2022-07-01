@@ -3,14 +3,12 @@ package ashe
 import (
 	"crypto/md5"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"math"
 	"net"
-	"sync/atomic"
 	"time"
 
 	"github.com/godump/doa"
@@ -81,7 +79,7 @@ func (c *UDPConn) Write(p []byte) (int, error) {
 	doa.Doa(len(p) <= math.MaxUint16)
 	b := make([]byte, 2)
 	binary.BigEndian.PutUint16(b, uint16(len(p)))
-	_, err := c.ReadWriteCloser.Write(b)
+	_, err := c.ReadWriteCloser.Write(b[:2])
 	if err != nil {
 		return 0, err
 	}
@@ -172,7 +170,7 @@ func (s *Server) Run() error {
 	s.Closer = ln
 	log.Println("listen and serve on", s.Listen)
 
-	i := uint32(math.MaxUint32)
+	idx := uint32(math.MaxUint32)
 	for {
 		cli, err := ln.Accept()
 		if err != nil {
@@ -181,17 +179,15 @@ func (s *Server) Run() error {
 			}
 			break
 		}
+		idx += 1
+		ctx := &daze.Context{Cid: daze.Hu32(idx)}
+		log.Printf("%s accept remote=%s", ctx.Cid, cli.RemoteAddr())
 		go func(cli net.Conn) {
 			defer cli.Close()
-			buf := make([]byte, 4)
-			binary.BigEndian.PutUint32(buf, atomic.AddUint32(&i, 1))
-			cid := hex.EncodeToString(buf[:4])
-			ctx := &daze.Context{Cid: cid}
-			log.Printf("%s accept remote=%s", cid, cli.RemoteAddr())
 			if err := s.Serve(ctx, cli); err != nil {
-				log.Println(cid, " error", err)
+				log.Println(ctx.Cid, " error", err)
 			}
-			log.Println(cid, "closed")
+			log.Println(ctx.Cid, "closed")
 		}(cli)
 	}
 	return nil

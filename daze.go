@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/godump/doa"
@@ -86,6 +85,13 @@ func Link(a, b io.ReadWriteCloser) {
 	io.Copy(a, b)
 	b.Close()
 	a.Close()
+}
+
+// Encode uint32 to hex string.
+func Hu32(u uint32) string {
+	p := make([]byte, 4)
+	binary.BigEndian.PutUint32(p, u)
+	return hex.EncodeToString(p[:4])
 }
 
 // ReadWriteCloser is the interface that groups the basic Read, Write and Close methods.
@@ -520,27 +526,25 @@ func (l *Locale) Run() error {
 	l.Closer = s
 	log.Println("listen and serve on", l.Listen)
 
-	i := uint32(math.MaxUint32)
+	idx := uint32(math.MaxUint32)
 	for {
-		c, err := s.Accept()
+		cli, err := s.Accept()
 		if err != nil {
 			if !errors.Is(err, net.ErrClosed) {
 				log.Println(err)
 			}
 			break
 		}
-		go func(c net.Conn) {
-			defer c.Close()
-			buf := make([]byte, 4)
-			binary.BigEndian.PutUint32(buf, atomic.AddUint32(&i, 1))
-			cid := hex.EncodeToString(buf[:4])
-			ctx := &Context{Cid: cid}
-			log.Printf("%s accept remote=%s", cid, c.RemoteAddr())
-			if err := l.Serve(ctx, c); err != nil {
-				log.Println(cid, " error", err)
+		idx += 1
+		ctx := &Context{Cid: Hu32(idx)}
+		log.Printf("%s accept remote=%s", ctx.Cid, cli.RemoteAddr())
+		go func(ctx *Context, cli net.Conn) {
+			defer cli.Close()
+			if err := l.Serve(ctx, cli); err != nil {
+				log.Println(ctx.Cid, " error", err)
 			}
-			log.Println(cid, "closed")
-		}(c)
+			log.Println(ctx.Cid, "closed")
+		}(ctx, cli)
 	}
 	return nil
 }
