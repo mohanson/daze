@@ -56,9 +56,20 @@ type TCPConn struct {
 	io.ReadWriteCloser
 }
 
+// NewTCPConn returns a new TCPConn.
+func NewTCPConn(c io.ReadWriteCloser) *TCPConn {
+	return &TCPConn{c}
+}
+
 // UDPConn is an implementation of the Conn interface for UDP network connections.
 type UDPConn struct {
 	io.ReadWriteCloser
+	b []byte
+}
+
+// NewUDPConn returns a new UDPConn.
+func NewUDPConn(c io.ReadWriteCloser) *UDPConn {
+	return &UDPConn{ReadWriteCloser: c, b: make([]byte, 2)}
 }
 
 // Read implements the Conn Read method.
@@ -77,9 +88,8 @@ func (c *UDPConn) Write(p []byte) (int, error) {
 	// But every packet lives in an Ethernet frame. Ethernet frames can only contain 1500 bytes of data. This is called
 	// the "maximum transmission unit" or "MTU".
 	doa.Doa(len(p) <= math.MaxUint16)
-	b := make([]byte, 2)
-	binary.BigEndian.PutUint16(b, uint16(len(p)))
-	_, err := c.ReadWriteCloser.Write(b[:2])
+	binary.BigEndian.PutUint16(c.b, uint16(len(p)))
+	_, err := c.ReadWriteCloser.Write(c.b[:2])
 	if err != nil {
 		return 0, err
 	}
@@ -145,9 +155,9 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	cli.Write([]byte{0})
 	switch dstNet {
 	case 0x01:
-		cli = &TCPConn{cli}
+		cli = NewTCPConn(cli)
 	case 0x03:
-		cli = &UDPConn{cli}
+		cli = NewUDPConn(cli)
 	}
 	daze.Link(cli, srv)
 	return nil
@@ -247,9 +257,9 @@ func (c *Client) DialDaze(ctx *daze.Context, srv io.ReadWriteCloser, network str
 	}
 	switch network {
 	case "tcp":
-		return &TCPConn{srv}, nil
+		return NewTCPConn(srv), nil
 	case "udp":
-		return &UDPConn{srv}, nil
+		return NewUDPConn(srv), nil
 	}
 	panic("unreachable")
 }
