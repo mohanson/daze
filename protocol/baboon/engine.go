@@ -155,7 +155,7 @@ type Client struct {
 func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.ReadWriteCloser, error) {
 	var (
 		srv io.ReadWriteCloser
-		buf = make([]byte, 32)
+		buf = make([]byte, 256)
 		req *http.Request
 		err error
 	)
@@ -170,7 +170,8 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	req = doa.Try(http.NewRequest("POST", "http://"+c.Server+"/sync", http.NoBody))
 	req.Header.Set("Authorization", hex.EncodeToString(buf[:32]))
 	req.Write(srv)
-	io.CopyN(io.Discard, srv, 147)
+	// Discard responded header
+	io.ReadFull(srv, buf[:147])
 	cli := &ashe.Client{
 		Server: c.Server,
 		Cipher: c.Cipher,
