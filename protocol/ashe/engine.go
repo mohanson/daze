@@ -99,9 +99,9 @@ func (c *UDPConn) Write(p []byte) (int, error) {
 // Server implemented the ashe protocol. The ASHE server will typically evaluate the request based on source and
 // destination addresses, and return one or more reply messages, as appropriate for the request type.
 type Server struct {
-	Listen   string
-	Listener io.Closer
-	Cipher   [16]byte
+	Listen string
+	Cipher [16]byte
+	Closer io.Closer
 }
 
 // Serve. Parameter raw will be closed automatically when the function exits.
@@ -165,8 +165,8 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 
 // Close listener.
 func (s *Server) Close() error {
-	if s.Listener != nil {
-		return s.Listener.Close()
+	if s.Closer != nil {
+		return s.Closer.Close()
 	}
 	return nil
 }
@@ -177,7 +177,7 @@ func (s *Server) Run() error {
 	if err != nil {
 		return err
 	}
-	s.Listener = ln
+	s.Closer = ln
 	log.Println("listen and serve on", s.Listen)
 
 	go func() {
