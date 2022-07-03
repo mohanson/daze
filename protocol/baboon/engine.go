@@ -22,7 +22,7 @@ import (
 var Conf = struct {
 	Masker string
 }{
-	Masker: "https://www.baidu.com",
+	Masker: "http://www.baidu.com",
 }
 
 // Server implemented the baboon protocol.
