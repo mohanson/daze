@@ -94,6 +94,11 @@ func Hu32(u uint32) string {
 	return hex.EncodeToString(p[:4])
 }
 
+// Hang prevent program from exiting.
+func Hang() {
+	select {}
+}
+
 // ReadWriteCloser is the interface that groups the basic Read, Write and Close methods.
 type ReadWriteCloser struct {
 	io.Reader
@@ -526,26 +531,29 @@ func (l *Locale) Run() error {
 	l.Closer = s
 	log.Println("listen and serve on", l.Listen)
 
-	idx := uint32(math.MaxUint32)
-	for {
-		cli, err := s.Accept()
-		if err != nil {
-			if !errors.Is(err, net.ErrClosed) {
-				log.Println(err)
+	go func() {
+		idx := uint32(math.MaxUint32)
+		for {
+			cli, err := s.Accept()
+			if err != nil {
+				if !errors.Is(err, net.ErrClosed) {
+					log.Println(err)
+				}
+				break
 			}
-			break
+			idx += 1
+			ctx := &Context{Cid: Hu32(idx)}
+			log.Printf("%s accept remote=%s", ctx.Cid, cli.RemoteAddr())
+			go func(ctx *Context, cli net.Conn) {
+				defer cli.Close()
+				if err := l.Serve(ctx, cli); err != nil {
+					log.Println(ctx.Cid, " error", err)
+				}
+				log.Println(ctx.Cid, "closed")
+			}(ctx, cli)
 		}
-		idx += 1
-		ctx := &Context{Cid: Hu32(idx)}
-		log.Printf("%s accept remote=%s", ctx.Cid, cli.RemoteAddr())
-		go func(ctx *Context, cli net.Conn) {
-			defer cli.Close()
-			if err := l.Serve(ctx, cli); err != nil {
-				log.Println(ctx.Cid, " error", err)
-			}
-			log.Println(ctx.Cid, "closed")
-		}(ctx, cli)
-	}
+	}()
+
 	return nil
 }
 

@@ -84,7 +84,7 @@ func main() {
 			}
 			doa.Nil(server.Run())
 		}
-		panic("unreachable")
+		daze.Hang()
 	case "client":
 		var (
 			flListen = flag.String("l", "127.0.0.1:1080", "listen address")
@@ -161,6 +161,7 @@ func main() {
 		locale := daze.NewLocale(*flListen, aimbot)
 		defer locale.Close()
 		doa.Nil(locale.Run())
+		daze.Hang()
 	case "gen":
 		flag.Usage = func() {
 			fmt.Fprint(flag.CommandLine.Output(), HelpGen)

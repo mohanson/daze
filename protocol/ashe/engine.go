@@ -99,9 +99,9 @@ func (c *UDPConn) Write(p []byte) (int, error) {
 // Server implemented the ashe protocol. The ASHE server will typically evaluate the request based on source and
 // destination addresses, and return one or more reply messages, as appropriate for the request type.
 type Server struct {
-	Listen string
-	Cipher [16]byte
-	Closer io.Closer
+	Listen   string
+	Listener io.Closer
+	Cipher   [16]byte
 }
 
 // Serve. Parameter raw will be closed automatically when the function exits.
@@ -165,8 +165,8 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 
 // Close listener.
 func (s *Server) Close() error {
-	if s.Closer != nil {
-		return s.Closer.Close()
+	if s.Listener != nil {
+		return s.Listener.Close()
 	}
 	return nil
 }
@@ -177,29 +177,32 @@ func (s *Server) Run() error {
 	if err != nil {
 		return err
 	}
-	s.Closer = ln
+	s.Listener = ln
 	log.Println("listen and serve on", s.Listen)
 
-	idx := uint32(math.MaxUint32)
-	for {
-		cli, err := ln.Accept()
-		if err != nil {
-			if !errors.Is(err, net.ErrClosed) {
-				log.Println(err)
+	go func() {
+		idx := uint32(math.MaxUint32)
+		for {
+			cli, err := ln.Accept()
+			if err != nil {
+				if !errors.Is(err, net.ErrClosed) {
+					log.Println(err)
+				}
+				break
 			}
-			break
+			idx += 1
+			ctx := &daze.Context{Cid: daze.Hu32(idx)}
+			log.Printf("%s accept remote=%s", ctx.Cid, cli.RemoteAddr())
+			go func(cli net.Conn) {
+				defer cli.Close()
+				if err := s.Serve(ctx, cli); err != nil {
+					log.Println(ctx.Cid, " error", err)
+				}
+				log.Println(ctx.Cid, "closed")
+			}(cli)
 		}
-		idx += 1
-		ctx := &daze.Context{Cid: daze.Hu32(idx)}
-		log.Printf("%s accept remote=%s", ctx.Cid, cli.RemoteAddr())
-		go func(cli net.Conn) {
-			defer cli.Close()
-			if err := s.Serve(ctx, cli); err != nil {
-				log.Println(ctx.Cid, " error", err)
-			}
-			log.Println(ctx.Cid, "closed")
-		}(cli)
-	}
+	}()
+
 	return nil
 }
 

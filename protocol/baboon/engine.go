@@ -3,11 +3,11 @@ package baboon
 import (
 	"crypto/md5"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"log"
 	"math"
+	"net"
 	"net/http"
 	"sync/atomic"
 	"time"
@@ -27,11 +27,11 @@ var Conf = struct {
 
 // Server implemented the baboon protocol.
 type Server struct {
-	Listen string
-	Cipher [16]byte
-	Closer io.Closer
-	Masker string
-	NextID uint32
+	Listen   string
+	Listener io.Closer
+	Cipher   [16]byte
+	Masker   string
+	NextID   uint32
 }
 
 // ServeMask forward the request to a fake website. From the outside, the daze server looks like a normal website.
@@ -117,22 +117,23 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // Close listener.
 func (s *Server) Close() error {
-	if s.Closer != nil {
-		return s.Closer.Close()
+	if s.Listener != nil {
+		return s.Listener.Close()
 	}
 	return nil
 }
 
 // Run.
 func (s *Server) Run() error {
-	log.Println("listen and serve on", s.Listen)
-	srv := &http.Server{Addr: s.Listen, Handler: s}
-	s.Closer = srv
-	err := srv.ListenAndServe()
-	if errors.Is(err, http.ErrServerClosed) {
-		return nil
+	ln, err := net.Listen("tcp", s.Listen)
+	if err != nil {
+		return err
 	}
-	return err
+	s.Listener = ln
+	log.Println("listen and serve on", s.Listen)
+	srv := &http.Server{Handler: s}
+	go srv.Serve(ln)
+	return nil
 }
 
 // NewServer returns a new Server. A secret data needs to be passed in Cipher, as a sign to interface with the Client.

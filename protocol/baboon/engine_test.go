@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"testing"
-	"time"
 
 	"github.com/godump/doa"
 	"github.com/mohanson/daze"
@@ -21,8 +20,6 @@ const (
 )
 
 func TestProtocolBaboonTCP(t *testing.T) {
-	defer time.Sleep(time.Second)
-
 	echoListener := doa.Try(net.Listen("tcp", EchoServerListenOn))
 	defer echoListener.Close()
 	go func() {
@@ -43,9 +40,7 @@ func TestProtocolBaboonTCP(t *testing.T) {
 
 	dazeServer := NewServer(DazeServerListenOn, Password)
 	defer dazeServer.Close()
-	go dazeServer.Run()
-
-	time.Sleep(time.Second)
+	dazeServer.Run()
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
 	ctx := &daze.Context{Cid: "00000000"}
@@ -62,8 +57,6 @@ func TestProtocolBaboonTCP(t *testing.T) {
 }
 
 func TestProtocolBaboonUDP(t *testing.T) {
-	defer time.Sleep(time.Second)
-
 	echoAddr := doa.Try(net.ResolveUDPAddr("udp", EchoServerListenOn))
 	echoServer := doa.Try(net.ListenUDP("udp", echoAddr))
 	defer echoServer.Close()
@@ -81,9 +74,7 @@ func TestProtocolBaboonUDP(t *testing.T) {
 
 	dazeServer := NewServer(DazeServerListenOn, Password)
 	defer dazeServer.Close()
-	go dazeServer.Run()
-
-	time.Sleep(time.Second)
+	dazeServer.Run()
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
 	ctx := &daze.Context{Cid: "00000000"}
@@ -102,9 +93,7 @@ func TestProtocolBaboonUDP(t *testing.T) {
 func TestProtocolBaboonMasker(t *testing.T) {
 	dazeServer := NewServer(DazeServerListenOn, Password)
 	defer dazeServer.Close()
-	go dazeServer.Run()
-
-	time.Sleep(time.Second)
+	dazeServer.Run()
 
 	resp := doa.Try(http.Get("http://" + DazeServerListenOn))
 	body := doa.Try(io.ReadAll(resp.Body))
