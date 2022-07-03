@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"os/exec"
 	"testing"
-	"time"
 
 	"github.com/godump/doa"
 )
@@ -17,9 +16,7 @@ const (
 func TestLocaleHTTP(t *testing.T) {
 	locale := NewLocale(DazeServerListenOn, &Direct{})
 	defer locale.Close()
-	go locale.Run()
-
-	time.Sleep(time.Second)
+	locale.Run()
 
 	cmd := exec.Command("curl", "-x", "http://"+DazeServerListenOn, CurlDest)
 	out := doa.Try(cmd.Output())
@@ -31,9 +28,7 @@ func TestLocaleHTTP(t *testing.T) {
 func TestLocaleSocks4(t *testing.T) {
 	locale := NewLocale(DazeServerListenOn, &Direct{})
 	defer locale.Close()
-	go locale.Run()
-
-	time.Sleep(time.Second)
+	locale.Run()
 
 	cmd := exec.Command("curl", "-x", "socks4://"+DazeServerListenOn, CurlDest)
 	out := doa.Try(cmd.Output())
@@ -45,9 +40,7 @@ func TestLocaleSocks4(t *testing.T) {
 func TestLocaleSocks4a(t *testing.T) {
 	locale := NewLocale(DazeServerListenOn, &Direct{})
 	defer locale.Close()
-	go locale.Run()
-
-	time.Sleep(time.Second)
+	locale.Run()
 
 	cmd := exec.Command("curl", "-x", "socks4a://"+DazeServerListenOn, CurlDest)
 	out := doa.Try(cmd.Output())
@@ -59,9 +52,7 @@ func TestLocaleSocks4a(t *testing.T) {
 func TestLocaleSocks5(t *testing.T) {
 	locale := NewLocale(DazeServerListenOn, &Direct{})
 	defer locale.Close()
-	go locale.Run()
-
-	time.Sleep(time.Second)
+	locale.Run()
 
 	cmd := exec.Command("curl", "-x", "socks5://"+DazeServerListenOn, CurlDest)
 	out := doa.Try(cmd.Output())

@@ -180,26 +180,29 @@ func (s *Server) Run() error {
 	s.Closer = ln
 	log.Println("listen and serve on", s.Listen)
 
-	idx := uint32(math.MaxUint32)
-	for {
-		cli, err := ln.Accept()
-		if err != nil {
-			if !errors.Is(err, net.ErrClosed) {
-				log.Println(err)
+	go func() {
+		idx := uint32(math.MaxUint32)
+		for {
+			cli, err := ln.Accept()
+			if err != nil {
+				if !errors.Is(err, net.ErrClosed) {
+					log.Println(err)
+				}
+				break
 			}
-			break
+			idx += 1
+			ctx := &daze.Context{Cid: daze.Hu32(idx)}
+			log.Printf("%s accept remote=%s", ctx.Cid, cli.RemoteAddr())
+			go func(cli net.Conn) {
+				defer cli.Close()
+				if err := s.Serve(ctx, cli); err != nil {
+					log.Println(ctx.Cid, " error", err)
+				}
+				log.Println(ctx.Cid, "closed")
+			}(cli)
 		}
-		idx += 1
-		ctx := &daze.Context{Cid: daze.Hu32(idx)}
-		log.Printf("%s accept remote=%s", ctx.Cid, cli.RemoteAddr())
-		go func(cli net.Conn) {
-			defer cli.Close()
-			if err := s.Serve(ctx, cli); err != nil {
-				log.Println(ctx.Cid, " error", err)
-			}
-			log.Println(ctx.Cid, "closed")
-		}(cli)
-	}
+	}()
+
 	return nil
 }
 
