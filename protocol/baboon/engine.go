@@ -27,11 +27,11 @@ var Conf = struct {
 
 // Server implemented the baboon protocol.
 type Server struct {
-	Listen   string
-	Listener io.Closer
-	Cipher   [16]byte
-	Masker   string
-	NextID   uint32
+	Listen string
+	Cipher [16]byte
+	Closer io.Closer
+	Masker string
+	NextID uint32
 }
 
 // ServeMask forward the request to a fake website. From the outside, the daze server looks like a normal website.
@@ -117,8 +117,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // Close listener.
 func (s *Server) Close() error {
-	if s.Listener != nil {
-		return s.Listener.Close()
+	if s.Closer != nil {
+		return s.Closer.Close()
 	}
 	return nil
 }
@@ -129,9 +129,9 @@ func (s *Server) Run() error {
 	if err != nil {
 		return err
 	}
-	s.Listener = ln
 	log.Println("listen and serve on", s.Listen)
 	srv := &http.Server{Handler: s}
+	s.Closer = srv
 	go srv.Serve(ln)
 	return nil
 }
