@@ -117,7 +117,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		headerIdx    uint16
 		headerLen    uint16
 		ok           bool
-		srv          net.Conn
+		srv          io.ReadWriteCloser
 		sio          *SioConn
 	)
 	for {
@@ -157,10 +157,13 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			case 0x01:
 				log.Printf("%s   dial network=tcp address=%s", ctx.Cid, dst)
 				srv, err = daze.Conf.Dialer.Dial("tcp", dst)
+				srv = ashe.NewTCPConn(srv)
 				sio = NewSioConn(srv)
 			case 0x03:
 				log.Printf("%s   dial network=udp address=%s", ctx.Cid, dst)
-				panic("unreachable")
+				srv, err = daze.Conf.Dialer.Dial("udp", dst)
+				srv = ashe.NewUDPConn(srv)
+				sio = NewSioConn(srv)
 			}
 			buf[0] = 3
 			if err != nil {
@@ -170,7 +173,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			}
 			cli.Write(buf[:8])
 			harbor[headerIdx] = sio
-			go func(headerIdx uint16, reader net.Conn) {
+			go func(headerIdx uint16, reader io.Reader) {
 				buf := make([]byte, 2048)
 				for {
 					n, err := reader.Read(buf[8:])
