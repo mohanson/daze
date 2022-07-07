@@ -394,7 +394,12 @@ func (c *Client) Run() {
 				copy(fub, buf)
 				c.Harbor[headerIdx].Reader <- fub
 			case 4:
-				// idx := binary.BigEndian.Uint16(buf[1:3])
+				headerIdx = binary.BigEndian.Uint16(buf[1:3])
+				mio, ok = c.Harbor[headerIdx]
+				if ok {
+					mio.Closed = 1
+					mio.Close()
+				}
 			}
 		}
 	}()
