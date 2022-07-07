@@ -81,6 +81,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		buf          = make([]byte, 2048)
 		dst          string
 		harbor       = map[uint16]net.Conn{}
+		harborCloser = map[uint16]int{}
 		headerCmd    uint8
 		headerDstLen uint8
 		headerDstNet uint8
@@ -109,7 +110,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		case 2:
 			headerIdx = binary.BigEndian.Uint16(buf[1:3])
 			headerLen = binary.BigEndian.Uint16(buf[3:5])
-			_, err = io.ReadFull(cli, buf[:headerLen])
+			_, err = io.ReadFull(cli, buf[8:8+headerLen])
 			if err != nil {
 				break
 			}
@@ -117,17 +118,17 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			srv, ok = harbor[headerIdx]
 			mutex2.Unlock()
 			if ok {
-				srv.Write(buf[:headerLen])
+				srv.Write(buf[8 : 8+headerLen])
 			}
 		case 3:
 			headerIdx = binary.BigEndian.Uint16(buf[1:3])
 			headerDstNet = buf[3]
 			headerDstLen = buf[4]
-			_, err = io.ReadFull(cli, buf[:headerDstLen])
+			_, err = io.ReadFull(cli, buf[8:8+headerDstLen])
 			if err != nil {
 				break
 			}
-			dst = string(buf[:headerDstLen])
+			dst = string(buf[8 : 8+headerDstLen])
 			switch headerDstNet {
 			case 0x01:
 				log.Printf("%s   dial network=tcp address=%s", ctx.Cid, dst)
@@ -137,7 +138,6 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 				panic("unreachable")
 			}
 			buf[0] = 3
-			binary.BigEndian.PutUint16(buf[1:3], headerIdx)
 			if err != nil {
 				buf[3] = 1
 			} else {
@@ -148,6 +148,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			mutex1.Unlock()
 			mutex2.Lock()
 			harbor[headerIdx] = srv
+			harborCloser[headerIdx] = 0
 			mutex2.Unlock()
 			go func(headerIdx uint16, reader net.Conn) {
 				buf := make([]byte, 2048)
@@ -165,25 +166,33 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 						break
 					}
 				}
+				mutex2.Lock()
+				if harborCloser[headerIdx] == 1 {
+					mutex2.Unlock()
+					return
+				}
+				delete(harbor, headerIdx)
+				mutex2.Unlock()
 				buf[0] = 4
 				binary.BigEndian.PutUint16(buf[1:3], headerIdx)
 				mutex1.Lock()
 				cli.Write(buf[:8])
 				mutex1.Unlock()
+				log.Println(ctx.Cid, "closed")
 			}(headerIdx, srv)
 		case 4:
 			headerIdx = binary.BigEndian.Uint16(buf[1:3])
+			mutex2.Lock()
 			srv, ok = harbor[headerIdx]
 			if ok {
+				harborCloser[headerIdx] = 1
 				srv.Close()
-				mutex2.Lock()
-				delete(harbor, headerIdx)
-				mutex2.Unlock()
 			}
-			log.Println(ctx.Cid, "closed")
+			mutex2.Unlock()
 		}
 	}
 
+	doa.Doa(len(harbor) == len(harborCloser))
 	for _, e := range harbor {
 		e.Close()
 	}
