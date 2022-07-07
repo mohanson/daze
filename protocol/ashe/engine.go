@@ -104,6 +104,36 @@ type Server struct {
 	Closer io.Closer
 }
 
+// ServeCipher create encrypted channel.
+func (s *Server) ServeCipher(ctx *daze.Context, raw io.ReadWriteCloser) (io.ReadWriteCloser, error) {
+	var (
+		buf     = make([]byte, 144)
+		cli     io.ReadWriteCloser
+		err     error
+		gap     int64
+		gapSign int64
+	)
+	_, err = io.ReadFull(raw, buf[:128])
+	if err != nil {
+		return nil, err
+	}
+	copy(buf[128:144], s.Cipher[:])
+	cli = daze.Gravity(raw, buf[:144])
+	_, err = io.ReadFull(cli, buf[:10])
+	if err != nil {
+		return nil, err
+	}
+	if buf[0] != 0xff || buf[1] != 0xff {
+		return nil, errors.New("daze: request malformed")
+	}
+	gap = time.Now().Unix() - int64(binary.BigEndian.Uint64(buf[2:10]))
+	gapSign = gap >> 63
+	if gap^gapSign-gapSign > int64(Conf.LifeExpired) {
+		return nil, errors.New("daze: request expired")
+	}
+	return cli, nil
+}
+
 // Serve. Parameter raw will be closed automatically when the function exits.
 func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	var (
@@ -115,26 +145,16 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		srv    io.ReadWriteCloser
 		err    error
 	)
-	_, err = io.ReadFull(raw, buf[:128])
+	cli, err = s.ServeCipher(ctx, raw)
 	if err != nil {
 		return err
 	}
-	cli = daze.Gravity(raw, append(buf[:128], s.Cipher[:]...))
-
-	_, err = io.ReadFull(cli, buf[:12])
+	_, err = io.ReadFull(cli, buf[:2])
 	if err != nil {
 		return err
 	}
-	if buf[0] != 0xff || buf[1] != 0xff {
-		return errors.New("daze: request malformed")
-	}
-	d := time.Now().Unix() - int64(binary.BigEndian.Uint64(buf[2:10]))
-	y := d >> 63
-	if d^y-y > int64(Conf.LifeExpired) {
-		return errors.New("daze: request expired")
-	}
-	dstNet = buf[10]
-	dstLen = buf[11]
+	dstNet = buf[0]
+	dstLen = buf[1]
 	_, err = io.ReadFull(cli, buf[:dstLen])
 	if err != nil {
 		return err
@@ -220,11 +240,35 @@ type Client struct {
 	Cipher [16]byte
 }
 
-// Dial with ashe protocol. It is the caller's responsibility to close the srv.
-func (c *Client) DialDaze(ctx *daze.Context, srv io.ReadWriteCloser, network string, address string) (io.ReadWriteCloser, error) {
+// WithCipher create encrypted channel.
+func (c *Client) WithCipher(ctx *daze.Context, raw io.ReadWriteCloser) (io.ReadWriteCloser, error) {
+	var (
+		buf = make([]byte, 144)
+		err error
+		srv io.ReadWriteCloser
+	)
+	daze.Conf.Random.Read(buf[:128])
+	_, err = raw.Write(buf[:128])
+	if err != nil {
+		return nil, err
+	}
+	copy(buf[128:144], c.Cipher[:])
+	srv = daze.Gravity(raw, buf[:144])
+	buf[0x00] = 0xff
+	buf[0x01] = 0xff
+	binary.BigEndian.PutUint64(buf[2:10], uint64(time.Now().Unix()))
+	_, err = srv.Write(buf[:10])
+	if err != nil {
+		return nil, err
+	}
+	return srv, nil
+}
+
+// With an existing connection. It is the caller's responsibility to close the srv.
+func (c *Client) With(ctx *daze.Context, srv io.ReadWriteCloser, network string, address string) (io.ReadWriteCloser, error) {
 	var (
 		n   = len(address)
-		buf = make([]byte, 128)
+		buf = make([]byte, 2)
 		err error
 	)
 	if n > 255 {
@@ -233,20 +277,18 @@ func (c *Client) DialDaze(ctx *daze.Context, srv io.ReadWriteCloser, network str
 	if network != "tcp" && network != "udp" {
 		return nil, fmt.Errorf("daze: network must be tcp or udp")
 	}
-	daze.Conf.Random.Read(buf[:128])
-	srv.Write(buf[:128])
-	srv = daze.Gravity(srv, append(buf[:128], c.Cipher[:]...))
-	buf[0x00] = 0xff
-	buf[0x01] = 0xff
-	binary.BigEndian.PutUint64(buf[2:10], uint64(time.Now().Unix()))
+	srv, err = c.WithCipher(ctx, srv)
+	if err != nil {
+		return nil, err
+	}
 	switch network {
 	case "tcp":
-		buf[0x0a] = 0x01
+		buf[0x00] = 0x01
 	case "udp":
-		buf[0x0a] = 0x03
+		buf[0x00] = 0x03
 	}
-	buf[0x0b] = uint8(n)
-	srv.Write(buf[:12])
+	buf[0x01] = uint8(n)
+	srv.Write(buf[:2])
 	_, err = srv.Write([]byte(address))
 	if err != nil {
 		return nil, err
@@ -273,7 +315,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	if err != nil {
 		return nil, err
 	}
-	ret, err := c.DialDaze(ctx, srv, network, address)
+	ret, err := c.With(ctx, srv, network, address)
 	if err != nil {
 		srv.Close()
 	}
