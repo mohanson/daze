@@ -397,6 +397,7 @@ func (c *Client) Run() {
 				headerIdx = binary.BigEndian.Uint16(buf[1:3])
 				mio, ok = c.Harbor[headerIdx]
 				if ok {
+					close(mio.Reader)
 					mio.Closed = 1
 					mio.Close()
 				}
