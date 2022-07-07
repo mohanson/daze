@@ -126,7 +126,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		if err != nil {
 			break
 		}
-		log.Printf("%s server recv=0x%s", ctx.Cid, hex.EncodeToString(buf[:8]))
+		log.Printf("%s   recv data=0x%s", ctx.Cid, hex.EncodeToString(buf[:8]))
 		headerCmd = buf[0]
 		switch headerCmd {
 		case 1:
@@ -142,7 +142,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 				break
 			}
 			sio, ok = harbor[headerIdx]
-			if ok {
+			if ok && sio.Closed == 0 {
 				sio.Write(buf[8 : 8+headerLen])
 			}
 		case 3:
@@ -185,11 +185,12 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 						break
 					}
 				}
-				if harbor[headerIdx].Closed == 0 {
-					delete(harbor, headerIdx)
+				sio := harbor[headerIdx]
+				if sio.Closed == 0 {
 					buf[0] = 4
 					binary.BigEndian.PutUint16(buf[1:3], headerIdx)
 					cli.Write(buf[:8])
+					sio.Closed = 1
 				}
 				log.Println(ctx.Cid, "closed")
 			}(headerIdx, srv)
@@ -348,7 +349,7 @@ func (c *Client) Run() {
 	c.Writer = make(chan []byte, 1024)
 	go func() {
 		for send := range c.Writer {
-			log.Println("client send:", send)
+			// log.Println("client send:", send)
 			doa.Try(srv.Write(send))
 		}
 	}()
@@ -357,7 +358,7 @@ func (c *Client) Run() {
 		buf := make([]byte, 2048)
 		for {
 			doa.Try(srv.Read(buf[:8]))
-			log.Println("client recv:", buf[:8])
+			// log.Println("client recv:", buf[:8])
 			switch buf[0] {
 			case 1:
 				idx := binary.BigEndian.Uint16(buf[1:3])
