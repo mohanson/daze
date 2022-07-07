@@ -312,19 +312,18 @@ type Client struct {
 func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.ReadWriteCloser, error) {
 	buf := make([]byte, 8+len(address))
 	buf[0] = 3
-	id := <-c.IDPool
-	binary.BigEndian.PutUint16(buf[1:3], id)
+	idx := <-c.IDPool
+	binary.BigEndian.PutUint16(buf[1:3], idx)
 	buf[3] = 1
 	buf[4] = uint8(len(address))
 	copy(buf[8:], []byte(address))
 	c.Lio.Write(buf)
-
 	mio := &MioConn{
 		Father: c,
-		Idx:    id,
+		Idx:    idx,
 		Reader: make(chan []byte),
 	}
-	c.Harbor[id] = mio
+	c.Harbor[idx] = mio
 	ret := <-mio.Reader
 	doa.Doa(ret[0] == 3)
 	doa.Doa(ret[3] == 0)
