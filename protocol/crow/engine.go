@@ -341,10 +341,10 @@ func (c *Client) Run() {
 	srv = doa.Try(daze.Conf.Dialer.Dial("tcp", c.Server))
 	asheClient = &ashe.Client{Cipher: c.Cipher}
 	srv, err = asheClient.WithCipher(ctx, srv)
-	srv = NewLioConn(srv)
 	if err != nil {
 		return
 	}
+	srv = NewLioConn(srv)
 
 	c.Reader = [256]chan []byte{}
 	for i := 0; i < 256; i++ {
