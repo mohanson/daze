@@ -265,20 +265,20 @@ func NewServer(listen string, cipher string) *Server {
 	}
 }
 
-type TCPConn struct {
+type MioConn struct {
 	Father *Client
 	Idx    uint16
 	Reader chan []byte
 }
 
-func (c *TCPConn) Read(p []byte) (int, error) {
+func (c *MioConn) Read(p []byte) (int, error) {
 	data := <-c.Reader
 	doa.Doa(len(data) <= len(p))
 	copy(p, data)
 	return len(data), nil
 }
 
-func (c *TCPConn) Write(p []byte) (int, error) {
+func (c *MioConn) Write(p []byte) (int, error) {
 	doa.Doa(len(p) <= 2040)
 	buf := make([]byte, 8+len(p))
 	buf[0] = 2
@@ -288,7 +288,7 @@ func (c *TCPConn) Write(p []byte) (int, error) {
 	return c.Father.Lio.Write(buf)
 }
 
-func (c *TCPConn) Close() error {
+func (c *MioConn) Close() error {
 	buf := make([]byte, 8)
 	buf[0] = 4
 	binary.BigEndian.PutUint16(buf[1:3], c.Idx)
@@ -322,7 +322,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	doa.Doa(ret[0] == 3)
 	doa.Doa(ret[3] == 0)
 
-	r := &TCPConn{
+	r := &MioConn{
 		Father: c,
 		Idx:    id,
 		Reader: c.Reader[id],
