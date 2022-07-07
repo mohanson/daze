@@ -98,10 +98,11 @@ type Server struct {
 // Serve. Parameter raw will be closed automatically when the function exits.
 func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	var (
-		cli io.ReadWriteCloser
-		err error
+		asheServer *ashe.Server
+		cli        io.ReadWriteCloser
+		err        error
 	)
-	asheServer := ashe.Server{Cipher: s.Cipher}
+	asheServer = &ashe.Server{Cipher: s.Cipher}
 	cli, err = asheServer.ServeCipher(ctx, raw)
 	if err != nil {
 		return err
@@ -331,21 +332,21 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 }
 
 func (c *Client) Run() {
+	var (
+		asheClient *ashe.Client
+		srv        io.ReadWriteCloser
+		err        error
+	)
+	srv = doa.Try(daze.Conf.Dialer.Dial("tcp", c.Server))
+	asheClient = &ashe.Client{Cipher: c.Cipher}
+	srv, err = asheClient.WithCipher(&daze.Context{Cid: "ffffffff"}, srv)
+	if err != nil {
+		return
+	}
+
 	c.Reader = [256]chan []byte{}
 	for i := 0; i < 256; i++ {
 		c.Reader[i] = make(chan []byte, 1024)
-	}
-
-	var (
-		srv io.ReadWriteCloser
-		err error
-	)
-	srv = doa.Try(daze.Conf.Dialer.Dial("tcp", c.Server))
-
-	asheClient := ashe.Client{Cipher: c.Cipher}
-	srv, err = asheClient.WithCipher(&daze.Context{}, srv)
-	if err != nil {
-		return
 	}
 
 	c.Writer = make(chan []byte, 1024)
