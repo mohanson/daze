@@ -264,7 +264,7 @@ func (c *Client) WithCipher(ctx *daze.Context, raw io.ReadWriteCloser) (io.ReadW
 	return srv, nil
 }
 
-// Dial with ashe protocol. It is the caller's responsibility to close the srv.
+// With an existing connection. It is the caller's responsibility to close the srv.
 func (c *Client) With(ctx *daze.Context, srv io.ReadWriteCloser, network string, address string) (io.ReadWriteCloser, error) {
 	var (
 		n   = len(address)
