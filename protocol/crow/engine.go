@@ -334,12 +334,13 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 func (c *Client) Run() {
 	var (
 		asheClient *ashe.Client
-		srv        io.ReadWriteCloser
+		ctx        = &daze.Context{Cid: "ffffffff"}
 		err        error
+		srv        io.ReadWriteCloser
 	)
 	srv = doa.Try(daze.Conf.Dialer.Dial("tcp", c.Server))
 	asheClient = &ashe.Client{Cipher: c.Cipher}
-	srv, err = asheClient.WithCipher(&daze.Context{Cid: "ffffffff"}, srv)
+	srv, err = asheClient.WithCipher(ctx, srv)
 	if err != nil {
 		return
 	}
