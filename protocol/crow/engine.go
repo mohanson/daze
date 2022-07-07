@@ -306,8 +306,6 @@ type Client struct {
 	Harbor map[uint16]*MioConn
 	IDPool chan uint16
 	Lio    io.ReadWriteCloser
-
-	Reader [256]chan []byte
 }
 
 // Dial connects to the address on the named network.
@@ -321,16 +319,16 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	copy(buf[8:], []byte(address))
 	c.Lio.Write(buf)
 
-	ret := <-c.Reader[id]
-	doa.Doa(ret[0] == 3)
-	doa.Doa(ret[3] == 0)
-
-	r := &MioConn{
+	mio := &MioConn{
 		Father: c,
 		Idx:    id,
-		Reader: c.Reader[id],
+		Reader: make(chan []byte),
 	}
-	return r, nil
+	c.Harbor[id] = mio
+	ret := <-mio.Reader
+	doa.Doa(ret[0] == 3)
+	doa.Doa(ret[3] == 0)
+	return mio, nil
 }
 
 func (c *Client) Run() {
@@ -348,11 +346,6 @@ func (c *Client) Run() {
 	}
 	srv = NewLioConn(srv)
 	c.Lio = srv
-
-	c.Reader = [256]chan []byte{}
-	for i := 0; i < 256; i++ {
-		c.Reader[i] = make(chan []byte)
-	}
 
 	go func() {
 		var (
@@ -384,11 +377,15 @@ func (c *Client) Run() {
 					break
 				}
 				if headerIdx != 0 {
-					c.Reader[headerIdx] <- buf[8 : 8+headerMsgLen]
+					fub := make([]byte, headerMsgLen)
+					copy(fub, buf[8:8+headerMsgLen])
+					c.Harbor[headerIdx].Reader <- fub
 				}
 			case 3:
 				headerIdx = binary.BigEndian.Uint16(buf[1:3])
-				c.Reader[headerIdx] <- buf
+				fub := make([]byte, 8)
+				copy(fub, buf)
+				c.Harbor[headerIdx].Reader <- fub
 			case 4:
 				// idx := binary.BigEndian.Uint16(buf[1:3])
 			}
