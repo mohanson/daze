@@ -59,20 +59,20 @@ import (
 // |  4  |    Idx    |             Rsv             |
 // +-----+-----+-----+-----+-----+-----+-----+-----+
 
-type LioConn struct {
+type CioConn struct {
 	io.ReadWriteCloser
 	l *sync.Mutex
 }
 
 // Write implements the Conn Write method.
-func (c *LioConn) Write(p []byte) (int, error) {
+func (c *CioConn) Write(p []byte) (int, error) {
 	c.l.Lock()
 	defer c.l.Unlock()
 	return c.ReadWriteCloser.Write(p)
 }
 
-func NewLioConn(c io.ReadWriteCloser) *LioConn {
-	return &LioConn{
+func NewCioConn(c io.ReadWriteCloser) *CioConn {
+	return &CioConn{
 		ReadWriteCloser: c,
 		l:               &sync.Mutex{},
 	}
@@ -96,7 +96,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	if err != nil {
 		return err
 	}
-	cli = NewLioConn(cli)
+	cli = NewCioConn(cli)
 	var (
 		buf          = make([]byte, 2048)
 		dst          string
