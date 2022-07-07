@@ -303,6 +303,7 @@ func (c *MioConn) Close() error {
 type Client struct {
 	Server string
 	Cipher [16]byte
+	Harbor map[uint16]*MioConn
 	IDPool chan uint16
 	Lio    io.ReadWriteCloser
 
@@ -404,6 +405,7 @@ func NewClient(server, cipher string) *Client {
 	return &Client{
 		Server: server,
 		Cipher: md5.Sum([]byte(cipher)),
+		Harbor: map[uint16]*MioConn{},
 		IDPool: idpool,
 	}
 }
