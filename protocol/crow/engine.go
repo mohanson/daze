@@ -59,32 +59,32 @@ import (
 // |  4  |    Idx    |             Rsv             |
 // +-----+-----+-----+-----+-----+-----+-----+-----+
 
-type CioConn struct {
+type LioConn struct {
 	io.ReadWriteCloser
 	l *sync.Mutex
 }
 
 // Write implements the Conn Write method.
-func (c *CioConn) Write(p []byte) (int, error) {
+func (c *LioConn) Write(p []byte) (int, error) {
 	c.l.Lock()
 	defer c.l.Unlock()
 	return c.ReadWriteCloser.Write(p)
 }
 
-func NewCioConn(c io.ReadWriteCloser) *CioConn {
-	return &CioConn{
+func NewLioConn(c io.ReadWriteCloser) *LioConn {
+	return &LioConn{
 		ReadWriteCloser: c,
 		l:               &sync.Mutex{},
 	}
 }
 
-type SioConn struct {
+type RioConn struct {
 	io.ReadWriteCloser
 	Closed int
 }
 
-func NewSioConn(c io.ReadWriteCloser) *SioConn {
-	return &SioConn{
+func NewRioConn(c io.ReadWriteCloser) *RioConn {
+	return &RioConn{
 		ReadWriteCloser: c,
 	}
 }
@@ -107,11 +107,11 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	if err != nil {
 		return err
 	}
-	cli = NewCioConn(cli)
+	cli = NewLioConn(cli)
 	var (
 		buf          = make([]byte, 2048)
 		dst          string
-		harbor       = map[uint16]*SioConn{}
+		harbor       = map[uint16]*RioConn{}
 		headerCmd    uint8
 		headerDstLen uint8
 		headerDstNet uint8
@@ -119,7 +119,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		headerLen    uint16
 		ok           bool
 		srv          net.Conn
-		sio          *SioConn
+		sio          *RioConn
 	)
 	for {
 		_, err = io.ReadFull(cli, buf[:8])
@@ -158,7 +158,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			case 0x01:
 				log.Printf("%s   dial network=tcp address=%s", ctx.Cid, dst)
 				srv, err = daze.Conf.Dialer.Dial("tcp", dst)
-				sio = NewSioConn(srv)
+				sio = NewRioConn(srv)
 			case 0x03:
 				log.Printf("%s   dial network=udp address=%s", ctx.Cid, dst)
 				panic("unreachable")
@@ -185,10 +185,12 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 						break
 					}
 				}
-				delete(harbor, headerIdx)
-				buf[0] = 4
-				binary.BigEndian.PutUint16(buf[1:3], headerIdx)
-				cli.Write(buf[:8])
+				if harbor[headerIdx].Closed == 0 {
+					delete(harbor, headerIdx)
+					buf[0] = 4
+					binary.BigEndian.PutUint16(buf[1:3], headerIdx)
+					cli.Write(buf[:8])
+				}
 				log.Println(ctx.Cid, "closed")
 			}(headerIdx, srv)
 		case 4:
@@ -201,6 +203,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	}
 
 	for _, e := range harbor {
+		e.Closed = 1
 		e.Close()
 	}
 
