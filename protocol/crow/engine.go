@@ -371,7 +371,6 @@ func (c *Client) Run() {
 			switch headerCmd {
 			case 1:
 				headerMsgLen = binary.BigEndian.Uint16(buf[3:5])
-				doa.Doa(headerMsgLen <= 2040)
 				buf[0] = 2
 				c.Lio.Write(buf[:8+headerMsgLen])
 			case 2:
