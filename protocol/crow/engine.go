@@ -282,6 +282,9 @@ func (c *MioConn) Read(p []byte) (int, error) {
 }
 
 func (c *MioConn) Write(p []byte) (int, error) {
+	if c.Closed != 0 {
+		return 0, errors.New("daze: use of closed network connection")
+	}
 	doa.Doa(len(p) <= 2040)
 	buf := make([]byte, 8+len(p))
 	buf[0] = 2
@@ -399,7 +402,6 @@ func (c *Client) Run() {
 				if ok {
 					close(mio.Reader)
 					mio.Closed = 1
-					mio.Close()
 				}
 			}
 		}
