@@ -279,21 +279,20 @@ func (c *TCPConn) Read(p []byte) (int, error) {
 }
 
 func (c *TCPConn) Write(p []byte) (int, error) {
-	doa.Doa(len(p) <= 2048)
+	doa.Doa(len(p) <= 2040)
 	buf := make([]byte, 8+len(p))
 	buf[0] = 2
-	binary.BigEndian.PutUint16(buf[0x01:0x03], c.Idx)
-	binary.BigEndian.PutUint16(buf[0x03:0x05], uint16(len(p)))
+	binary.BigEndian.PutUint16(buf[1:3], c.Idx)
+	binary.BigEndian.PutUint16(buf[3:5], uint16(len(p)))
 	copy(buf[8:], p)
-	c.Father.Writer <- buf
-	return len(p), nil
+	return c.Father.Lio.Write(buf)
 }
 
 func (c *TCPConn) Close() error {
 	buf := make([]byte, 8)
 	buf[0] = 4
-	binary.BigEndian.PutUint16(buf[0x01:0x03], c.Idx)
-	c.Father.Writer <- buf
+	binary.BigEndian.PutUint16(buf[1:3], c.Idx)
+	c.Father.Lio.Write(buf)
 	c.Father.IDPool <- c.Idx
 	return nil
 }
@@ -306,7 +305,6 @@ type Client struct {
 	Lio    io.ReadWriteCloser
 
 	Reader [256]chan []byte
-	Writer chan []byte
 }
 
 // Dial connects to the address on the named network.
@@ -318,7 +316,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	buf[3] = 1
 	buf[4] = uint8(len(address))
 	copy(buf[8:], []byte(address))
-	c.Writer <- buf
+	c.Lio.Write(buf)
 
 	ret := <-c.Reader[id]
 	doa.Doa(ret[0] == 3)
@@ -346,19 +344,12 @@ func (c *Client) Run() {
 		return
 	}
 	srv = NewLioConn(srv)
+	c.Lio = srv
 
 	c.Reader = [256]chan []byte{}
 	for i := 0; i < 256; i++ {
 		c.Reader[i] = make(chan []byte, 1024)
 	}
-
-	c.Writer = make(chan []byte, 1024)
-	go func() {
-		for send := range c.Writer {
-			// log.Println("client send:", send)
-			doa.Try(srv.Write(send))
-		}
-	}()
 
 	go func() {
 		buf := make([]byte, 2048)
@@ -375,7 +366,7 @@ func (c *Client) Run() {
 				binary.BigEndian.PutUint16(buf[1:3], idx)
 				binary.BigEndian.PutUint16(buf[3:5], len)
 				daze.Conf.Random.Read(buf[8:])
-				c.Writer <- buf
+				c.Lio.Write(buf)
 			case 2:
 				idx := binary.BigEndian.Uint16(buf[1:3])
 				len := binary.BigEndian.Uint16(buf[3:5])
