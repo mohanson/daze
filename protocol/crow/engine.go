@@ -268,6 +268,7 @@ func NewServer(listen string, cipher string) *Server {
 }
 
 type MioConn struct {
+	Closed int
 	Father *Client
 	Idx    uint16
 	Reader chan []byte
@@ -328,6 +329,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	doa.Doa(ret[0] == 3)
 	if ret[3] != 0 {
 		c.IDPool <- idx
+		mio.Closed = 1
 		return nil, errors.New("daze: general server failure")
 	}
 	return mio, nil
@@ -353,9 +355,11 @@ func (c *Client) Run() {
 		var (
 			buf          = make([]byte, 2048)
 			err          error
+			mio          *MioConn
 			headerCmd    uint8
 			headerIdx    uint16
 			headerMsgLen uint16
+			ok           bool
 		)
 		for {
 			_, err = io.ReadFull(srv, buf[:8])
@@ -378,7 +382,8 @@ func (c *Client) Run() {
 				if err != nil {
 					break
 				}
-				if headerIdx != 0 {
+				mio, ok = c.Harbor[headerIdx]
+				if ok && mio.Closed == 0 {
 					fub := make([]byte, headerMsgLen)
 					copy(fub, buf[8:8+headerMsgLen])
 					c.Harbor[headerIdx].Reader <- fub
