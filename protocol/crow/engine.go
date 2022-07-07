@@ -376,7 +376,6 @@ func (c *Client) Run() {
 			case 2:
 				headerIdx = binary.BigEndian.Uint16(buf[1:3])
 				headerMsgLen = binary.BigEndian.Uint16(buf[3:5])
-				doa.Doa(int(headerMsgLen) <= 2040)
 				_, err = io.ReadFull(srv, buf[8:8+headerMsgLen])
 				if err != nil {
 					break
