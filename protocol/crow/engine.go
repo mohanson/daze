@@ -371,11 +371,13 @@ func (c *Client) Run() {
 			switch headerCmd {
 			case 1:
 				headerMsgLen = binary.BigEndian.Uint16(buf[3:5])
+				doa.Doa(headerMsgLen <= 2040)
 				buf[0] = 2
 				c.Lio.Write(buf[:8+headerMsgLen])
 			case 2:
 				headerIdx = binary.BigEndian.Uint16(buf[1:3])
 				headerMsgLen = binary.BigEndian.Uint16(buf[3:5])
+				doa.Doa(int(headerMsgLen) <= 2040)
 				_, err = io.ReadFull(srv, buf[8:8+headerMsgLen])
 				if err != nil {
 					break
