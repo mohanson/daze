@@ -386,11 +386,8 @@ func (c *Client) Run() {
 					c.Reader[headerIdx] <- buf[8 : 8+headerMsgLen]
 				}
 			case 3:
-				idx := binary.BigEndian.Uint16(buf[1:3])
-				// rep := buf[3]
-				buf := []byte{3, 0x00, 0x01, 0x00}
-				binary.BigEndian.PutUint16(buf[1:3], idx)
-				c.Reader[idx] <- buf
+				headerIdx = binary.BigEndian.Uint16(buf[1:3])
+				c.Reader[headerIdx] <- buf
 			case 4:
 				// idx := binary.BigEndian.Uint16(buf[1:3])
 			}
