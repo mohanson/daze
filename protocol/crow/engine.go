@@ -59,52 +59,6 @@ import (
 // |  4  |    Idx    |             Rsv             |
 // +-----+-----+-----+-----+-----+-----+-----+-----+
 
-// AioConn is an implementation of the Conn interface for Async io network connections.
-type AioConn struct {
-	io.ReadWriteCloser
-	Reader chan []byte
-	Writer chan []byte
-	Closed int
-}
-
-// NewAioConn returns a new AioConn.
-func NewAioConn(c io.ReadWriteCloser) *AioConn {
-	aio := &AioConn{
-		ReadWriteCloser: c,
-		Reader:          make(chan []byte, 1024),
-		Writer:          make(chan []byte, 1024),
-	}
-	go func() {
-		for msg := range aio.Writer {
-			_, err := aio.ReadWriteCloser.Write(msg)
-			if err != nil {
-				break
-			}
-		}
-		for msg := range aio.Writer {
-			_ = msg
-		}
-	}()
-	go func() {
-		for {
-			msg := make([]byte, 2040)
-			n, err := aio.ReadWriteCloser.Read(msg)
-			aio.Reader <- msg[:n]
-			if err != nil {
-				break
-			}
-		}
-		close(aio.Reader)
-	}()
-	return aio
-}
-
-func (a *AioConn) Close() error {
-	close(a.Writer)
-	a.ReadWriteCloser.Close()
-	return nil
-}
-
 // Server implemented the crow protocol.
 type Server struct {
 	Listen string

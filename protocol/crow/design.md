@@ -63,3 +63,42 @@ Rep: Reply field
 +-----+-----+
 |  1  |  2  |
 +-----+-----+
+
+func (s *Server) ServeCmd(ctx *daze.Context, cli io.ReadWriteCloser, c chan<- []byte) {
+	var (
+		buf          []byte
+		headerDstLen uint8
+		headerMsgLen uint16
+		err          error
+	)
+	for {
+		buf = make([]byte, 2048)
+		_, err = io.ReadFull(cli, buf[:8])
+		if err != nil {
+			break
+		}
+		log.Printf("%s server recv=0x%s", ctx.Cid, hex.EncodeToString(buf[:8]))
+		switch buf[0] {
+		case 1:
+			c <- buf
+		case 2:
+			headerMsgLen = binary.BigEndian.Uint16(buf[3:5])
+			_, err = io.ReadFull(cli, buf[8:8+headerMsgLen])
+			if err == nil {
+				c <- buf
+			}
+		case 3:
+			headerDstLen = buf[4]
+			_, err = io.ReadFull(cli, buf[8:8+headerDstLen])
+			if err == nil {
+				c <- buf
+			}
+		case 4:
+			c <- buf
+		}
+	}
+	buf = make([]byte, 2048)
+	buf[0] = 0
+	c <- buf
+	close(c)
+}
