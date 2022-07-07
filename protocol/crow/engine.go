@@ -78,6 +78,17 @@ func NewCioConn(c io.ReadWriteCloser) *CioConn {
 	}
 }
 
+type SioConn struct {
+	io.ReadWriteCloser
+	Closed int
+}
+
+func NewSioConn(c io.ReadWriteCloser) *SioConn {
+	return &SioConn{
+		ReadWriteCloser: c,
+	}
+}
+
 // Server implemented the crow protocol.
 type Server struct {
 	Listen string
@@ -100,8 +111,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	var (
 		buf          = make([]byte, 2048)
 		dst          string
-		harbor       = map[uint16]net.Conn{}
-		harborCloser = map[uint16]int{}
+		harbor       = map[uint16]*SioConn{}
 		headerCmd    uint8
 		headerDstLen uint8
 		headerDstNet uint8
@@ -109,6 +119,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		headerLen    uint16
 		ok           bool
 		srv          net.Conn
+		sio          *SioConn
 	)
 	for {
 		_, err = io.ReadFull(cli, buf[:8])
@@ -130,9 +141,9 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			if err != nil {
 				break
 			}
-			srv, ok = harbor[headerIdx]
+			sio, ok = harbor[headerIdx]
 			if ok {
-				srv.Write(buf[8 : 8+headerLen])
+				sio.Write(buf[8 : 8+headerLen])
 			}
 		case 3:
 			headerIdx = binary.BigEndian.Uint16(buf[1:3])
@@ -147,6 +158,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			case 0x01:
 				log.Printf("%s   dial network=tcp address=%s", ctx.Cid, dst)
 				srv, err = daze.Conf.Dialer.Dial("tcp", dst)
+				sio = NewSioConn(srv)
 			case 0x03:
 				log.Printf("%s   dial network=udp address=%s", ctx.Cid, dst)
 				panic("unreachable")
@@ -158,8 +170,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 				buf[3] = 0
 			}
 			cli.Write(buf[:8])
-			harbor[headerIdx] = srv
-			harborCloser[headerIdx] = 0
+			harbor[headerIdx] = sio
 			go func(headerIdx uint16, reader net.Conn) {
 				buf := make([]byte, 2048)
 				for {
@@ -174,9 +185,6 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 						break
 					}
 				}
-				if harborCloser[headerIdx] == 1 {
-					return
-				}
 				delete(harbor, headerIdx)
 				buf[0] = 4
 				binary.BigEndian.PutUint16(buf[1:3], headerIdx)
@@ -185,15 +193,13 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			}(headerIdx, srv)
 		case 4:
 			headerIdx = binary.BigEndian.Uint16(buf[1:3])
-			srv, ok = harbor[headerIdx]
+			sio, ok = harbor[headerIdx]
 			if ok {
-				harborCloser[headerIdx] = 1
-				srv.Close()
+				sio.Close()
 			}
 		}
 	}
 
-	doa.Doa(len(harbor) == len(harborCloser))
 	for _, e := range harbor {
 		e.Close()
 	}
