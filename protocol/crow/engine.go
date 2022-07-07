@@ -59,6 +59,25 @@ import (
 // |  4  |    Idx    |             Rsv             |
 // +-----+-----+-----+-----+-----+-----+-----+-----+
 
+type LioConn struct {
+	io.ReadWriteCloser
+	l *sync.Mutex
+}
+
+// Write implements the Conn Write method.
+func (c *LioConn) Write(p []byte) (int, error) {
+	c.l.Lock()
+	defer c.l.Unlock()
+	return c.ReadWriteCloser.Write(p)
+}
+
+func NewLioConn(c io.ReadWriteCloser) *LioConn {
+	return &LioConn{
+		ReadWriteCloser: c,
+		l:               &sync.Mutex{},
+	}
+}
+
 // Server implemented the crow protocol.
 type Server struct {
 	Listen string
@@ -77,6 +96,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	if err != nil {
 		return err
 	}
+	cli = NewLioConn(cli)
 	var (
 		buf          = make([]byte, 2048)
 		dst          string
@@ -87,8 +107,6 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		headerDstNet uint8
 		headerIdx    uint16
 		headerLen    uint16
-		mutex1       = &sync.Mutex{}
-		mutex2       = &sync.Mutex{}
 		ok           bool
 		srv          net.Conn
 	)
@@ -104,9 +122,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			headerLen = binary.BigEndian.Uint16(buf[3:5])
 			doa.Doa(headerLen <= 2040)
 			buf[0] = 2
-			mutex1.Lock()
 			cli.Write(buf[:8+headerLen])
-			mutex1.Unlock()
 		case 2:
 			headerIdx = binary.BigEndian.Uint16(buf[1:3])
 			headerLen = binary.BigEndian.Uint16(buf[3:5])
@@ -114,9 +130,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			if err != nil {
 				break
 			}
-			mutex2.Lock()
 			srv, ok = harbor[headerIdx]
-			mutex2.Unlock()
 			if ok {
 				srv.Write(buf[8 : 8+headerLen])
 			}
@@ -143,13 +157,9 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			} else {
 				buf[3] = 0
 			}
-			mutex1.Lock()
 			cli.Write(buf[:8])
-			mutex1.Unlock()
-			mutex2.Lock()
 			harbor[headerIdx] = srv
 			harborCloser[headerIdx] = 0
-			mutex2.Unlock()
 			go func(headerIdx uint16, reader net.Conn) {
 				buf := make([]byte, 2048)
 				for {
@@ -158,37 +168,28 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 						buf[0] = 2
 						binary.BigEndian.PutUint16(buf[1:3], headerIdx)
 						binary.BigEndian.PutUint16(buf[3:5], uint16(n))
-						mutex1.Lock()
 						cli.Write(buf[:8+n])
-						mutex1.Unlock()
 					}
 					if err != nil {
 						break
 					}
 				}
-				mutex2.Lock()
 				if harborCloser[headerIdx] == 1 {
-					mutex2.Unlock()
 					return
 				}
 				delete(harbor, headerIdx)
-				mutex2.Unlock()
 				buf[0] = 4
 				binary.BigEndian.PutUint16(buf[1:3], headerIdx)
-				mutex1.Lock()
 				cli.Write(buf[:8])
-				mutex1.Unlock()
 				log.Println(ctx.Cid, "closed")
 			}(headerIdx, srv)
 		case 4:
 			headerIdx = binary.BigEndian.Uint16(buf[1:3])
-			mutex2.Lock()
 			srv, ok = harbor[headerIdx]
 			if ok {
 				harborCloser[headerIdx] = 1
 				srv.Close()
 			}
-			mutex2.Unlock()
 		}
 	}
 
