@@ -201,6 +201,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			headerIdx = binary.BigEndian.Uint16(buf[1:3])
 			sio, ok = harbor[headerIdx]
 			if ok {
+				sio.Closed = 1
 				sio.Close()
 			}
 		}
@@ -352,11 +353,19 @@ func (c *Client) Run() {
 	}
 
 	go func() {
-		buf := make([]byte, 2048)
+		var (
+			buf       = make([]byte, 2048)
+			err       error
+			headerCmd uint8
+		)
 		for {
-			doa.Try(srv.Read(buf[:8]))
-			// log.Println("client recv:", buf[:8])
-			switch buf[0] {
+			_, err = io.ReadFull(srv, buf[:8])
+			if err != nil {
+				break
+			}
+			log.Printf("%s   recv data=0x%x", ctx.Cid, buf[:8])
+			headerCmd = buf[0]
+			switch headerCmd {
 			case 1:
 				idx := binary.BigEndian.Uint16(buf[1:3])
 				len := binary.BigEndian.Uint16(buf[3:5])
