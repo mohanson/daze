@@ -116,7 +116,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		headerDstLen uint8
 		headerDstNet uint8
 		headerIdx    uint16
-		headerLen    uint16
+		headerMsgLen uint16
 		ok           bool
 		srv          io.ReadWriteCloser
 		sio          *SioConn
@@ -130,20 +130,21 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		headerCmd = buf[0]
 		switch headerCmd {
 		case 1:
-			headerLen = binary.BigEndian.Uint16(buf[3:5])
-			doa.Doa(headerLen <= 2040)
+			headerMsgLen = binary.BigEndian.Uint16(buf[3:5])
+			doa.Doa(headerMsgLen <= 2040)
 			buf[0] = 2
-			cli.Write(buf[:8+headerLen])
+			cli.Write(buf[:8+headerMsgLen])
 		case 2:
 			headerIdx = binary.BigEndian.Uint16(buf[1:3])
-			headerLen = binary.BigEndian.Uint16(buf[3:5])
-			_, err = io.ReadFull(cli, buf[8:8+headerLen])
+			headerMsgLen = binary.BigEndian.Uint16(buf[3:5])
+			doa.Doa(headerMsgLen <= 2040)
+			_, err = io.ReadFull(cli, buf[8:8+headerMsgLen])
 			if err != nil {
 				break
 			}
 			sio, ok = harbor[headerIdx]
 			if ok && sio.Closed == 0 {
-				sio.Write(buf[8 : 8+headerLen])
+				sio.Write(buf[8 : 8+headerMsgLen])
 			}
 		case 3:
 			headerIdx = binary.BigEndian.Uint16(buf[1:3])
@@ -349,14 +350,16 @@ func (c *Client) Run() {
 
 	c.Reader = [256]chan []byte{}
 	for i := 0; i < 256; i++ {
-		c.Reader[i] = make(chan []byte, 1024)
+		c.Reader[i] = make(chan []byte)
 	}
 
 	go func() {
 		var (
-			buf       = make([]byte, 2048)
-			err       error
-			headerCmd uint8
+			buf          = make([]byte, 2048)
+			err          error
+			headerCmd    uint8
+			headerIdx    uint16
+			headerMsgLen uint16
 		)
 		for {
 			_, err = io.ReadFull(srv, buf[:8])
@@ -367,23 +370,20 @@ func (c *Client) Run() {
 			headerCmd = buf[0]
 			switch headerCmd {
 			case 1:
-				idx := binary.BigEndian.Uint16(buf[1:3])
-				len := binary.BigEndian.Uint16(buf[3:5])
-				doa.Doa(int(len) <= 2040)
-				buf := make([]byte, 8+len)
-				buf[0] = 0x02
-				binary.BigEndian.PutUint16(buf[1:3], idx)
-				binary.BigEndian.PutUint16(buf[3:5], len)
-				daze.Conf.Random.Read(buf[8:])
-				c.Lio.Write(buf)
+				headerMsgLen = binary.BigEndian.Uint16(buf[3:5])
+				doa.Doa(headerMsgLen <= 2040)
+				buf[0] = 2
+				c.Lio.Write(buf[:8+headerMsgLen])
 			case 2:
-				idx := binary.BigEndian.Uint16(buf[1:3])
-				len := binary.BigEndian.Uint16(buf[3:5])
-				doa.Doa(int(len) <= 2040)
-				srv.Read(buf[:len])
-				msg := buf[:len]
-				if idx != 0 {
-					c.Reader[idx] <- msg
+				headerIdx = binary.BigEndian.Uint16(buf[1:3])
+				headerMsgLen = binary.BigEndian.Uint16(buf[3:5])
+				doa.Doa(int(headerMsgLen) <= 2040)
+				_, err = io.ReadFull(srv, buf[8:8+headerMsgLen])
+				if err != nil {
+					break
+				}
+				if headerIdx != 0 {
+					c.Reader[headerIdx] <- buf[8 : 8+headerMsgLen]
 				}
 			case 3:
 				idx := binary.BigEndian.Uint16(buf[1:3])
