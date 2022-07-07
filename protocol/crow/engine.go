@@ -266,8 +266,8 @@ func NewServer(listen string, cipher string) *Server {
 }
 
 type TCPConn struct {
-	ID     uint16
 	Father *Client
+	Idx    uint16
 	Reader chan []byte
 }
 
@@ -282,7 +282,7 @@ func (c *TCPConn) Write(p []byte) (int, error) {
 	doa.Doa(len(p) <= 2048)
 	buf := make([]byte, 8+len(p))
 	buf[0] = 2
-	binary.BigEndian.PutUint16(buf[0x01:0x03], c.ID)
+	binary.BigEndian.PutUint16(buf[0x01:0x03], c.Idx)
 	binary.BigEndian.PutUint16(buf[0x03:0x05], uint16(len(p)))
 	copy(buf[8:], p)
 	c.Father.Writer <- buf
@@ -292,9 +292,9 @@ func (c *TCPConn) Write(p []byte) (int, error) {
 func (c *TCPConn) Close() error {
 	buf := make([]byte, 8)
 	buf[0] = 4
-	binary.BigEndian.PutUint16(buf[0x01:0x03], c.ID)
+	binary.BigEndian.PutUint16(buf[0x01:0x03], c.Idx)
 	c.Father.Writer <- buf
-	c.Father.IDPool <- c.ID
+	c.Father.IDPool <- c.Idx
 	return nil
 }
 
@@ -303,6 +303,7 @@ type Client struct {
 	Server string
 	Cipher [16]byte
 	IDPool chan uint16
+	Lio    io.ReadWriteCloser
 
 	Reader [256]chan []byte
 	Writer chan []byte
@@ -324,8 +325,8 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	doa.Doa(ret[3] == 0)
 
 	r := &TCPConn{
-		ID:     id,
 		Father: c,
+		Idx:    id,
 		Reader: c.Reader[id],
 	}
 	return r, nil
