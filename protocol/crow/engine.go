@@ -3,7 +3,6 @@ package crow
 import (
 	"crypto/md5"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"io"
 	"log"
@@ -126,7 +125,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		if err != nil {
 			break
 		}
-		log.Printf("%s   recv data=0x%s", ctx.Cid, hex.EncodeToString(buf[:8]))
+		log.Printf("%s   recv data=0x%x", ctx.Cid, buf[:8])
 		headerCmd = buf[0]
 		switch headerCmd {
 		case 1:
