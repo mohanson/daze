@@ -78,13 +78,13 @@ func NewLioConn(c io.ReadWriteCloser) *LioConn {
 	}
 }
 
-type RioConn struct {
+type SioConn struct {
 	io.ReadWriteCloser
 	Closed int
 }
 
-func NewRioConn(c io.ReadWriteCloser) *RioConn {
-	return &RioConn{
+func NewSioConn(c io.ReadWriteCloser) *SioConn {
+	return &SioConn{
 		ReadWriteCloser: c,
 	}
 }
@@ -111,7 +111,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	var (
 		buf          = make([]byte, 2048)
 		dst          string
-		harbor       = map[uint16]*RioConn{}
+		harbor       = map[uint16]*SioConn{}
 		headerCmd    uint8
 		headerDstLen uint8
 		headerDstNet uint8
@@ -119,7 +119,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		headerLen    uint16
 		ok           bool
 		srv          net.Conn
-		sio          *RioConn
+		sio          *SioConn
 	)
 	for {
 		_, err = io.ReadFull(cli, buf[:8])
@@ -158,7 +158,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			case 0x01:
 				log.Printf("%s   dial network=tcp address=%s", ctx.Cid, dst)
 				srv, err = daze.Conf.Dialer.Dial("tcp", dst)
-				sio = NewRioConn(srv)
+				sio = NewSioConn(srv)
 			case 0x03:
 				log.Printf("%s   dial network=udp address=%s", ctx.Cid, dst)
 				panic("unreachable")
