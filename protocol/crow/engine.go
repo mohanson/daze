@@ -268,17 +268,15 @@ func NewServer(listen string, cipher string) *Server {
 }
 
 type MioConn struct {
-	Closed int
-	Father *Client
-	Idx    uint16
-	Reader chan []byte
+	Closed     int
+	Father     *Client
+	Idx        uint16
+	PipeReader *io.PipeReader
+	PipeWriter *io.PipeWriter
 }
 
 func (c *MioConn) Read(p []byte) (int, error) {
-	data := <-c.Reader
-	doa.Doa(len(data) <= len(p))
-	copy(p, data)
-	return len(data), nil
+	return c.PipeReader.Read(p)
 }
 
 func (c *MioConn) Write(p []byte) (int, error) {
@@ -303,6 +301,17 @@ func (c *MioConn) Close() error {
 	return nil
 }
 
+func NewMioConn(idx uint16) *MioConn {
+	r, w := io.Pipe()
+	return &MioConn{
+		Closed:     0,
+		Father:     nil,
+		Idx:        idx,
+		PipeReader: r,
+		PipeWriter: w,
+	}
+}
+
 // Client implemented the crow protocol.
 type Client struct {
 	Cipher [16]byte
@@ -322,15 +331,14 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	buf[4] = uint8(len(address))
 	copy(buf[8:], []byte(address))
 	c.Lio.Write(buf)
-	mio := &MioConn{
-		Father: c,
-		Idx:    idx,
-		Reader: make(chan []byte),
-	}
+
+	mio := NewMioConn(idx)
+	mio.Father = c
 	c.Harbor[idx] = mio
-	ret := <-mio.Reader
-	doa.Doa(ret[0] == 3)
-	if ret[3] != 0 {
+
+	io.ReadFull(mio.PipeReader, buf[:8])
+	doa.Doa(buf[0] == 3)
+	if buf[3] != 0 {
 		c.IDPool <- idx
 		mio.Closed = 1
 		return nil, errors.New("daze: general server failure")
@@ -389,18 +397,19 @@ func (c *Client) Run() {
 				if ok && mio.Closed == 0 {
 					fub := make([]byte, headerMsgLen)
 					copy(fub, buf[8:8+headerMsgLen])
-					c.Harbor[headerIdx].Reader <- fub
+					c.Harbor[headerIdx].PipeWriter.Write(fub)
 				}
 			case 3:
 				headerIdx = binary.BigEndian.Uint16(buf[1:3])
 				fub := make([]byte, 8)
 				copy(fub, buf)
-				c.Harbor[headerIdx].Reader <- fub
+				c.Harbor[headerIdx].PipeWriter.Write(fub)
 			case 4:
 				headerIdx = binary.BigEndian.Uint16(buf[1:3])
 				mio, ok = c.Harbor[headerIdx]
 				if ok {
-					close(mio.Reader)
+					mio.PipeWriter.Close()
+					mio.PipeReader.Close()
 					mio.Closed = 1
 				}
 			}
