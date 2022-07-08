@@ -427,6 +427,7 @@ func NewClient(server, cipher string) *Client {
 		Cipher: md5.Sum([]byte(cipher)),
 		Harbor: map[uint16]*MioConn{},
 		IDPool: idpool,
+		Lio:    nil,
 		Server: server,
 	}
 }
