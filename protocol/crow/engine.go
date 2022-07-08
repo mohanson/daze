@@ -411,12 +411,18 @@ func (c *Client) DialLio(ctx *daze.Context) error {
 
 // Dial connects to the address on the named network.
 func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.ReadWriteCloser, error) {
-	if err := c.DialLio(ctx); err != nil {
+	var (
+		buf = make([]byte, 8+len(address))
+		err error
+		idx uint16
+		mio *MioConn
+	)
+	err = c.DialLio(ctx)
+	if err != nil {
 		return nil, err
 	}
-	buf := make([]byte, 8+len(address))
 	buf[0] = 3
-	idx := <-c.IDPool
+	idx = <-c.IDPool
 	binary.BigEndian.PutUint16(buf[1:3], idx)
 	switch network {
 	case "tcp":
@@ -428,11 +434,11 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	copy(buf[8:], []byte(address))
 	c.Lio.Write(buf)
 
-	mio := NewMioConn(idx)
+	mio = NewMioConn(idx)
 	mio.Father = c
 	c.Harbor[idx] = mio
 
-	_, err := io.ReadFull(mio.PipeReader, buf[:8])
+	_, err = io.ReadFull(mio.PipeReader, buf[:8])
 	if err != nil || buf[0] != 3 || buf[3] != 0 {
 		c.IDPool <- idx
 		mio.close()
