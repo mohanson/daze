@@ -58,6 +58,7 @@ import (
 // |  4  |    Idx    |             Rsv             |
 // +-----+-----+-----+-----+-----+-----+-----+-----+
 
+// LioConn is concurrency safe in write.
 type LioConn struct {
 	io.ReadWriteCloser
 	l *sync.Mutex
@@ -70,6 +71,7 @@ func (c *LioConn) Write(p []byte) (int, error) {
 	return c.ReadWriteCloser.Write(p)
 }
 
+// NewLioConn returns new LioConn.
 func NewLioConn(c io.ReadWriteCloser) *LioConn {
 	return &LioConn{
 		ReadWriteCloser: c,
@@ -77,12 +79,14 @@ func NewLioConn(c io.ReadWriteCloser) *LioConn {
 	}
 }
 
+// SioConn wraps conn and provides some property values.
 type SioConn struct {
 	io.ReadWriteCloser
 	Closed int
 	Idx    uint16
 }
 
+// NewSioConn returns a new SioConn. It is the caller's responsibility to set additional properties.
 func NewSioConn(c io.ReadWriteCloser) *SioConn {
 	return &SioConn{
 		ReadWriteCloser: c,
@@ -96,6 +100,7 @@ type Server struct {
 	Closer io.Closer
 }
 
+// ServeSio.
 func (s *Server) ServeSio(ctx *daze.Context, sio *SioConn, cli io.ReadWriteCloser) {
 	buf := make([]byte, 2048)
 	for {
