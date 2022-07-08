@@ -305,11 +305,11 @@ func (c *MioConn) Close() error {
 
 // Client implemented the crow protocol.
 type Client struct {
-	Server string
 	Cipher [16]byte
 	Harbor map[uint16]*MioConn
 	IDPool chan uint16
 	Lio    io.ReadWriteCloser
+	Server string
 }
 
 // Dial connects to the address on the named network.
@@ -415,9 +415,9 @@ func NewClient(server, cipher string) *Client {
 		idpool <- i
 	}
 	return &Client{
-		Server: server,
 		Cipher: md5.Sum([]byte(cipher)),
 		Harbor: map[uint16]*MioConn{},
 		IDPool: idpool,
+		Server: server,
 	}
 }
