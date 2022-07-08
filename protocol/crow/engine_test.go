@@ -19,20 +19,6 @@ const (
 	Password           = "password"
 )
 
-// func TestProtocolAsheTCP(t *testing.T) {
-// 	defer time.Sleep(time.Second)
-
-// 	dazeServer := NewServer(DazeServerListenOn, Password)
-// 	defer dazeServer.Close()
-// 	go dazeServer.Run()
-
-// 	time.Sleep(time.Second)
-
-// 	dazeClient := NewClient(DazeServerListenOn, Password)
-// 	dazeClient.Run()
-// 	dazeClient.Writer <- []byte{0x01, 0x00, 0x08}
-// }
-
 func TestProtocalCrowTCP(t *testing.T) {
 	defer time.Sleep(time.Second)
 	echoListener := doa.Try(net.Listen("tcp", EchoServerListenOn))
@@ -60,7 +46,7 @@ func TestProtocalCrowTCP(t *testing.T) {
 	dazeClient := NewClient(DazeServerListenOn, Password)
 	dazeClient.Run()
 
-	ctx := &daze.Context{Cid: "ffffffff"}
+	ctx := &daze.Context{Cid: "00000000"}
 	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
 	defer cli.Close()
 
@@ -71,15 +57,4 @@ func TestProtocalCrowTCP(t *testing.T) {
 	if !bytes.Equal(buf0, buf1) {
 		t.FailNow()
 	}
-
-	// cli2 := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
-	// defer cli2.Close()
-
-	// buf02 := []byte("Hello World!")
-	// cli2.Write(buf0)
-	// buf12 := make([]byte, 12)
-	// io.ReadFull(cli2, buf12)
-	// if !bytes.Equal(buf02, buf12) {
-	// 	t.FailNow()
-	// }
 }
