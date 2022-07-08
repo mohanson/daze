@@ -316,7 +316,6 @@ func (c *MioConn) Close() error {
 func NewMioConn() *MioConn {
 	r, w := io.Pipe()
 	return &MioConn{
-		Ctx:        nil,
 		PipeReader: r,
 		PipeWriter: w,
 	}
