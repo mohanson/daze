@@ -413,6 +413,11 @@ func (c *Client) Run() {
 				}
 			}
 		}
+		for _, mio = range c.Harbor {
+			mio.Closed = 1
+			mio.PipeWriter.Close()
+			mio.PipeReader.Close()
+		}
 	}()
 }
 
