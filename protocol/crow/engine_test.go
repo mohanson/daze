@@ -45,9 +45,43 @@ func TestProtocalCrowTCP(t *testing.T) {
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
 	dazeClient.Run()
-
 	ctx := &daze.Context{Cid: "00000000"}
 	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
+	defer cli.Close()
+
+	buf0 := []byte("Hello World!")
+	cli.Write(buf0)
+	buf1 := make([]byte, 12)
+	io.ReadFull(cli, buf1)
+	if !bytes.Equal(buf0, buf1) {
+		t.FailNow()
+	}
+}
+
+func TestProtocolCrowUDP(t *testing.T) {
+	echoAddr := doa.Try(net.ResolveUDPAddr("udp", EchoServerListenOn))
+	echoServer := doa.Try(net.ListenUDP("udp", echoAddr))
+	defer echoServer.Close()
+	go func() {
+		b := make([]byte, 2048)
+		for {
+			n, addr, err := echoServer.ReadFromUDP(b)
+			if err != nil {
+				break
+			}
+			m := doa.Try(echoServer.WriteToUDP(b[:n], addr))
+			doa.Doa(n == m)
+		}
+	}()
+
+	dazeServer := NewServer(DazeServerListenOn, Password)
+	defer dazeServer.Close()
+	dazeServer.Run()
+
+	dazeClient := NewClient(DazeServerListenOn, Password)
+	dazeClient.Run()
+	ctx := &daze.Context{Cid: "00000000"}
+	cli := doa.Try(dazeClient.Dial(ctx, "udp", EchoServerListenOn))
 	defer cli.Close()
 
 	buf0 := []byte("Hello World!")
