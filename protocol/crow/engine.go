@@ -343,11 +343,10 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	mio.Father = c
 	c.Harbor[idx] = mio
 
-	io.ReadFull(mio.PipeReader, buf[:8])
-	doa.Doa(buf[0] == 3)
-	if buf[3] != 0 {
+	_, err := io.ReadFull(mio.PipeReader, buf[:8])
+	if err != nil || buf[0] != 3 || buf[3] != 0 {
 		c.IDPool <- idx
-		mio.Closed = 1
+		mio.close()
 		return nil, errors.New("daze: general server failure")
 	}
 	return mio, nil
