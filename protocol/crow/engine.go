@@ -403,10 +403,10 @@ func (c *Client) Run() {
 			case 4:
 				headerIdx = binary.BigEndian.Uint16(buf[1:3])
 				mio, ok = c.Harbor[headerIdx]
-				if ok {
+				if ok && mio.Closed == 0 {
+					mio.Closed = 1
 					mio.PipeWriter.Close()
 					mio.PipeReader.Close()
-					mio.Closed = 1
 				}
 			}
 		}
