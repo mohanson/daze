@@ -80,6 +80,7 @@ func NewLioConn(c io.ReadWriteCloser) *LioConn {
 type SioConn struct {
 	io.ReadWriteCloser
 	Closed int
+	Idx    uint16
 }
 
 func NewSioConn(c io.ReadWriteCloser) *SioConn {
@@ -93,6 +94,29 @@ type Server struct {
 	Listen string
 	Cipher [16]byte
 	Closer io.Closer
+}
+
+func (s *Server) ServeSio(ctx *daze.Context, sio *SioConn, cli io.ReadWriteCloser) {
+	buf := make([]byte, 2048)
+	for {
+		n, err := sio.Read(buf[8:])
+		if n != 0 {
+			buf[0] = 2
+			binary.BigEndian.PutUint16(buf[1:3], sio.Idx)
+			binary.BigEndian.PutUint16(buf[3:5], uint16(n))
+			cli.Write(buf[:8+n])
+		}
+		if err != nil {
+			break
+		}
+	}
+	if sio.Closed == 0 {
+		buf[0] = 4
+		binary.BigEndian.PutUint16(buf[1:3], sio.Idx)
+		cli.Write(buf[:8])
+		sio.Closed = 1
+	}
+	log.Println(ctx.Cid, "closed")
 }
 
 // Serve. Parameter raw will be closed automatically when the function exits.
@@ -167,6 +191,8 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 				srv = ashe.NewUDPConn(srv)
 				sio = NewSioConn(srv)
 			}
+			sio.Idx = headerIdx
+			harbor[headerIdx] = sio
 			buf[0] = 3
 			if err != nil {
 				buf[3] = 1
@@ -174,34 +200,11 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 				buf[3] = 0
 			}
 			cli.Write(buf[:8])
-			harbor[headerIdx] = sio
-			go func(headerIdx uint16, reader io.Reader) {
-				buf := make([]byte, 2048)
-				for {
-					n, err := reader.Read(buf[8:])
-					if n != 0 {
-						buf[0] = 2
-						binary.BigEndian.PutUint16(buf[1:3], headerIdx)
-						binary.BigEndian.PutUint16(buf[3:5], uint16(n))
-						cli.Write(buf[:8+n])
-					}
-					if err != nil {
-						break
-					}
-				}
-				sio := harbor[headerIdx]
-				if sio.Closed == 0 {
-					buf[0] = 4
-					binary.BigEndian.PutUint16(buf[1:3], headerIdx)
-					cli.Write(buf[:8])
-					sio.Closed = 1
-				}
-				log.Println(ctx.Cid, "closed")
-			}(headerIdx, srv)
+			go s.ServeSio(ctx, sio, cli)
 		case 4:
 			headerIdx = binary.BigEndian.Uint16(buf[1:3])
 			sio, ok = harbor[headerIdx]
-			if ok {
+			if ok && sio.Closed == 0 {
 				sio.Closed = 1
 				sio.Close()
 			}
