@@ -9,6 +9,7 @@ import (
 	"math"
 	"net"
 	"sync"
+	"sync/atomic"
 
 	"github.com/godump/doa"
 	"github.com/mohanson/daze"
@@ -324,6 +325,7 @@ func NewMioConn(idx uint16) *MioConn {
 
 // Client implemented the crow protocol.
 type Client struct {
+	Cid    uint32
 	Cipher [16]byte
 	Harbor map[uint16]*MioConn
 	IDPool chan uint16
@@ -360,10 +362,15 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	return mio, nil
 }
 
+func (c *Client) Close() {
+	c.Lio.Close()
+	c.Lio = nil
+}
+
 func (c *Client) Run() {
 	var (
 		asheClient *ashe.Client
-		ctx        = &daze.Context{Cid: "ffffffff"}
+		ctx        = &daze.Context{Cid: daze.Hu32(atomic.AddUint32(&c.Cid, 1))}
 		err        error
 		srv        io.ReadWriteCloser
 	)
@@ -436,6 +443,7 @@ func NewClient(server, cipher string) *Client {
 		idpool <- i
 	}
 	return &Client{
+		Cid:    math.MaxUint32,
 		Cipher: md5.Sum([]byte(cipher)),
 		Harbor: map[uint16]*MioConn{},
 		IDPool: idpool,
