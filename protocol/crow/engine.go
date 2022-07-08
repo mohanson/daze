@@ -292,15 +292,19 @@ func (c *MioConn) Write(p []byte) (int, error) {
 	return c.Father.Lio.Write(buf)
 }
 
+func (c *MioConn) close() {
+	c.Closed = 1
+	c.PipeWriter.Close()
+	c.PipeReader.Close()
+}
+
 func (c *MioConn) Close() error {
 	buf := make([]byte, 8)
 	buf[0] = 4
 	binary.BigEndian.PutUint16(buf[1:3], c.Idx)
 	c.Father.Lio.Write(buf)
 	c.Father.IDPool <- c.Idx
-	c.Closed = 1
-	c.PipeWriter.Close()
-	c.PipeReader.Close()
+	c.close()
 	return nil
 }
 
@@ -407,16 +411,12 @@ func (c *Client) Run() {
 				headerIdx = binary.BigEndian.Uint16(buf[1:3])
 				mio, ok = c.Harbor[headerIdx]
 				if ok && mio.Closed == 0 {
-					mio.Closed = 1
-					mio.PipeWriter.Close()
-					mio.PipeReader.Close()
+					mio.close()
 				}
 			}
 		}
 		for _, mio = range c.Harbor {
-			mio.Closed = 1
-			mio.PipeWriter.Close()
-			mio.PipeReader.Close()
+			mio.close()
 		}
 	}()
 }
