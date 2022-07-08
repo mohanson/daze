@@ -425,6 +425,7 @@ func (c *Client) Run() {
 		for _, mio = range c.Harbor {
 			mio.close()
 		}
+		c.Lio = nil
 	}()
 }
 
