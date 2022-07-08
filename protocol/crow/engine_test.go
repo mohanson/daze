@@ -58,10 +58,8 @@ func TestProtocalCrowTCP(t *testing.T) {
 	dazeServer.Run()
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
-	dazeClient.Run()
-	// dazeClient.Writer <- []byte{0x01, 0x00, 0x08}
 
-	ctx := &daze.Context{Cid: "00000000"}
+	ctx := &daze.Context{Cid: "ffffffff"}
 	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
 	defer cli.Close()
 

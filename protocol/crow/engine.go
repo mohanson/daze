@@ -9,7 +9,6 @@ import (
 	"math"
 	"net"
 	"sync"
-	"sync/atomic"
 
 	"github.com/godump/doa"
 	"github.com/mohanson/daze"
@@ -325,16 +324,96 @@ func NewMioConn(idx uint16) *MioConn {
 
 // Client implemented the crow protocol.
 type Client struct {
-	Cid    uint32
-	Cipher [16]byte
-	Harbor map[uint16]*MioConn
-	IDPool chan uint16
-	Lio    io.ReadWriteCloser
-	Server string
+	Cid      uint32
+	Cipher   [16]byte
+	Harbor   map[uint16]*MioConn
+	IDPool   chan uint16
+	Lio      io.ReadWriteCloser
+	LioMutex *sync.Mutex
+	Server   string
+}
+
+func (c *Client) DialLioDaemon(ctx *daze.Context) error {
+	srv := c.Lio
+	var (
+		buf          = make([]byte, 2048)
+		err          error
+		mio          *MioConn
+		headerCmd    uint8
+		headerIdx    uint16
+		headerMsgLen uint16
+		ok           bool
+	)
+	for {
+		_, err = io.ReadFull(srv, buf[:8])
+		if err != nil {
+			break
+		}
+		log.Printf("%s   recv data=0x%x", ctx.Cid, buf[:8])
+		headerCmd = buf[0]
+		switch headerCmd {
+		case 1:
+			headerMsgLen = binary.BigEndian.Uint16(buf[3:5])
+			doa.Doa(headerMsgLen <= 2040)
+			buf[0] = 2
+			srv.Write(buf[:8+headerMsgLen])
+		case 2:
+			headerIdx = binary.BigEndian.Uint16(buf[1:3])
+			headerMsgLen = binary.BigEndian.Uint16(buf[3:5])
+			doa.Doa(int(headerMsgLen) <= 2040)
+			_, err = io.ReadFull(srv, buf[8:8+headerMsgLen])
+			if err != nil {
+				break
+			}
+			mio, ok = c.Harbor[headerIdx]
+			if ok && mio.Closed == 0 {
+				c.Harbor[headerIdx].PipeWriter.Write(buf[8 : 8+headerMsgLen])
+			}
+		case 3:
+			headerIdx = binary.BigEndian.Uint16(buf[1:3])
+			c.Harbor[headerIdx].PipeWriter.Write(buf[:8])
+		case 4:
+			headerIdx = binary.BigEndian.Uint16(buf[1:3])
+			mio, ok = c.Harbor[headerIdx]
+			if ok && mio.Closed == 0 {
+				mio.close()
+			}
+		}
+	}
+	for _, mio = range c.Harbor {
+		mio.close()
+	}
+	c.LioMutex.Lock()
+	defer c.LioMutex.Unlock()
+	c.Lio = nil
+	return nil
+}
+
+func (c *Client) DialLio(ctx *daze.Context) error {
+	c.LioMutex.Lock()
+	defer c.LioMutex.Unlock()
+	if c.Lio != nil {
+		return nil
+	}
+	srv, err := daze.Conf.Dialer.Dial("tcp", c.Server)
+	if err != nil {
+		return err
+	}
+	asheClient := &ashe.Client{Cipher: c.Cipher}
+	sr2, err := asheClient.WithCipher(ctx, srv)
+	if err != nil {
+		return err
+	}
+	c.Lio = NewLioConn(sr2)
+	go c.DialLioDaemon(ctx)
+	return nil
 }
 
 // Dial connects to the address on the named network.
 func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.ReadWriteCloser, error) {
+	if err := c.DialLio(ctx); err != nil {
+		return nil, err
+	}
 	buf := make([]byte, 8+len(address))
 	buf[0] = 3
 	idx := <-c.IDPool
@@ -362,80 +441,6 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	return mio, nil
 }
 
-func (c *Client) Close() {
-	c.Lio.Close()
-	c.Lio = nil
-}
-
-func (c *Client) Run() {
-	var (
-		asheClient *ashe.Client
-		ctx        = &daze.Context{Cid: daze.Hu32(atomic.AddUint32(&c.Cid, 1))}
-		err        error
-		srv        io.ReadWriteCloser
-	)
-	srv = doa.Try(daze.Conf.Dialer.Dial("tcp", c.Server))
-	asheClient = &ashe.Client{Cipher: c.Cipher}
-	srv, err = asheClient.WithCipher(ctx, srv)
-	if err != nil {
-		return
-	}
-	srv = NewLioConn(srv)
-	c.Lio = srv
-
-	go func() {
-		var (
-			buf          = make([]byte, 2048)
-			err          error
-			mio          *MioConn
-			headerCmd    uint8
-			headerIdx    uint16
-			headerMsgLen uint16
-			ok           bool
-		)
-		for {
-			_, err = io.ReadFull(srv, buf[:8])
-			if err != nil {
-				break
-			}
-			log.Printf("%s   recv data=0x%x", ctx.Cid, buf[:8])
-			headerCmd = buf[0]
-			switch headerCmd {
-			case 1:
-				headerMsgLen = binary.BigEndian.Uint16(buf[3:5])
-				doa.Doa(headerMsgLen <= 2040)
-				buf[0] = 2
-				srv.Write(buf[:8+headerMsgLen])
-			case 2:
-				headerIdx = binary.BigEndian.Uint16(buf[1:3])
-				headerMsgLen = binary.BigEndian.Uint16(buf[3:5])
-				doa.Doa(int(headerMsgLen) <= 2040)
-				_, err = io.ReadFull(srv, buf[8:8+headerMsgLen])
-				if err != nil {
-					break
-				}
-				mio, ok = c.Harbor[headerIdx]
-				if ok && mio.Closed == 0 {
-					c.Harbor[headerIdx].PipeWriter.Write(buf[8 : 8+headerMsgLen])
-				}
-			case 3:
-				headerIdx = binary.BigEndian.Uint16(buf[1:3])
-				c.Harbor[headerIdx].PipeWriter.Write(buf[:8])
-			case 4:
-				headerIdx = binary.BigEndian.Uint16(buf[1:3])
-				mio, ok = c.Harbor[headerIdx]
-				if ok && mio.Closed == 0 {
-					mio.close()
-				}
-			}
-		}
-		for _, mio = range c.Harbor {
-			mio.close()
-		}
-		c.Lio = nil
-	}()
-}
-
 // NewClient returns a new Client. A secret data needs to be passed in Cipher, as a sign to interface with the Server.
 func NewClient(server, cipher string) *Client {
 	idpool := make(chan uint16, 256)
@@ -443,11 +448,12 @@ func NewClient(server, cipher string) *Client {
 		idpool <- i
 	}
 	return &Client{
-		Cid:    math.MaxUint32,
-		Cipher: md5.Sum([]byte(cipher)),
-		Harbor: map[uint16]*MioConn{},
-		IDPool: idpool,
-		Lio:    nil,
-		Server: server,
+		Server:   server,
+		Cipher:   md5.Sum([]byte(cipher)),
+		Cid:      math.MaxUint32,
+		Harbor:   map[uint16]*MioConn{},
+		IDPool:   idpool,
+		Lio:      nil,
+		LioMutex: &sync.Mutex{},
 	}
 }
