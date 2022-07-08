@@ -298,6 +298,7 @@ func (c *MioConn) Close() error {
 	binary.BigEndian.PutUint16(buf[1:3], c.Idx)
 	c.Father.Lio.Write(buf)
 	c.Father.IDPool <- c.Idx
+	c.Closed = 1
 	return nil
 }
 
