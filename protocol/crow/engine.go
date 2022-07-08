@@ -395,15 +395,11 @@ func (c *Client) Run() {
 				}
 				mio, ok = c.Harbor[headerIdx]
 				if ok && mio.Closed == 0 {
-					fub := make([]byte, headerMsgLen)
-					copy(fub, buf[8:8+headerMsgLen])
-					c.Harbor[headerIdx].PipeWriter.Write(fub)
+					c.Harbor[headerIdx].PipeWriter.Write(buf[8 : 8+headerMsgLen])
 				}
 			case 3:
 				headerIdx = binary.BigEndian.Uint16(buf[1:3])
-				fub := make([]byte, 8)
-				copy(fub, buf)
-				c.Harbor[headerIdx].PipeWriter.Write(fub)
+				c.Harbor[headerIdx].PipeWriter.Write(buf[:8])
 			case 4:
 				headerIdx = binary.BigEndian.Uint16(buf[1:3])
 				mio, ok = c.Harbor[headerIdx]
