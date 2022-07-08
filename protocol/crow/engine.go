@@ -299,6 +299,8 @@ func (c *MioConn) Close() error {
 	c.Father.Lio.Write(buf)
 	c.Father.IDPool <- c.Idx
 	c.Closed = 1
+	c.PipeWriter.Close()
+	c.PipeReader.Close()
 	return nil
 }
 
