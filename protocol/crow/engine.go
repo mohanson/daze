@@ -337,7 +337,12 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	buf[0] = 3
 	idx := <-c.IDPool
 	binary.BigEndian.PutUint16(buf[1:3], idx)
-	buf[3] = 1
+	switch network {
+	case "tcp":
+		buf[3] = 1
+	case "udp":
+		buf[3] = 3
+	}
 	buf[4] = uint8(len(address))
 	copy(buf[8:], []byte(address))
 	c.Lio.Write(buf)
