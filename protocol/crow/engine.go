@@ -329,13 +329,13 @@ func NewMioConn(idx uint16) *MioConn {
 
 // Client implemented the crow protocol.
 type Client struct {
-	Cid      uint32
+	Server   string
 	Cipher   [16]byte
+	Cid      uint32
 	Harbor   map[uint16]*MioConn
 	IDPool   chan uint16
 	Lio      io.ReadWriteCloser
 	LioMutex *sync.Mutex
-	Server   string
 }
 
 func (c *Client) DialLioDaemon(ctx *daze.Context) error {
