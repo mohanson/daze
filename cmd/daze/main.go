@@ -85,6 +85,7 @@ func main() {
 			}
 			doa.Nil(server.Run())
 		case "crow":
+			crow.Conf.LogServer = 0
 			server := crow.NewServer(*flListen, *flCipher)
 			defer server.Close()
 			doa.Nil(server.Run())
@@ -116,6 +117,7 @@ func main() {
 			case "baboon":
 				return baboon.NewClient(*flServer, *flCipher)
 			case "crow":
+				crow.Conf.LogClient = 0
 				return crow.NewClient(*flServer, *flCipher)
 			}
 			panic("unreachable")
