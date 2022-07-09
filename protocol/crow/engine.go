@@ -391,26 +391,26 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 func (c *Client) Serve() error {
 	var (
 		asheClient *ashe.Client
-		srv        io.ReadWriteCloser
+		closedChan = make(chan int, 1)
 		err        error
+		srv        io.ReadWriteCloser
 	)
 	srv, err = daze.Conf.Dialer.Dial("tcp", c.Server)
 	if err != nil {
 		return err
 	}
 	asheClient = &ashe.Client{Cipher: c.Cipher}
-	srv, err = asheClient.WithCipher(&daze.Context{Cid: "cccccccc"}, srv)
+	srv, err = asheClient.WithCipher(&daze.Context{Cid: "00000000"}, srv)
 	if err != nil {
 		return err
 	}
 	srv = NewLioConn(srv)
 
-	intChan := make(chan int)
 	go func() {
 		for {
 			select {
 			case c.Srv <- srv:
-			case <-intChan:
+			case <-closedChan:
 				return
 			}
 		}
@@ -469,7 +469,7 @@ func (c *Client) Serve() error {
 			sio.CloseOther()
 		}
 
-		intChan <- 0
+		close(closedChan)
 	}()
 
 	return nil
@@ -481,13 +481,13 @@ func NewClient(server, cipher string) *Client {
 	for i := uint16(1); i < 256; i++ {
 		idpool <- i
 	}
-	c := &Client{
+	client := &Client{
 		Server: server,
 		Cipher: md5.Sum([]byte(cipher)),
 		Harbor: map[uint16]*SioConn{},
 		IDPool: idpool,
 		Srv:    make(chan io.ReadWriteCloser, 1),
 	}
-	c.Serve()
-	return c
+	client.Serve()
+	return client
 }
