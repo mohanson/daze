@@ -329,8 +329,8 @@ type Client struct {
 	Srv    chan io.ReadWriteCloser
 }
 
-// DialLio.
-func (c *Client) DialLio(ctx *daze.Context, sio *SioConn, srv io.ReadWriteCloser, idx uint16) {
+// Tail.
+func (c *Client) Tail(ctx *daze.Context, sio *SioConn, srv io.ReadWriteCloser, idx uint16) {
 	var (
 		buf = make([]byte, 2048)
 		err error
@@ -362,9 +362,12 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		buf = make([]byte, 8+len(address))
 		err error
 		idx = <-c.IDPool
-		sio *SioConn
+		sio = NewSioConn()
 		srv = <-c.Srv
 	)
+	c.Harbor[idx] = sio
+	go c.Tail(ctx, sio, srv, idx)
+
 	buf[0] = 3
 	binary.BigEndian.PutUint16(buf[1:3], idx)
 	switch network {
@@ -375,13 +378,14 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	}
 	buf[4] = uint8(len(address))
 	copy(buf[8:], []byte(address))
-	sio = NewSioConn()
-	c.Harbor[idx] = sio
-	srv.Write(buf)
-	go c.DialLio(ctx, sio, srv, idx)
+	_, err = srv.Write(buf)
+	if err != nil {
+		doa.Nil(sio.Close())
+		return nil, err
+	}
 	_, err = io.ReadFull(sio.ReaderReader, buf[:8])
 	if err != nil || buf[3] != 0 {
-		sio.Close()
+		doa.Nil(sio.Close())
 		return nil, errors.New("daze: general server failure")
 	}
 	return sio, nil
