@@ -362,11 +362,11 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 			}
 		}
 		if mio.Closed == 0 {
-			mio.Closed = 1
 			buf := make([]byte, 8)
 			buf[0] = 4
 			binary.BigEndian.PutUint16(buf[1:3], idx)
 			c.Lio.Write(buf)
+			mio.Closed = 1
 		}
 		c.IDPool <- idx
 	}()
