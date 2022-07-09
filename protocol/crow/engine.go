@@ -411,25 +411,27 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 }
 
 // Serve creates an establish connection to crow server.
-func (c *Client) Link() error {
+func (c *Client) Link() {
 	var (
 		asheClient *ashe.Client
 		closedChan = make(chan int)
 		err        error
 		srv        io.ReadWriteCloser
 	)
+	goto Tag2
+Tag1:
+	time.Sleep(time.Second)
+Tag2:
 	srv, err = daze.Conf.Dialer.Dial("tcp", c.Server)
 	if err != nil {
 		log.Println(err)
-		// Tail recursive, nice!
-		return c.Link()
+		goto Tag1
 	}
 	asheClient = &ashe.Client{Cipher: c.Cipher}
 	srv, err = asheClient.WithCipher(&daze.Context{Cid: "00000000"}, srv)
 	if err != nil {
 		log.Println(err)
-		// Tail recursive, nice!
-		return c.Link()
+		goto Tag1
 	}
 	srv = NewLioConn(srv)
 
@@ -500,10 +502,9 @@ func (c *Client) Link() error {
 		sio.CloseOther()
 	}
 
-	close(closedChan)
+	closedChan <- 0
 
-	// Tail recursive, nice!
-	return c.Link()
+	goto Tag1
 }
 
 // NewClient returns a new Client. A secret data needs to be passed in Cipher, as a sign to interface with the Server.

@@ -94,7 +94,19 @@ func TestProtocalCrowTCPServerClose(t *testing.T) {
 	}
 }
 
-func TestProtocalCrowTCPDialFailed(t *testing.T) {
+func TestProtocalCrowTCPClientDialFailed(t *testing.T) {
+	dazeClient := NewClient(DazeServerListenOn, Password)
+	ctx := &daze.Context{Cid: "00000000"}
+	_, err := dazeClient.Dial(ctx, "tcp", "127.0.0.1:65535")
+	if err == nil {
+		t.FailNow()
+	}
+	if err.Error() != "daze: dial timeout" {
+		t.FailNow()
+	}
+}
+
+func TestProtocalCrowTCPServerDialFailed(t *testing.T) {
 	defer time.Sleep(time.Second)
 
 	dazeServer := NewServer(DazeServerListenOn, Password)
