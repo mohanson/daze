@@ -377,8 +377,6 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		srv = <-c.Srv
 	)
 	c.Harbor[idx] = sio
-	go c.Tail(ctx, sio, srv, idx)
-
 	buf[0] = 3
 	binary.BigEndian.PutUint16(buf[1:3], idx)
 	switch network {
@@ -399,6 +397,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		doa.Nil(sio.Close())
 		return nil, errors.New("daze: general server failure")
 	}
+	go c.Tail(ctx, sio, srv, idx)
 	return sio, nil
 }
 

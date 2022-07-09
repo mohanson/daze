@@ -94,6 +94,21 @@ func TestProtocalCrowTCPServerClose(t *testing.T) {
 	}
 }
 
+func TestProtocalCrowTCPDialFailed(t *testing.T) {
+	defer time.Sleep(time.Second)
+
+	dazeServer := NewServer(DazeServerListenOn, Password)
+	defer dazeServer.Close()
+	dazeServer.Run()
+
+	dazeClient := NewClient(DazeServerListenOn, Password)
+	ctx := &daze.Context{Cid: "00000000"}
+	_, err := dazeClient.Dial(ctx, "tcp", "127.0.0.1:65535")
+	if err == nil {
+		t.FailNow()
+	}
+}
+
 func TestProtocolCrowUDP(t *testing.T) {
 	defer time.Sleep(time.Second)
 	echoAddr := doa.Try(net.ResolveUDPAddr("udp", EchoServerListenOn))
