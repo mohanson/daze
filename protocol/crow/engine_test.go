@@ -58,6 +58,44 @@ func TestProtocalCrowTCP(t *testing.T) {
 	}
 }
 
+func TestProtocalCrowTCPServerClose(t *testing.T) {
+	defer time.Sleep(time.Second)
+	echoListener := doa.Try(net.Listen("tcp", EchoServerListenOn))
+	defer echoListener.Close()
+	go func() {
+		for {
+			c, err := echoListener.Accept()
+			if err != nil {
+				if !errors.Is(err, net.ErrClosed) {
+					log.Println(err)
+				}
+				break
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+			}(c)
+		}
+	}()
+
+	dazeServer := NewServer(DazeServerListenOn, Password)
+	defer dazeServer.Close()
+	dazeServer.Run()
+
+	dazeClient := NewClient(DazeServerListenOn, Password)
+	dazeClient.Run()
+	ctx := &daze.Context{Cid: "00000000"}
+	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
+	defer cli.Close()
+
+	buf0 := []byte("Hello World!")
+	cli.Write(buf0)
+	buf1 := make([]byte, 12)
+	_, err := io.ReadFull(cli, buf1)
+	if err == io.ErrUnexpectedEOF {
+		t.FailNow()
+	}
+}
+
 func TestProtocolCrowUDP(t *testing.T) {
 	echoAddr := doa.Try(net.ResolveUDPAddr("udp", EchoServerListenOn))
 	echoServer := doa.Try(net.ListenUDP("udp", echoAddr))
