@@ -391,7 +391,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 func (c *Client) Link() error {
 	var (
 		asheClient *ashe.Client
-		closedChan = make(chan int, 1)
+		closedChan = make(chan int)
 		err        error
 		srv        io.ReadWriteCloser
 	)
