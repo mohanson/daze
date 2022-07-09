@@ -374,9 +374,9 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	io.ReadFull(mio.Prr, buf[:8])
 	doa.Doa(buf[0] == 3)
 	if buf[3] != 0 {
-		c.IDPool <- idx
-		mio.Prw.Close()
+		mio.Closed = 1
 		mio.Prr.Close()
+		mio.Pww.Close()
 		return nil, errors.New("daze: general server failure")
 	}
 	return mio, nil
