@@ -175,7 +175,7 @@ func (s *Server) ServeSio(ctx *daze.Context, sio *SioConn, cli io.ReadWriteClose
 		buf[0] = 4
 		cli.Write(buf[:8])
 	}
-	log.Println(ctx.Cid, "closed")
+	log.Printf("%s closed idx=%x", ctx.Cid, idx)
 }
 
 // Serve. Parameter raw will be closed automatically when the function exits.
@@ -258,6 +258,8 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 				harbor[idx] = sio
 				go daze.Link(srv, sio)
 				go s.ServeSio(ctx, sio, cli, idx)
+			} else {
+				log.Println(ctx.Cid, " error", err)
 			}
 			buf[0] = 3
 			if err != nil {
@@ -338,6 +340,7 @@ func NewServer(listen string, cipher string) *Server {
 type Client struct {
 	Server string
 	Cipher [16]byte
+	Closed chan int
 	Harbor map[uint16]*SioConn
 	IDPool chan uint16
 	Srv    chan io.ReadWriteCloser
@@ -422,6 +425,11 @@ func (c *Client) Link() {
 Tag1:
 	time.Sleep(time.Second)
 Tag2:
+	select {
+	case <-c.Closed:
+		return
+	default:
+	}
 	srv, err = daze.Conf.Dialer.Dial("tcp", c.Server)
 	if err != nil {
 		log.Println(err)
@@ -503,8 +511,18 @@ Tag2:
 	}
 
 	closedChan <- 0
-
 	goto Tag1
+}
+
+// Close the static link.
+func (c *Client) Close() error {
+	close(c.Closed)
+	select {
+	case srv := <-c.Srv:
+		return srv.Close()
+	case <-time.NewTimer(time.Second * 8).C:
+		return nil
+	}
 }
 
 // NewClient returns a new Client. A secret data needs to be passed in Cipher, as a sign to interface with the Server.
@@ -516,6 +534,7 @@ func NewClient(server, cipher string) *Client {
 	client := &Client{
 		Server: server,
 		Cipher: md5.Sum([]byte(cipher)),
+		Closed: make(chan int),
 		Harbor: map[uint16]*SioConn{},
 		IDPool: idpool,
 		Srv:    make(chan io.ReadWriteCloser, 1),

@@ -44,6 +44,7 @@ func TestProtocalCrowTCP(t *testing.T) {
 	dazeServer.Run()
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
+	defer dazeClient.Close()
 	ctx := &daze.Context{Cid: "00000000"}
 	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
 	defer cli.Close()
@@ -81,6 +82,7 @@ func TestProtocalCrowTCPServerClose(t *testing.T) {
 	dazeServer.Run()
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
+	defer dazeClient.Close()
 	ctx := &daze.Context{Cid: "00000000"}
 	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
 	defer cli.Close()
@@ -96,6 +98,7 @@ func TestProtocalCrowTCPServerClose(t *testing.T) {
 
 func TestProtocalCrowTCPClientDialFailed(t *testing.T) {
 	dazeClient := NewClient(DazeServerListenOn, Password)
+	defer dazeClient.Close()
 	ctx := &daze.Context{Cid: "00000000"}
 	_, err := dazeClient.Dial(ctx, "tcp", "127.0.0.1:65535")
 	if err == nil {
@@ -114,6 +117,7 @@ func TestProtocalCrowTCPServerDialFailed(t *testing.T) {
 	dazeServer.Run()
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
+	defer dazeClient.Close()
 	ctx := &daze.Context{Cid: "00000000"}
 	_, err := dazeClient.Dial(ctx, "tcp", "127.0.0.1:65535")
 	if err == nil {
@@ -143,6 +147,7 @@ func TestProtocolCrowUDP(t *testing.T) {
 	dazeServer.Run()
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
+	defer dazeClient.Close()
 	ctx := &daze.Context{Cid: "00000000"}
 	cli := doa.Try(dazeClient.Dial(ctx, "udp", EchoServerListenOn))
 	defer cli.Close()
