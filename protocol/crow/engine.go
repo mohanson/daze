@@ -413,12 +413,16 @@ func (c *Client) Link() error {
 	)
 	srv, err = daze.Conf.Dialer.Dial("tcp", c.Server)
 	if err != nil {
-		return err
+		log.Println(err)
+		// Tail recursive, nice!
+		return c.Link()
 	}
 	asheClient = &ashe.Client{Cipher: c.Cipher}
 	srv, err = asheClient.WithCipher(&daze.Context{Cid: "00000000"}, srv)
 	if err != nil {
-		return err
+		log.Println(err)
+		// Tail recursive, nice!
+		return c.Link()
 	}
 	srv = NewLioConn(srv)
 
