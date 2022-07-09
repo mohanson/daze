@@ -59,11 +59,11 @@ import (
 // +-----+-----+-----+-----+-----+-----+-----+-----+
 
 var Conf = struct {
-	LogClient bool
-	LogServer bool
+	LogClient int
+	LogServer int
 }{
-	LogClient: true,
-	LogServer: true,
+	LogClient: 1,
+	LogServer: 1,
 }
 
 // LioConn is concurrency safe in write.
@@ -209,7 +209,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		if err != nil {
 			break
 		}
-		if Conf.LogServer {
+		if Conf.LogServer != 0 {
 			log.Printf("%s   recv data=[% x]", ctx.Cid, buf[:8])
 		}
 		cmd = buf[0]
@@ -444,7 +444,7 @@ func (c *Client) Link() error {
 		if err != nil {
 			break
 		}
-		if Conf.LogClient {
+		if Conf.LogClient != 0 {
 			log.Printf("%s   recv data=[% x]", "cccccccc", buf[:8])
 		}
 		cmd = buf[0]
