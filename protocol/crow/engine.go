@@ -470,6 +470,10 @@ func (c *Client) Serve() error {
 		for _, sio := range c.Harbor {
 			sio.CloseOther()
 		}
+
+		c.Lmutex.Lock()
+		c.Lio = nil
+		c.Lmutex.Unlock()
 	}()
 
 	return nil
