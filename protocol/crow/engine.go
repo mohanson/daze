@@ -463,6 +463,12 @@ func (c *Client) Run() error {
 				}
 			}
 		}
+
+		for _, e := range c.Harbor {
+			e.Closed = 1
+			e.Prw.Close()
+			e.Pwr.Close()
+		}
 	}()
 
 	return nil
