@@ -62,8 +62,8 @@ var Conf = struct {
 	LogClient int
 	LogServer int
 }{
-	LogClient: 1,
-	LogServer: 1,
+	LogClient: 0,
+	LogServer: 0,
 }
 
 // LioConn is concurrency safe in write.
