@@ -146,14 +146,14 @@ type Server struct {
 func (s *Server) ServeSio(ctx *daze.Context, sio *SioConn, cli io.ReadWriteCloser, idx uint16) {
 	var (
 		buf = make([]byte, 2048)
-		n   int
 		err error
+		n   int
 	)
+	buf[0] = 2
+	binary.BigEndian.PutUint16(buf[1:3], idx)
 	for {
 		n, err = sio.WriterReader.Read(buf[8:])
 		if n != 0 {
-			buf[0] = 2
-			binary.BigEndian.PutUint16(buf[1:3], idx)
 			binary.BigEndian.PutUint16(buf[3:5], uint16(n))
 			cli.Write(buf[:8+n])
 		}
@@ -164,7 +164,6 @@ func (s *Server) ServeSio(ctx *daze.Context, sio *SioConn, cli io.ReadWriteClose
 	doa.Doa(err == io.EOF || err == io.ErrClosedPipe)
 	if err == io.EOF {
 		buf[0] = 4
-		binary.BigEndian.PutUint16(buf[1:3], idx)
 		cli.Write(buf[:8])
 	}
 	log.Println(ctx.Cid, "closed")
@@ -327,8 +326,34 @@ type Client struct {
 	Cipher [16]byte
 	Harbor map[uint16]*SioConn
 	IDPool chan uint16
-	Lio    io.ReadWriteCloser
-	Lmutex *sync.Mutex
+	Srv    chan io.ReadWriteCloser
+}
+
+// DialLio.
+func (c *Client) DialLio(ctx *daze.Context, sio *SioConn, srv io.ReadWriteCloser, idx uint16) {
+	var (
+		buf = make([]byte, 2048)
+		err error
+		n   int
+	)
+	buf[0] = 2
+	binary.BigEndian.PutUint16(buf[1:3], idx)
+	for {
+		n, err = sio.WriterReader.Read(buf[8:])
+		if n != 0 {
+			binary.BigEndian.PutUint16(buf[3:5], uint16(n))
+			srv.Write(buf[:8+n])
+		}
+		if err != nil {
+			break
+		}
+	}
+	doa.Doa(err == io.EOF || err == io.ErrClosedPipe)
+	if err == io.EOF {
+		buf[0] = 4
+		srv.Write(buf[:8])
+	}
+	c.IDPool <- idx
 }
 
 // Dial connects to the address on the named network.
@@ -336,15 +361,11 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	var (
 		buf = make([]byte, 8+len(address))
 		err error
-		idx uint16
+		idx = <-c.IDPool
 		sio *SioConn
+		srv = <-c.Srv
 	)
-	err = c.Serve()
-	if err != nil {
-		return nil, err
-	}
 	buf[0] = 3
-	idx = <-c.IDPool
 	binary.BigEndian.PutUint16(buf[1:3], idx)
 	switch network {
 	case "tcp":
@@ -354,53 +375,20 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	}
 	buf[4] = uint8(len(address))
 	copy(buf[8:], []byte(address))
-	c.Lio.Write(buf)
-
+	srv.Write(buf)
 	sio = NewSioConn()
 	c.Harbor[idx] = sio
-
-	go func() {
-		buf := make([]byte, 2048)
-		buf[0] = 2
-		binary.BigEndian.PutUint16(buf[1:3], idx)
-		n := 0
-		var err error
-		for {
-			n, err = sio.WriterReader.Read(buf[8:])
-			if n != 0 {
-				binary.BigEndian.PutUint16(buf[3:5], uint16(n))
-				c.Lio.Write(buf[:8+n])
-			}
-			if err != nil {
-				break
-			}
-		}
-		if err == io.EOF {
-			buf := make([]byte, 8)
-			buf[0] = 4
-			binary.BigEndian.PutUint16(buf[1:3], idx)
-			c.Lio.Write(buf)
-		}
-		c.IDPool <- idx
-	}()
-
-	io.ReadFull(sio.ReaderReader, buf[:8])
-	doa.Doa(buf[0] == 3)
-	if buf[3] != 0 {
+	go c.DialLio(ctx, sio, srv, idx)
+	_, err = io.ReadFull(sio.ReaderReader, buf[:8])
+	if err != nil || buf[3] != 0 {
 		sio.Close()
 		return nil, errors.New("daze: general server failure")
 	}
-
 	return sio, nil
 }
 
 // Serve creates an establish connection to crow server.
 func (c *Client) Serve() error {
-	c.Lmutex.Lock()
-	defer c.Lmutex.Unlock()
-	if c.Lio != nil {
-		return nil
-	}
 	var (
 		asheClient *ashe.Client
 		srv        io.ReadWriteCloser
@@ -416,7 +404,17 @@ func (c *Client) Serve() error {
 		return err
 	}
 	srv = NewLioConn(srv)
-	c.Lio = srv
+
+	intChan := make(chan int)
+	go func() {
+		for {
+			select {
+			case c.Srv <- srv:
+			case <-intChan:
+				return
+			}
+		}
+	}()
 
 	go func() {
 		var (
@@ -471,9 +469,7 @@ func (c *Client) Serve() error {
 			sio.CloseOther()
 		}
 
-		c.Lmutex.Lock()
-		c.Lio = nil
-		c.Lmutex.Unlock()
+		intChan <- 0
 	}()
 
 	return nil
@@ -485,12 +481,13 @@ func NewClient(server, cipher string) *Client {
 	for i := uint16(1); i < 256; i++ {
 		idpool <- i
 	}
-	return &Client{
+	c := &Client{
 		Server: server,
 		Cipher: md5.Sum([]byte(cipher)),
 		Harbor: map[uint16]*SioConn{},
 		IDPool: idpool,
-		Lio:    nil,
-		Lmutex: &sync.Mutex{},
+		Srv:    make(chan io.ReadWriteCloser, 1),
 	}
+	c.Serve()
+	return c
 }
