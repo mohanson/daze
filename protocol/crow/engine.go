@@ -275,12 +275,13 @@ func NewServer(listen string, cipher string) *Server {
 	}
 }
 
+// MioConn.
 type MioConn struct {
-	C   chan int
-	Prr *io.PipeReader
-	Prw *io.PipeWriter
-	Pwr *io.PipeReader
-	Pww *io.PipeWriter
+	Closed int
+	Prr    *io.PipeReader
+	Prw    *io.PipeWriter
+	Pwr    *io.PipeReader
+	Pww    *io.PipeWriter
 }
 
 func (c *MioConn) Read(p []byte) (int, error) {
@@ -292,7 +293,14 @@ func (c *MioConn) Write(p []byte) (int, error) {
 }
 
 func (c *MioConn) Close() error {
-	close(c.C)
+	err1 := c.Prr.Close()
+	err2 := c.Pww.Close()
+	if err1 != nil {
+		return err1
+	}
+	if err2 != nil {
+		return err2
+	}
 	return nil
 }
 
@@ -300,7 +308,6 @@ func NewMioConn() *MioConn {
 	rr, rw := io.Pipe()
 	wr, ww := io.Pipe()
 	return &MioConn{
-		C:   make(chan int),
 		Prr: rr,
 		Prw: rw,
 		Pwr: wr,
@@ -354,16 +361,13 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 				break
 			}
 		}
-	}()
-
-	go func() {
-		<-mio.C
-		mio.Pww.Close()
-		mio.Prr.Close()
-		buf := make([]byte, 8)
-		buf[0] = 4
-		binary.BigEndian.PutUint16(buf[1:3], idx)
-		c.Lio.Write(buf)
+		if mio.Closed == 0 {
+			mio.Closed = 1
+			buf := make([]byte, 8)
+			buf[0] = 4
+			binary.BigEndian.PutUint16(buf[1:3], idx)
+			c.Lio.Write(buf)
+		}
 		c.IDPool <- idx
 	}()
 
@@ -445,8 +449,9 @@ func (c *Client) Run() error {
 				headerIdx = binary.BigEndian.Uint16(buf[1:3])
 				mio, ok = c.Harbor[headerIdx]
 				if ok {
+					mio.Closed = 1
 					mio.Prw.Close()
-					mio.Prr.Close()
+					mio.Pwr.Close()
 				}
 			}
 		}
