@@ -276,48 +276,35 @@ func NewServer(listen string, cipher string) *Server {
 }
 
 type MioConn struct {
-	Closed     int
-	Ctx        *daze.Context
-	Idx        uint16
-	Father     *Client
-	PipeReader *io.PipeReader
-	PipeWriter *io.PipeWriter
+	C   chan int
+	Prr *io.PipeReader
+	Prw *io.PipeWriter
+	Pwr *io.PipeReader
+	Pww *io.PipeWriter
 }
 
 func (c *MioConn) Read(p []byte) (int, error) {
-	return c.PipeReader.Read(p)
+	return c.Prr.Read(p)
 }
 
 func (c *MioConn) Write(p []byte) (int, error) {
-	if c.Closed != 0 {
-		return 0, errors.New("daze: use of closed network connection")
-	}
-	doa.Doa(len(p) <= 2040)
-	buf := make([]byte, 8+len(p))
-	buf[0] = 2
-	binary.BigEndian.PutUint16(buf[1:3], c.Idx)
-	binary.BigEndian.PutUint16(buf[3:5], uint16(len(p)))
-	copy(buf[8:], p)
-	return c.Father.Lio.Write(buf)
+	return c.Pww.Write(p)
 }
 
 func (c *MioConn) Close() error {
-	buf := make([]byte, 8)
-	buf[0] = 4
-	binary.BigEndian.PutUint16(buf[1:3], c.Idx)
-	c.Father.Lio.Write(buf)
-	c.Father.IDPool <- c.Idx
-	c.Closed = 1
-	c.PipeWriter.Close()
-	c.PipeReader.Close()
+	close(c.C)
 	return nil
 }
 
 func NewMioConn() *MioConn {
-	r, w := io.Pipe()
+	rr, rw := io.Pipe()
+	wr, ww := io.Pipe()
 	return &MioConn{
-		PipeReader: r,
-		PipeWriter: w,
+		C:   make(chan int),
+		Prr: rr,
+		Prw: rw,
+		Pwr: wr,
+		Pww: ww,
 	}
 }
 
@@ -351,18 +338,41 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	c.Lio.Write(buf)
 
 	mio = NewMioConn()
-	mio.Ctx = ctx
-	mio.Father = c
-	mio.Idx = idx
 	c.Harbor[idx] = mio
 
-	io.ReadFull(mio.PipeReader, buf[:8])
+	go func() {
+		buf := make([]byte, 2048)
+		buf[0] = 2
+		binary.BigEndian.PutUint16(buf[1:3], idx)
+		for {
+			n, err := mio.Pwr.Read(buf[8:])
+			if n != 0 {
+				binary.BigEndian.PutUint16(buf[3:5], uint16(n))
+				c.Lio.Write(buf[:8+n])
+			}
+			if err != nil {
+				break
+			}
+		}
+	}()
+
+	go func() {
+		<-mio.C
+		mio.Pww.Close()
+		mio.Prr.Close()
+		buf := make([]byte, 8)
+		buf[0] = 4
+		binary.BigEndian.PutUint16(buf[1:3], idx)
+		c.Lio.Write(buf)
+		c.IDPool <- idx
+	}()
+
+	io.ReadFull(mio.Prr, buf[:8])
 	doa.Doa(buf[0] == 3)
 	if buf[3] != 0 {
 		c.IDPool <- idx
-		mio.Closed = 1
-		mio.PipeWriter.Close()
-		mio.PipeReader.Close()
+		mio.Prw.Close()
+		mio.Prr.Close()
 		return nil, errors.New("daze: general server failure")
 	}
 	return mio, nil
@@ -422,22 +432,21 @@ func (c *Client) Run() error {
 					break
 				}
 				mio, ok = c.Harbor[headerIdx]
-				if ok && mio.Closed == 0 {
-					mio.PipeWriter.Write(buf[0:headerMsgLen])
+				if ok {
+					mio.Prw.Write(buf[0:headerMsgLen])
 				}
 			case 3:
 				headerIdx = binary.BigEndian.Uint16(buf[1:3])
 				mio, ok = c.Harbor[headerIdx]
-				if ok && mio.Closed == 0 {
-					mio.PipeWriter.Write(buf[:8])
+				if ok {
+					mio.Prw.Write(buf[:8])
 				}
 			case 4:
 				headerIdx = binary.BigEndian.Uint16(buf[1:3])
 				mio, ok = c.Harbor[headerIdx]
-				if ok && mio.Closed == 0 {
-					mio.Closed = 1
-					mio.PipeWriter.Close()
-					mio.PipeReader.Close()
+				if ok {
+					mio.Prw.Close()
+					mio.Prr.Close()
 				}
 			}
 		}
