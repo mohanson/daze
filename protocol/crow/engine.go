@@ -155,7 +155,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		if err != nil {
 			break
 		}
-		log.Printf("%s   recv data=0x%x", ctx.Cid, buf[:8])
+		// log.Printf("%s   recv data=0x%x", ctx.Cid, buf[:8])
 		headerCmd = buf[0]
 		switch headerCmd {
 		case 1:
@@ -427,7 +427,7 @@ func (c *Client) Run() error {
 			if err != nil {
 				break
 			}
-			log.Printf("%s   recv data=0x%x", "cccccccc", buf[:8])
+			// log.Printf("%s   recv data=0x%x", "cccccccc", buf[:8])
 			headerCmd = buf[0]
 			switch headerCmd {
 			case 1:
