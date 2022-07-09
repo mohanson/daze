@@ -60,11 +60,15 @@ import (
 // +-----+-----+-----+-----+-----+-----+-----+-----+
 
 var Conf = struct {
-	LogClient int
-	LogServer int
+	ClientLinkRetry   time.Duration
+	ClientLinkTimeout time.Duration
+	LogClient         int
+	LogServer         int
 }{
-	LogClient: 0,
-	LogServer: 0,
+	ClientLinkRetry:   time.Second * 4,
+	ClientLinkTimeout: time.Second * 8,
+	LogClient:         0,
+	LogServer:         0,
 }
 
 // LioConn is concurrency safe in write.
@@ -384,7 +388,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	)
 	select {
 	case srv = <-c.Srv:
-	case <-time.NewTimer(time.Second * 8).C:
+	case <-time.NewTimer(Conf.ClientLinkTimeout).C:
 		c.IDPool <- idx
 		return nil, errors.New("daze: dial timeout")
 	}
@@ -423,7 +427,7 @@ func (c *Client) Link() {
 	)
 	goto Tag2
 Tag1:
-	time.Sleep(time.Second)
+	time.Sleep(Conf.ClientLinkRetry)
 Tag2:
 	select {
 	case <-c.Closed:
@@ -517,12 +521,14 @@ Tag2:
 // Close the static link.
 func (c *Client) Close() error {
 	close(c.Closed)
-	select {
-	case srv := <-c.Srv:
-		return srv.Close()
-	case <-time.NewTimer(time.Second * 8).C:
-		return nil
-	}
+	go func() {
+		select {
+		case srv := <-c.Srv:
+			srv.Close()
+		case <-time.NewTimer(Conf.ClientLinkTimeout).C:
+		}
+	}()
+	return nil
 }
 
 // NewClient returns a new Client. A secret data needs to be passed in Cipher, as a sign to interface with the Server.
