@@ -13,6 +13,7 @@ import (
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/protocol/ashe"
 	"github.com/mohanson/daze/protocol/baboon"
+	"github.com/mohanson/daze/protocol/crow"
 )
 
 var Conf = struct {
@@ -83,6 +84,10 @@ func main() {
 				server.Masker = *flExtend
 			}
 			doa.Nil(server.Run())
+		case "crow":
+			server := crow.NewServer(*flListen, *flCipher)
+			defer server.Close()
+			doa.Nil(server.Run())
 		}
 		daze.Hang()
 	case "client":
@@ -110,6 +115,8 @@ func main() {
 				return ashe.NewClient(*flServer, *flCipher)
 			case "baboon":
 				return baboon.NewClient(*flServer, *flCipher)
+			case "crow":
+				return crow.NewClient(*flServer, *flCipher)
 			}
 			panic("unreachable")
 		}()
