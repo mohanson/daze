@@ -228,6 +228,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 				break
 			}
 			sio, ok = harbor[idx]
+			doa.Doa(ok)
 			if ok {
 				// Errors can be safely ignored. Don't ask me why, it's magic.
 				sio.ReaderWriter.Write(buf[8 : 8+msgLen])
@@ -267,6 +268,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		case 4:
 			idx = binary.BigEndian.Uint16(buf[1:3])
 			sio, ok = harbor[idx]
+			doa.Doa(ok)
 			if ok {
 				sio.CloseOther()
 			}
@@ -462,18 +464,21 @@ func (c *Client) Link() error {
 				break
 			}
 			sio, ok = c.Harbor[idx]
+			doa.Doa(ok)
 			if ok {
 				sio.ReaderWriter.Write(buf[0:msgLen])
 			}
 		case 3:
 			idx = binary.BigEndian.Uint16(buf[1:3])
 			sio, ok = c.Harbor[idx]
+			doa.Doa(ok)
 			if ok {
 				sio.ReaderWriter.Write(buf[:8])
 			}
 		case 4:
 			idx = binary.BigEndian.Uint16(buf[1:3])
 			sio, ok = c.Harbor[idx]
+			doa.Doa(ok)
 			if ok {
 				sio.CloseOther()
 			}
