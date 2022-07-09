@@ -375,9 +375,9 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	}
 	buf[4] = uint8(len(address))
 	copy(buf[8:], []byte(address))
-	srv.Write(buf)
 	sio = NewSioConn()
 	c.Harbor[idx] = sio
+	srv.Write(buf)
 	go c.DialLio(ctx, sio, srv, idx)
 	_, err = io.ReadFull(sio.ReaderReader, buf[:8])
 	if err != nil || buf[3] != 0 {
