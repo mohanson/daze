@@ -322,11 +322,15 @@ type Client struct {
 	Harbor map[uint16]*MioConn
 	IDPool chan uint16
 	Lio    io.ReadWriteCloser
+	Lmutex *sync.Mutex
 }
 
 // Dial connects to the address on the named network.
 func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.ReadWriteCloser, error) {
-	if err := c.Run(); err != nil {
+	c.Lmutex.Lock()
+	err := c.Run()
+	c.Lmutex.Unlock()
+	if err != nil {
 		return nil, err
 	}
 
@@ -476,5 +480,6 @@ func NewClient(server, cipher string) *Client {
 		Harbor: map[uint16]*MioConn{},
 		IDPool: idpool,
 		Lio:    nil,
+		Lmutex: &sync.Mutex{},
 	}
 }
