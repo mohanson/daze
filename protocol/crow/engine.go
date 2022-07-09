@@ -161,6 +161,7 @@ func (s *Server) ServeSio(ctx *daze.Context, sio *SioConn, cli io.ReadWriteClose
 			break
 		}
 	}
+	doa.Doa(err == io.EOF || err == io.ErrClosedPipe)
 	if err == io.EOF {
 		buf[0] = 4
 		binary.BigEndian.PutUint16(buf[1:3], idx)
@@ -182,54 +183,55 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		return err
 	}
 	cli = NewLioConn(cli)
+
 	var (
-		buf          = make([]byte, 2048)
-		dst          string
-		harbor       = map[uint16]*SioConn{}
-		headerCmd    uint8
-		headerDstLen uint8
-		headerDstNet uint8
-		headerIdx    uint16
-		headerMsgLen uint16
-		ok           bool
-		srv          io.ReadWriteCloser
-		sio          *SioConn
+		buf    = make([]byte, 2048)
+		cmd    uint8
+		dst    string
+		dstLen uint8
+		dstNet uint8
+		harbor = map[uint16]*SioConn{}
+		idx    uint16
+		msgLen uint16
+		ok     bool
+		srv    io.ReadWriteCloser
+		sio    *SioConn
 	)
 	for {
 		_, err = io.ReadFull(cli, buf[:8])
 		if err != nil {
 			break
 		}
-		headerCmd = buf[0]
-		switch headerCmd {
+		cmd = buf[0]
+		switch cmd {
 		case 1:
-			headerMsgLen = binary.BigEndian.Uint16(buf[3:5])
-			doa.Doa(headerMsgLen <= 2040)
+			msgLen = binary.BigEndian.Uint16(buf[3:5])
+			doa.Doa(msgLen <= 2040)
 			buf[0] = 2
-			cli.Write(buf[:8+headerMsgLen])
+			cli.Write(buf[:8+msgLen])
 		case 2:
-			headerIdx = binary.BigEndian.Uint16(buf[1:3])
-			headerMsgLen = binary.BigEndian.Uint16(buf[3:5])
-			doa.Doa(headerMsgLen <= 2040)
-			_, err = io.ReadFull(cli, buf[8:8+headerMsgLen])
+			idx = binary.BigEndian.Uint16(buf[1:3])
+			msgLen = binary.BigEndian.Uint16(buf[3:5])
+			doa.Doa(msgLen <= 2040)
+			_, err = io.ReadFull(cli, buf[8:8+msgLen])
 			if err != nil {
 				break
 			}
-			sio, ok = harbor[headerIdx]
+			sio, ok = harbor[idx]
 			if ok {
 				// Errors can be safely ignored. Don't ask me why, it's magic.
-				sio.ReaderWriter.Write(buf[8 : 8+headerMsgLen])
+				sio.ReaderWriter.Write(buf[8 : 8+msgLen])
 			}
 		case 3:
-			headerIdx = binary.BigEndian.Uint16(buf[1:3])
-			headerDstNet = buf[3]
-			headerDstLen = buf[4]
-			_, err = io.ReadFull(cli, buf[8:8+headerDstLen])
+			idx = binary.BigEndian.Uint16(buf[1:3])
+			dstNet = buf[3]
+			dstLen = buf[4]
+			_, err = io.ReadFull(cli, buf[8:8+dstLen])
 			if err != nil {
 				break
 			}
-			dst = string(buf[8 : 8+headerDstLen])
-			switch headerDstNet {
+			dst = string(buf[8 : 8+dstLen])
+			switch dstNet {
 			case 0x01:
 				log.Printf("%s   dial network=tcp address=%s", ctx.Cid, dst)
 				srv, err = daze.Conf.Dialer.Dial("tcp", dst)
@@ -241,9 +243,9 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			}
 			if err == nil {
 				sio = NewSioConn()
-				harbor[headerIdx] = sio
+				harbor[idx] = sio
 				go daze.Link(srv, sio)
-				go s.ServeSio(ctx, sio, cli, headerIdx)
+				go s.ServeSio(ctx, sio, cli, idx)
 			}
 			buf[0] = 3
 			if err != nil {
@@ -253,8 +255,8 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			}
 			cli.Write(buf[:8])
 		case 4:
-			headerIdx = binary.BigEndian.Uint16(buf[1:3])
-			sio, ok = harbor[headerIdx]
+			idx = binary.BigEndian.Uint16(buf[1:3])
+			sio, ok = harbor[idx]
 			if ok {
 				sio.CloseOther()
 			}
