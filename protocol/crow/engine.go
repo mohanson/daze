@@ -9,6 +9,7 @@ import (
 	"math"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/godump/doa"
 	"github.com/mohanson/daze"
@@ -376,8 +377,14 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		err error
 		idx = <-c.IDPool
 		sio = NewSioConn()
-		srv = <-c.Srv
+		srv io.ReadWriteCloser
 	)
+	select {
+	case srv = <-c.Srv:
+	case <-time.NewTimer(time.Second * 8).C:
+		c.IDPool <- idx
+		return nil, errors.New("daze: dial timeout")
+	}
 	c.Harbor[idx] = sio
 	buf[0] = 3
 	binary.BigEndian.PutUint16(buf[1:3], idx)
@@ -391,12 +398,12 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	copy(buf[8:], []byte(address))
 	_, err = srv.Write(buf)
 	if err != nil {
-		doa.Nil(sio.Close())
+		c.IDPool <- idx
 		return nil, err
 	}
 	_, err = io.ReadFull(sio.ReaderReader, buf[:8])
 	if err != nil || buf[3] != 0 {
-		doa.Nil(sio.Close())
+		c.IDPool <- idx
 		return nil, errors.New("daze: general server failure")
 	}
 	go c.Tail(ctx, sio, srv, idx)
