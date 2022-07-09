@@ -350,33 +350,6 @@ type Client struct {
 	Srv    chan io.ReadWriteCloser
 }
 
-// Tail.
-func (c *Client) Tail(ctx *daze.Context, sio *SioConn, srv io.ReadWriteCloser, idx uint16) {
-	var (
-		buf = make([]byte, 2048)
-		err error
-		n   int
-	)
-	buf[0] = 2
-	binary.BigEndian.PutUint16(buf[1:3], idx)
-	for {
-		n, err = sio.WriterReader.Read(buf[8:])
-		if n != 0 {
-			binary.BigEndian.PutUint16(buf[3:5], uint16(n))
-			srv.Write(buf[:8+n])
-		}
-		if err != nil {
-			break
-		}
-	}
-	doa.Doa(err == io.EOF || err == io.ErrClosedPipe)
-	if err == io.EOF {
-		buf[0] = 4
-		srv.Write(buf[:8])
-	}
-	c.IDPool <- idx
-}
-
 // Dial connects to the address on the named network.
 func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.ReadWriteCloser, error) {
 	var (
@@ -413,12 +386,39 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		c.IDPool <- idx
 		return nil, errors.New("daze: general server failure")
 	}
-	go c.Tail(ctx, sio, srv, idx)
+	go c.Proxy(ctx, sio, srv, idx)
 	return sio, nil
 }
 
+// Proxy.
+func (c *Client) Proxy(ctx *daze.Context, sio *SioConn, srv io.ReadWriteCloser, idx uint16) {
+	var (
+		buf = make([]byte, 2048)
+		err error
+		n   int
+	)
+	buf[0] = 2
+	binary.BigEndian.PutUint16(buf[1:3], idx)
+	for {
+		n, err = sio.WriterReader.Read(buf[8:])
+		if n != 0 {
+			binary.BigEndian.PutUint16(buf[3:5], uint16(n))
+			srv.Write(buf[:8+n])
+		}
+		if err != nil {
+			break
+		}
+	}
+	doa.Doa(err == io.EOF || err == io.ErrClosedPipe)
+	if err == io.EOF {
+		buf[0] = 4
+		srv.Write(buf[:8])
+	}
+	c.IDPool <- idx
+}
+
 // Serve creates an establish connection to crow server.
-func (c *Client) Link() {
+func (c *Client) Serve() {
 	var (
 		asheClient *ashe.Client
 		closedChan = make(chan int)
@@ -545,6 +545,6 @@ func NewClient(server, cipher string) *Client {
 		IDPool: idpool,
 		Srv:    make(chan io.ReadWriteCloser, 1),
 	}
-	go client.Link()
+	go client.Serve()
 	return client
 }
