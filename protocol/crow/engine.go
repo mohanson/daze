@@ -61,13 +61,13 @@ import (
 // LioConn is concurrency safe in write.
 type LioConn struct {
 	io.ReadWriteCloser
-	l *sync.Mutex
+	Lock *sync.Mutex
 }
 
 // Write implements the Conn Write method.
 func (c *LioConn) Write(p []byte) (int, error) {
-	c.l.Lock()
-	defer c.l.Unlock()
+	c.Lock.Lock()
+	defer c.Lock.Unlock()
 	return c.ReadWriteCloser.Write(p)
 }
 
@@ -75,21 +75,63 @@ func (c *LioConn) Write(p []byte) (int, error) {
 func NewLioConn(c io.ReadWriteCloser) *LioConn {
 	return &LioConn{
 		ReadWriteCloser: c,
-		l:               &sync.Mutex{},
+		Lock:            &sync.Mutex{},
 	}
 }
 
-// SioConn wraps conn and provides some property values.
+// SioConn is a combination of two pipes and it implements io.ReadWriteCloser.
 type SioConn struct {
-	io.ReadWriteCloser
-	Closed int
-	Idx    uint16
+	ReaderReader *io.PipeReader
+	ReaderWriter *io.PipeWriter
+	WriterReader *io.PipeReader
+	WriterWriter *io.PipeWriter
 }
 
-// NewSioConn returns a new SioConn. It is the caller's responsibility to set additional properties.
-func NewSioConn(c io.ReadWriteCloser) *SioConn {
+// Read implements io.Reader.
+func (c *SioConn) Read(p []byte) (int, error) {
+	return c.ReaderReader.Read(p)
+}
+
+// Write implements io.Writer.
+func (c *SioConn) Write(p []byte) (int, error) {
+	return c.WriterWriter.Write(p)
+}
+
+// Close implements io.Closer. Note that it only closes the pipe on SioConn side.
+func (c *SioConn) Close() error {
+	err1 := c.ReaderReader.Close()
+	err2 := c.WriterWriter.Close()
+	if err1 != nil {
+		return err1
+	}
+	if err2 != nil {
+		return err2
+	}
+	return nil
+}
+
+// CloseOther close the other half of the pipe.
+func (c *SioConn) CloseOther() error {
+	err1 := c.ReaderWriter.Close()
+	err2 := c.WriterReader.Close()
+	if err1 != nil {
+		return err1
+	}
+	if err2 != nil {
+		return err2
+	}
+	return nil
+}
+
+// NewSioConn returns a new MioConn.
+func NewSioConn() *SioConn {
+	rr, rw := io.Pipe()
+	wr, ww := io.Pipe()
 	return &SioConn{
-		ReadWriteCloser: c,
+		ReaderReader: rr,
+		ReaderWriter: rw,
+		WriterReader: wr,
+		WriterWriter: ww,
 	}
 }
 
@@ -101,13 +143,17 @@ type Server struct {
 }
 
 // ServeSio.
-func (s *Server) ServeSio(ctx *daze.Context, sio *SioConn, cli io.ReadWriteCloser) {
-	buf := make([]byte, 2048)
+func (s *Server) ServeSio(ctx *daze.Context, sio *SioConn, cli io.ReadWriteCloser, idx uint16) {
+	var (
+		buf = make([]byte, 2048)
+		n   int
+		err error
+	)
 	for {
-		n, err := sio.Read(buf[8:])
+		n, err = sio.WriterReader.Read(buf[8:])
 		if n != 0 {
 			buf[0] = 2
-			binary.BigEndian.PutUint16(buf[1:3], sio.Idx)
+			binary.BigEndian.PutUint16(buf[1:3], idx)
 			binary.BigEndian.PutUint16(buf[3:5], uint16(n))
 			cli.Write(buf[:8+n])
 		}
@@ -115,11 +161,10 @@ func (s *Server) ServeSio(ctx *daze.Context, sio *SioConn, cli io.ReadWriteClose
 			break
 		}
 	}
-	if sio.Closed == 0 {
+	if err == io.EOF {
 		buf[0] = 4
-		binary.BigEndian.PutUint16(buf[1:3], sio.Idx)
+		binary.BigEndian.PutUint16(buf[1:3], idx)
 		cli.Write(buf[:8])
-		sio.Closed = 1
 	}
 	log.Println(ctx.Cid, "closed")
 }
@@ -155,7 +200,6 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		if err != nil {
 			break
 		}
-		// log.Printf("%s   recv data=0x%x", ctx.Cid, buf[:8])
 		headerCmd = buf[0]
 		switch headerCmd {
 		case 1:
@@ -172,8 +216,9 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 				break
 			}
 			sio, ok = harbor[headerIdx]
-			if ok && sio.Closed == 0 {
-				sio.Write(buf[8 : 8+headerMsgLen])
+			if ok {
+				// Errors can be safely ignored. Don't ask me why, it's magic.
+				sio.ReaderWriter.Write(buf[8 : 8+headerMsgLen])
 			}
 		case 3:
 			headerIdx = binary.BigEndian.Uint16(buf[1:3])
@@ -189,15 +234,17 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 				log.Printf("%s   dial network=tcp address=%s", ctx.Cid, dst)
 				srv, err = daze.Conf.Dialer.Dial("tcp", dst)
 				srv = ashe.NewTCPConn(srv)
-				sio = NewSioConn(srv)
 			case 0x03:
 				log.Printf("%s   dial network=udp address=%s", ctx.Cid, dst)
 				srv, err = daze.Conf.Dialer.Dial("udp", dst)
 				srv = ashe.NewUDPConn(srv)
-				sio = NewSioConn(srv)
 			}
-			sio.Idx = headerIdx
-			harbor[headerIdx] = sio
+			if err == nil {
+				sio = NewSioConn()
+				harbor[headerIdx] = sio
+				go daze.Link(srv, sio)
+				go s.ServeSio(ctx, sio, cli, headerIdx)
+			}
 			buf[0] = 3
 			if err != nil {
 				buf[3] = 1
@@ -205,20 +252,17 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 				buf[3] = 0
 			}
 			cli.Write(buf[:8])
-			go s.ServeSio(ctx, sio, cli)
 		case 4:
 			headerIdx = binary.BigEndian.Uint16(buf[1:3])
 			sio, ok = harbor[headerIdx]
-			if ok && sio.Closed == 0 {
-				sio.Closed = 1
-				sio.Close()
+			if ok {
+				sio.CloseOther()
 			}
 		}
 	}
 
-	for _, e := range harbor {
-		e.Closed = 1
-		e.Close()
+	for _, sio := range harbor {
+		sio.CloseOther()
 	}
 
 	return nil
