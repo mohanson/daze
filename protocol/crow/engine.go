@@ -326,6 +326,10 @@ type Client struct {
 
 // Dial connects to the address on the named network.
 func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.ReadWriteCloser, error) {
+	if err := c.Run(); err != nil {
+		return nil, err
+	}
+
 	var (
 		buf = make([]byte, 8+len(address))
 		idx uint16

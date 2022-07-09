@@ -44,7 +44,6 @@ func TestProtocalCrowTCP(t *testing.T) {
 	dazeServer.Run()
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
-	dazeClient.Run()
 	ctx := &daze.Context{Cid: "00000000"}
 	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
 	defer cli.Close()
@@ -82,7 +81,6 @@ func TestProtocalCrowTCPServerClose(t *testing.T) {
 	dazeServer.Run()
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
-	dazeClient.Run()
 	ctx := &daze.Context{Cid: "00000000"}
 	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
 	defer cli.Close()
@@ -117,7 +115,6 @@ func TestProtocolCrowUDP(t *testing.T) {
 	dazeServer.Run()
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
-	dazeClient.Run()
 	ctx := &daze.Context{Cid: "00000000"}
 	cli := doa.Try(dazeClient.Dial(ctx, "udp", EchoServerListenOn))
 	defer cli.Close()
