@@ -95,6 +95,7 @@ func TestProtocalCrowTCPServerClose(t *testing.T) {
 }
 
 func TestProtocolCrowUDP(t *testing.T) {
+	defer time.Sleep(time.Second)
 	echoAddr := doa.Try(net.ResolveUDPAddr("udp", EchoServerListenOn))
 	echoServer := doa.Try(net.ListenUDP("udp", echoAddr))
 	defer echoServer.Close()
