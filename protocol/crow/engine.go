@@ -275,7 +275,7 @@ func NewServer(listen string, cipher string) *Server {
 	}
 }
 
-// MioConn.
+// MioConn is a combination of two pipes and it implements io.ReadWriteCloser.
 type MioConn struct {
 	Closed int
 	Prr    *io.PipeReader
@@ -284,14 +284,17 @@ type MioConn struct {
 	Pww    *io.PipeWriter
 }
 
+// Read implements io.Reader.
 func (c *MioConn) Read(p []byte) (int, error) {
 	return c.Prr.Read(p)
 }
 
+// Write implements io.Writer.
 func (c *MioConn) Write(p []byte) (int, error) {
 	return c.Pww.Write(p)
 }
 
+// Close implements io.Closer. Note that it only closes the pipe on SioConn side.
 func (c *MioConn) Close() error {
 	err1 := c.Prr.Close()
 	err2 := c.Pww.Close()
@@ -304,6 +307,7 @@ func (c *MioConn) Close() error {
 	return nil
 }
 
+// NewMioConn returns a new MioConn.
 func NewMioConn() *MioConn {
 	rr, rw := io.Pipe()
 	wr, ww := io.Pipe()
