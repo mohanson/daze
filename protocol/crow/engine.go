@@ -388,7 +388,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 }
 
 // Serve creates an establish connection to crow server.
-func (c *Client) Serve() error {
+func (c *Client) Link() error {
 	var (
 		asheClient *ashe.Client
 		closedChan = make(chan int, 1)
@@ -416,63 +416,61 @@ func (c *Client) Serve() error {
 		}
 	}()
 
-	go func() {
-		var (
-			buf    = make([]byte, 2048)
-			cmd    uint8
-			err    error
-			idx    uint16
-			msgLen uint16
-			ok     bool
-			sio    *SioConn
-		)
-		for {
-			_, err = io.ReadFull(srv, buf[:8])
+	var (
+		buf    = make([]byte, 2048)
+		cmd    uint8
+		idx    uint16
+		msgLen uint16
+		ok     bool
+		sio    *SioConn
+	)
+	for {
+		_, err = io.ReadFull(srv, buf[:8])
+		if err != nil {
+			break
+		}
+		cmd = buf[0]
+		switch cmd {
+		case 1:
+			msgLen = binary.BigEndian.Uint16(buf[3:5])
+			doa.Doa(msgLen <= 2040)
+			buf[0] = 2
+			srv.Write(buf[:8+msgLen])
+		case 2:
+			idx = binary.BigEndian.Uint16(buf[1:3])
+			msgLen = binary.BigEndian.Uint16(buf[3:5])
+			doa.Doa(int(msgLen) <= 2040)
+			_, err = io.ReadFull(srv, buf[:msgLen])
 			if err != nil {
 				break
 			}
-			cmd = buf[0]
-			switch cmd {
-			case 1:
-				msgLen = binary.BigEndian.Uint16(buf[3:5])
-				doa.Doa(msgLen <= 2040)
-				buf[0] = 2
-				srv.Write(buf[:8+msgLen])
-			case 2:
-				idx = binary.BigEndian.Uint16(buf[1:3])
-				msgLen = binary.BigEndian.Uint16(buf[3:5])
-				doa.Doa(int(msgLen) <= 2040)
-				_, err = io.ReadFull(srv, buf[:msgLen])
-				if err != nil {
-					break
-				}
-				sio, ok = c.Harbor[idx]
-				if ok {
-					sio.ReaderWriter.Write(buf[0:msgLen])
-				}
-			case 3:
-				idx = binary.BigEndian.Uint16(buf[1:3])
-				sio, ok = c.Harbor[idx]
-				if ok {
-					sio.ReaderWriter.Write(buf[:8])
-				}
-			case 4:
-				idx = binary.BigEndian.Uint16(buf[1:3])
-				sio, ok = c.Harbor[idx]
-				if ok {
-					sio.CloseOther()
-				}
+			sio, ok = c.Harbor[idx]
+			if ok {
+				sio.ReaderWriter.Write(buf[0:msgLen])
+			}
+		case 3:
+			idx = binary.BigEndian.Uint16(buf[1:3])
+			sio, ok = c.Harbor[idx]
+			if ok {
+				sio.ReaderWriter.Write(buf[:8])
+			}
+		case 4:
+			idx = binary.BigEndian.Uint16(buf[1:3])
+			sio, ok = c.Harbor[idx]
+			if ok {
+				sio.CloseOther()
 			}
 		}
+	}
 
-		for _, sio := range c.Harbor {
-			sio.CloseOther()
-		}
+	for _, sio := range c.Harbor {
+		sio.CloseOther()
+	}
 
-		close(closedChan)
-	}()
+	close(closedChan)
 
-	return nil
+	// Tail recursive, nice!
+	return c.Link()
 }
 
 // NewClient returns a new Client. A secret data needs to be passed in Cipher, as a sign to interface with the Server.
@@ -488,6 +486,6 @@ func NewClient(server, cipher string) *Client {
 		IDPool: idpool,
 		Srv:    make(chan io.ReadWriteCloser, 1),
 	}
-	client.Serve()
+	go client.Link()
 	return client
 }
