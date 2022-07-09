@@ -420,47 +420,47 @@ func (c *Client) Serve() error {
 
 	go func() {
 		var (
-			buf          = make([]byte, 2048)
-			err          error
-			sio          *SioConn
-			headerCmd    uint8
-			headerIdx    uint16
-			headerMsgLen uint16
-			ok           bool
+			buf    = make([]byte, 2048)
+			cmd    uint8
+			err    error
+			idx    uint16
+			msgLen uint16
+			ok     bool
+			sio    *SioConn
 		)
 		for {
 			_, err = io.ReadFull(srv, buf[:8])
 			if err != nil {
 				break
 			}
-			headerCmd = buf[0]
-			switch headerCmd {
+			cmd = buf[0]
+			switch cmd {
 			case 1:
-				headerMsgLen = binary.BigEndian.Uint16(buf[3:5])
-				doa.Doa(headerMsgLen <= 2040)
+				msgLen = binary.BigEndian.Uint16(buf[3:5])
+				doa.Doa(msgLen <= 2040)
 				buf[0] = 2
-				srv.Write(buf[:8+headerMsgLen])
+				srv.Write(buf[:8+msgLen])
 			case 2:
-				headerIdx = binary.BigEndian.Uint16(buf[1:3])
-				headerMsgLen = binary.BigEndian.Uint16(buf[3:5])
-				doa.Doa(int(headerMsgLen) <= 2040)
-				_, err = io.ReadFull(srv, buf[:headerMsgLen])
+				idx = binary.BigEndian.Uint16(buf[1:3])
+				msgLen = binary.BigEndian.Uint16(buf[3:5])
+				doa.Doa(int(msgLen) <= 2040)
+				_, err = io.ReadFull(srv, buf[:msgLen])
 				if err != nil {
 					break
 				}
-				sio, ok = c.Harbor[headerIdx]
+				sio, ok = c.Harbor[idx]
 				if ok {
-					sio.ReaderWriter.Write(buf[0:headerMsgLen])
+					sio.ReaderWriter.Write(buf[0:msgLen])
 				}
 			case 3:
-				headerIdx = binary.BigEndian.Uint16(buf[1:3])
-				sio, ok = c.Harbor[headerIdx]
+				idx = binary.BigEndian.Uint16(buf[1:3])
+				sio, ok = c.Harbor[idx]
 				if ok {
 					sio.ReaderWriter.Write(buf[:8])
 				}
 			case 4:
-				headerIdx = binary.BigEndian.Uint16(buf[1:3])
-				sio, ok = c.Harbor[headerIdx]
+				idx = binary.BigEndian.Uint16(buf[1:3])
+				sio, ok = c.Harbor[idx]
 				if ok {
 					sio.CloseOther()
 				}
