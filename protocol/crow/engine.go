@@ -344,7 +344,7 @@ type Client struct {
 	Server string
 	Cipher [16]byte
 	Closed chan int
-	Harbor map[uint16]*SioConn
+	Harbor []*SioConn
 	IDPool chan uint16
 	Srv    chan io.ReadWriteCloser
 }
@@ -461,7 +461,6 @@ Tag2:
 		cmd    uint8
 		idx    uint16
 		msgLen uint16
-		ok     bool
 		sio    *SioConn
 	)
 	for {
@@ -487,29 +486,29 @@ Tag2:
 			if err != nil {
 				break
 			}
-			sio, ok = c.Harbor[idx]
-			if ok {
+			sio = c.Harbor[idx]
+			if sio != nil {
 				sio.ReaderWriter.Write(buf[0:msgLen])
 			}
 		case 3:
 			idx = binary.BigEndian.Uint16(buf[1:3])
-			sio, ok = c.Harbor[idx]
-			doa.Doa(ok)
-			if ok {
+			sio = c.Harbor[idx]
+			if sio != nil {
 				sio.ReaderWriter.Write(buf[:8])
 			}
 		case 4:
 			idx = binary.BigEndian.Uint16(buf[1:3])
-			sio, ok = c.Harbor[idx]
-			doa.Doa(ok)
-			if ok {
+			sio = c.Harbor[idx]
+			if sio != nil {
 				sio.CloseOther()
 			}
 		}
 	}
 
 	for _, sio := range c.Harbor {
-		sio.CloseOther()
+		if sio != nil {
+			sio.CloseOther()
+		}
 	}
 
 	closedChan <- 0
@@ -537,7 +536,7 @@ func NewClient(server, cipher string) *Client {
 		Server: server,
 		Cipher: md5.Sum([]byte(cipher)),
 		Closed: make(chan int),
-		Harbor: map[uint16]*SioConn{},
+		Harbor: make([]*SioConn, Conf.HarborSize),
 		IDPool: idpool,
 		Srv:    make(chan io.ReadWriteCloser, 1),
 	}
