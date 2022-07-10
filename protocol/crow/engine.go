@@ -62,17 +62,19 @@ import (
 
 // Conf is acting as package level configuration.
 var Conf = struct {
-	ClientLinkRetry   time.Duration
-	ClientLinkTimeout time.Duration
-	HarborSize        int
-	LogClient         int
-	LogServer         int
+	ClientLinkRetry         time.Duration
+	ClientLinkTimeout       time.Duration
+	HarborSize              int
+	MaximumTransmissionUnit int
+	LogClient               int
+	LogServer               int
 }{
-	ClientLinkRetry:   time.Second * 4,
-	ClientLinkTimeout: time.Second * 8,
-	HarborSize:        256,
-	LogClient:         0,
-	LogServer:         0,
+	ClientLinkRetry:         time.Second * 4,
+	ClientLinkTimeout:       time.Second * 8,
+	HarborSize:              256,
+	MaximumTransmissionUnit: 2048,
+	LogClient:               0,
+	LogServer:               0,
 }
 
 // LioConn is concurrency safe in write.
@@ -162,7 +164,7 @@ type Server struct {
 // ServeSio.
 func (s *Server) ServeSio(ctx *daze.Context, sio *SioConn, cli io.ReadWriteCloser, idx uint16) {
 	var (
-		buf = make([]byte, 2048)
+		buf = make([]byte, Conf.MaximumTransmissionUnit)
 		err error
 		n   int
 	)
@@ -201,7 +203,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	cli = NewLioConn(cli)
 
 	var (
-		buf    = make([]byte, 2048)
+		buf    = make([]byte, Conf.MaximumTransmissionUnit)
 		cmd    uint8
 		dst    string
 		dstLen uint8
@@ -224,13 +226,11 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		switch cmd {
 		case 1:
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
-			doa.Doa(msgLen <= 2040)
 			buf[0] = 2
 			cli.Write(buf[:8+msgLen])
 		case 2:
 			idx = binary.BigEndian.Uint16(buf[1:3])
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
-			doa.Doa(msgLen <= 2040)
 			_, err = io.ReadFull(cli, buf[8:8+msgLen])
 			if err != nil {
 				break
@@ -393,7 +393,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 // Proxy.
 func (c *Client) Proxy(ctx *daze.Context, sio *SioConn, srv io.ReadWriteCloser, idx uint16) {
 	var (
-		buf = make([]byte, 2048)
+		buf = make([]byte, Conf.MaximumTransmissionUnit)
 		err error
 		n   int
 	)
@@ -456,7 +456,7 @@ Tag2:
 	}()
 
 	var (
-		buf    = make([]byte, 2048)
+		buf    = make([]byte, Conf.MaximumTransmissionUnit)
 		cmd    uint8
 		idx    uint16
 		msgLen uint16
@@ -474,13 +474,11 @@ Tag2:
 		switch cmd {
 		case 1:
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
-			doa.Doa(msgLen <= 2040)
 			buf[0] = 2
 			srv.Write(buf[:8+msgLen])
 		case 2:
 			idx = binary.BigEndian.Uint16(buf[1:3])
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
-			doa.Doa(int(msgLen) <= 2040)
 			_, err = io.ReadFull(srv, buf[:msgLen])
 			if err != nil {
 				break
