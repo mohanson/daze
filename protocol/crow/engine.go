@@ -468,7 +468,7 @@ Tag2:
 			break
 		}
 		if Conf.LogClient != 0 {
-			log.Printf("%s   recv data=[% x]", "cccccccc", buf[:8])
+			log.Printf("%s   recv data=[% x]", ctx.Cid, buf[:8])
 		}
 		cmd = buf[0]
 		switch cmd {
