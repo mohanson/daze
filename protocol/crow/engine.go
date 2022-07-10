@@ -205,10 +205,9 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		dst    string
 		dstLen uint8
 		dstNet uint8
-		harbor = map[uint16]*SioConn{}
+		harbor = make([]*SioConn, Conf.HarborSize)
 		idx    uint16
 		msgLen uint16
-		ok     bool
 		srv    io.ReadWriteCloser
 		sio    *SioConn
 	)
@@ -235,9 +234,8 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			if err != nil {
 				break
 			}
-			sio, ok = harbor[idx]
-			doa.Doa(ok)
-			if ok {
+			sio = harbor[idx]
+			if sio != nil {
 				// Errors can be safely ignored. Don't ask me why, it's magic.
 				sio.ReaderWriter.Write(buf[8 : 8+msgLen])
 			}
@@ -260,33 +258,31 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 				srv, err = daze.Conf.Dialer.Dial("udp", dst)
 				srv = ashe.NewUDPConn(srv)
 			}
+			buf[0] = 3
 			if err == nil {
+				buf[3] = 0
 				sio = NewSioConn()
 				harbor[idx] = sio
 				go daze.Link(srv, sio)
 				go s.ServeSio(ctx, sio, cli, idx)
 			} else {
-				log.Println(ctx.Cid, " error", err)
-			}
-			buf[0] = 3
-			if err != nil {
 				buf[3] = 1
-			} else {
-				buf[3] = 0
+				log.Println(ctx.Cid, " error", err)
 			}
 			cli.Write(buf[:8])
 		case 4:
 			idx = binary.BigEndian.Uint16(buf[1:3])
-			sio, ok = harbor[idx]
-			doa.Doa(ok)
-			if ok {
+			sio = harbor[idx]
+			if sio != nil {
 				sio.CloseOther()
 			}
 		}
 	}
 
 	for _, sio := range harbor {
-		sio.CloseOther()
+		if sio != nil {
+			sio.CloseOther()
+		}
 	}
 
 	return nil
