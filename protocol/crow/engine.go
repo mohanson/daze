@@ -59,6 +59,7 @@ import (
 // |  4  |    Idx    |             Rsv             |
 // +-----+-----+-----+-----+-----+-----+-----+-----+
 
+// Conf is acting as package level configuration.
 var Conf = struct {
 	ClientLinkRetry   time.Duration
 	ClientLinkTimeout time.Duration
