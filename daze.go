@@ -18,10 +18,8 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
-	"net/http/pprof"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -968,14 +966,6 @@ func Hu32(u uint32) string {
 // Hang prevent program from exiting.
 func Hang() {
 	select {}
-}
-
-// Open golang pprof.
-func HTTPProf(listen string) {
-	_ = pprof.Profile
-	runtime.SetBlockProfileRate(1)
-	runtime.SetMutexProfileFraction(1)
-	go http.ListenAndServe(listen, nil)
 }
 
 // ============================================================================

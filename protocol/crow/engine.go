@@ -420,7 +420,6 @@ func (c *Client) Proxy(ctx *daze.Context, sio *SioConn, srv io.ReadWriteCloser, 
 // Serve creates an establish connection to crow server.
 func (c *Client) Serve() {
 	var (
-		adjustChan = make(chan int)
 		asheClient *ashe.Client
 		closedChan = make(chan int)
 		err        error
@@ -452,21 +451,6 @@ Tag2:
 		for {
 			select {
 			case c.Srv <- srv:
-			case <-closedChan:
-				return
-			}
-		}
-	}()
-
-	go func() {
-		timer := time.NewTimer(time.Microsecond * 100)
-		buf := []byte{0x01, 0x00, 0x00, 0x07, 0xf8, 0x00, 0x00, 0x00}
-		for {
-			select {
-			case <-adjustChan:
-				timer.Reset(time.Microsecond * 50)
-			case <-timer.C:
-				srv.Write(buf)
 			case <-closedChan:
 				return
 			}
@@ -523,15 +507,12 @@ Tag2:
 				sio.CloseOther()
 			}
 		}
-
-		adjustChan <- 0
 	}
 
 	for _, sio := range c.Harbor {
 		sio.CloseOther()
 	}
 
-	closedChan <- 0
 	closedChan <- 0
 	goto Tag1
 }

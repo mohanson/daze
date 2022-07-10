@@ -65,7 +65,6 @@ func main() {
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon}")
 			flExtend = flag.String("e", "", "extend data for different protocols")
-			flPprof  = flag.String("pprof", "", "listen address for golang net/http/pprof")
 		)
 		flag.Parse()
 		log.Println("server cipher is", *flCipher)
@@ -90,9 +89,6 @@ func main() {
 			defer server.Close()
 			doa.Nil(server.Run())
 		}
-		if *flPprof != "" {
-			daze.HTTPProf(*flPprof)
-		}
 		daze.Hang()
 	case "client":
 		var (
@@ -104,7 +100,6 @@ func main() {
 			flCIDRls = flag.String("c", filepath.Join(resExec, Conf.PathCIDR), "cidr path")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon}")
-			flPprof  = flag.String("pprof", "", "listen address for golang net/http/pprof")
 		)
 		flag.Parse()
 		log.Println("remote server is", *flServer)
@@ -173,9 +168,6 @@ func main() {
 		locale := daze.NewLocale(*flListen, aimbot)
 		defer locale.Close()
 		doa.Nil(locale.Run())
-		if *flPprof != "" {
-			daze.HTTPProf(*flPprof)
-		}
 		daze.Hang()
 	case "gen":
 		flag.Usage = func() {
