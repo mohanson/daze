@@ -428,10 +428,10 @@ func (c *Client) Serve() {
 	goto Tag2
 Tag1:
 	time.Sleep(Conf.ClientLinkRetry)
-Tag2:
 	if atomic.LoadUint32(&c.Closed) != 0 {
 		return
 	}
+Tag2:
 	srv, err = daze.Conf.Dialer.Dial("tcp", c.Server)
 	if err != nil {
 		log.Println(err)
