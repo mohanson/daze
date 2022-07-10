@@ -179,7 +179,7 @@ func (s *Server) ServeSio(ctx *daze.Context, sio *SioConn, cli io.ReadWriteClose
 		buf[0] = 4
 		cli.Write(buf[:8])
 	}
-	log.Printf("%s closed idx=%x", ctx.Cid, idx)
+	log.Printf("%s closed idx=%02x", ctx.Cid, idx)
 }
 
 // Serve. Parameter raw will be closed automatically when the function exits.
