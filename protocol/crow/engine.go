@@ -537,7 +537,7 @@ func NewClient(server, cipher string) *Client {
 		Closed: 0,
 		Harbor: make([]*SioConn, Conf.HarborSize),
 		IDPool: idpool,
-		Srv:    make(chan io.ReadWriteCloser, 1),
+		Srv:    make(chan io.ReadWriteCloser),
 	}
 	go client.Serve()
 	return client
