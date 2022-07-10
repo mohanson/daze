@@ -479,13 +479,13 @@ Tag2:
 		case 2:
 			idx = binary.BigEndian.Uint16(buf[1:3])
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
-			_, err = io.ReadFull(srv, buf[:msgLen])
+			_, err = io.ReadFull(srv, buf[0:msgLen])
 			if err != nil {
 				break
 			}
 			sio = c.Harbor[idx]
 			if sio != nil {
-				sio.ReaderWriter.Write(buf[0:msgLen])
+				sio.ReaderWriter.Write(buf[:msgLen])
 			}
 		case 3:
 			idx = binary.BigEndian.Uint16(buf[1:3])
