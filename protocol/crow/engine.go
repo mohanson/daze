@@ -62,11 +62,13 @@ import (
 var Conf = struct {
 	ClientLinkRetry   time.Duration
 	ClientLinkTimeout time.Duration
+	HarborSize        int
 	LogClient         int
 	LogServer         int
 }{
 	ClientLinkRetry:   time.Second * 4,
 	ClientLinkTimeout: time.Second * 8,
+	HarborSize:        256,
 	LogClient:         0,
 	LogServer:         0,
 }
@@ -530,9 +532,9 @@ func (c *Client) Close() error {
 
 // NewClient returns a new Client. A secret data needs to be passed in Cipher, as a sign to interface with the Server.
 func NewClient(server, cipher string) *Client {
-	idpool := make(chan uint16, 256)
-	for i := uint16(1); i < 256; i++ {
-		idpool <- i
+	idpool := make(chan uint16, Conf.HarborSize)
+	for i := 1; i < Conf.HarborSize; i++ {
+		idpool <- uint16(i)
 	}
 	client := &Client{
 		Server: server,
