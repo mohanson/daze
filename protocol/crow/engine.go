@@ -418,7 +418,7 @@ func (c *Client) Proxy(ctx *daze.Context, sio *SioConn, srv io.ReadWriteCloser, 
 }
 
 // Serve creates an establish connection to crow server.
-func (c *Client) Serve() {
+func (c *Client) Serve(ctx *daze.Context) {
 	var (
 		asheClient *ashe.Client
 		closedChan = make(chan int)
@@ -434,13 +434,13 @@ Tag1:
 Tag2:
 	srv, err = daze.Conf.Dialer.Dial("tcp", c.Server)
 	if err != nil {
-		log.Println(err)
+		log.Println(ctx.Cid, " error", err)
 		goto Tag1
 	}
 	asheClient = &ashe.Client{Cipher: c.Cipher}
-	srv, err = asheClient.WithCipher(&daze.Context{Cid: "00000000"}, srv)
+	srv, err = asheClient.WithCipher(ctx, srv)
 	if err != nil {
-		log.Println(err)
+		log.Println(ctx.Cid, " error", err)
 		goto Tag1
 	}
 	srv = NewLioConn(srv)
@@ -539,6 +539,6 @@ func NewClient(server, cipher string) *Client {
 		IDPool: idpool,
 		Srv:    make(chan io.ReadWriteCloser),
 	}
-	go client.Serve()
+	go client.Serve(&daze.Context{Cid: "000serve"})
 	return client
 }
