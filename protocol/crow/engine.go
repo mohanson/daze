@@ -521,14 +521,12 @@ Tag2:
 // Close the static link.
 func (c *Client) Close() error {
 	close(c.Closed)
-	go func() {
-		select {
-		case srv := <-c.Srv:
-			srv.Close()
-		case <-time.NewTimer(Conf.ClientLinkTimeout).C:
-		}
-	}()
-	return nil
+	select {
+	case srv := <-c.Srv:
+		return srv.Close()
+	default:
+		return nil
+	}
 }
 
 // NewClient returns a new Client. A secret data needs to be passed in Cipher, as a sign to interface with the Server.
