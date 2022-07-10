@@ -9,6 +9,7 @@ import (
 	"math"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/godump/doa"
@@ -343,7 +344,7 @@ func NewServer(listen string, cipher string) *Server {
 type Client struct {
 	Server string
 	Cipher [16]byte
-	Closed chan int
+	Closed uint32
 	Harbor []*SioConn
 	IDPool chan uint16
 	Srv    chan io.ReadWriteCloser
@@ -428,10 +429,8 @@ func (c *Client) Serve() {
 Tag1:
 	time.Sleep(Conf.ClientLinkRetry)
 Tag2:
-	select {
-	case <-c.Closed:
+	if atomic.LoadUint32(&c.Closed) != 0 {
 		return
-	default:
 	}
 	srv, err = daze.Conf.Dialer.Dial("tcp", c.Server)
 	if err != nil {
@@ -517,7 +516,7 @@ Tag2:
 
 // Close the static link.
 func (c *Client) Close() error {
-	close(c.Closed)
+	atomic.StoreUint32(&c.Closed, 1)
 	select {
 	case srv := <-c.Srv:
 		return srv.Close()
@@ -535,7 +534,7 @@ func NewClient(server, cipher string) *Client {
 	client := &Client{
 		Server: server,
 		Cipher: md5.Sum([]byte(cipher)),
-		Closed: make(chan int),
+		Closed: 0,
 		Harbor: make([]*SioConn, Conf.HarborSize),
 		IDPool: idpool,
 		Srv:    make(chan io.ReadWriteCloser, 1),
