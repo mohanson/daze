@@ -378,11 +378,13 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	copy(buf[8:], []byte(address))
 	_, err = srv.Write(buf)
 	if err != nil {
+		sio.Close()
 		c.IDPool <- idx
 		return nil, err
 	}
 	_, err = io.ReadFull(sio.ReaderReader, buf[:8])
 	if err != nil || buf[3] != 0 {
+		sio.Close()
 		c.IDPool <- idx
 		return nil, errors.New("daze: general server failure")
 	}
