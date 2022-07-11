@@ -353,19 +353,22 @@ type Client struct {
 // Dial connects to the address on the named network.
 func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.ReadWriteCloser, error) {
 	var (
-		buf = make([]byte, 8+len(address))
+		buf []byte
 		err error
-		idx = <-c.IDPool
-		sio = NewSioConn()
+		idx uint16
+		sio *SioConn
 		srv io.ReadWriteCloser
 	)
 	select {
 	case srv = <-c.Srv:
 	case <-time.NewTimer(Conf.ClientLinkTimeout).C:
-		c.IDPool <- idx
 		return nil, errors.New("daze: dial timeout")
 	}
+	idx = <-c.IDPool
+	sio = NewSioConn()
 	c.Harbor[idx] = sio
+
+	buf = make([]byte, 8+len(address))
 	buf[0] = 3
 	binary.BigEndian.PutUint16(buf[1:3], idx)
 	switch network {
@@ -376,20 +379,25 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	}
 	buf[4] = uint8(len(address))
 	copy(buf[8:], []byte(address))
+
 	_, err = srv.Write(buf)
 	if err != nil {
-		sio.Close()
-		c.IDPool <- idx
-		return nil, err
+		goto Fail
 	}
 	_, err = io.ReadFull(sio.ReaderReader, buf[:8])
 	if err != nil || buf[3] != 0 {
-		sio.Close()
-		c.IDPool <- idx
-		return nil, errors.New("daze: general server failure")
+		err = errors.New("daze: general server failure")
+		goto Fail
 	}
+
 	go c.Proxy(ctx, sio, srv, idx)
+
 	return sio, nil
+Fail:
+	sio.Close()
+	sio.CloseOther()
+	c.IDPool <- idx
+	return nil, err
 }
 
 // Proxy.
