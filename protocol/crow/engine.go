@@ -9,6 +9,7 @@ import (
 	"math"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/godump/doa"
@@ -59,16 +60,21 @@ import (
 // |  4  |    Idx    |             Rsv             |
 // +-----+-----+-----+-----+-----+-----+-----+-----+
 
+// Conf is acting as package level configuration.
 var Conf = struct {
-	ClientLinkRetry   time.Duration
-	ClientLinkTimeout time.Duration
-	LogClient         int
-	LogServer         int
+	ClientLinkRetry         time.Duration
+	ClientLinkTimeout       time.Duration
+	HarborSize              int
+	MaximumTransmissionUnit int
+	LogClient               int
+	LogServer               int
 }{
-	ClientLinkRetry:   time.Second * 4,
-	ClientLinkTimeout: time.Second * 8,
-	LogClient:         0,
-	LogServer:         0,
+	ClientLinkRetry:         time.Second * 4,
+	ClientLinkTimeout:       time.Second * 8,
+	HarborSize:              256,
+	MaximumTransmissionUnit: 4096,
+	LogClient:               0,
+	LogServer:               0,
 }
 
 // LioConn is concurrency safe in write.
@@ -158,7 +164,7 @@ type Server struct {
 // ServeSio.
 func (s *Server) ServeSio(ctx *daze.Context, sio *SioConn, cli io.ReadWriteCloser, idx uint16) {
 	var (
-		buf = make([]byte, 2048)
+		buf = make([]byte, Conf.MaximumTransmissionUnit)
 		err error
 		n   int
 	)
@@ -197,15 +203,14 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	cli = NewLioConn(cli)
 
 	var (
-		buf    = make([]byte, 2048)
+		buf    = make([]byte, Conf.MaximumTransmissionUnit)
 		cmd    uint8
 		dst    string
 		dstLen uint8
 		dstNet uint8
-		harbor = map[uint16]*SioConn{}
+		harbor = make([]*SioConn, Conf.HarborSize)
 		idx    uint16
 		msgLen uint16
-		ok     bool
 		srv    io.ReadWriteCloser
 		sio    *SioConn
 	)
@@ -221,20 +226,17 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		switch cmd {
 		case 1:
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
-			doa.Doa(msgLen <= 2040)
 			buf[0] = 2
 			cli.Write(buf[:8+msgLen])
 		case 2:
 			idx = binary.BigEndian.Uint16(buf[1:3])
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
-			doa.Doa(msgLen <= 2040)
 			_, err = io.ReadFull(cli, buf[8:8+msgLen])
 			if err != nil {
 				break
 			}
-			sio, ok = harbor[idx]
-			doa.Doa(ok)
-			if ok {
+			sio = harbor[idx]
+			if sio != nil {
 				// Errors can be safely ignored. Don't ask me why, it's magic.
 				sio.ReaderWriter.Write(buf[8 : 8+msgLen])
 			}
@@ -257,33 +259,31 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 				srv, err = daze.Conf.Dialer.Dial("udp", dst)
 				srv = ashe.NewUDPConn(srv)
 			}
+			buf[0] = 3
 			if err == nil {
+				buf[3] = 0
 				sio = NewSioConn()
 				harbor[idx] = sio
 				go daze.Link(srv, sio)
 				go s.ServeSio(ctx, sio, cli, idx)
 			} else {
-				log.Println(ctx.Cid, " error", err)
-			}
-			buf[0] = 3
-			if err != nil {
 				buf[3] = 1
-			} else {
-				buf[3] = 0
+				log.Println(ctx.Cid, " error", err)
 			}
 			cli.Write(buf[:8])
 		case 4:
 			idx = binary.BigEndian.Uint16(buf[1:3])
-			sio, ok = harbor[idx]
-			doa.Doa(ok)
-			if ok {
+			sio = harbor[idx]
+			if sio != nil {
 				sio.CloseOther()
 			}
 		}
 	}
 
 	for _, sio := range harbor {
-		sio.CloseOther()
+		if sio != nil {
+			sio.CloseOther()
+		}
 	}
 
 	return nil
@@ -344,8 +344,8 @@ func NewServer(listen string, cipher string) *Server {
 type Client struct {
 	Server string
 	Cipher [16]byte
-	Closed chan int
-	Harbor map[uint16]*SioConn
+	Closed uint32
+	Harbor []*SioConn
 	IDPool chan uint16
 	Srv    chan io.ReadWriteCloser
 }
@@ -353,19 +353,22 @@ type Client struct {
 // Dial connects to the address on the named network.
 func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.ReadWriteCloser, error) {
 	var (
-		buf = make([]byte, 8+len(address))
+		buf []byte
 		err error
-		idx = <-c.IDPool
-		sio = NewSioConn()
+		idx uint16
+		sio *SioConn
 		srv io.ReadWriteCloser
 	)
 	select {
 	case srv = <-c.Srv:
 	case <-time.NewTimer(Conf.ClientLinkTimeout).C:
-		c.IDPool <- idx
 		return nil, errors.New("daze: dial timeout")
 	}
+	idx = <-c.IDPool
+	sio = NewSioConn()
 	c.Harbor[idx] = sio
+
+	buf = make([]byte, 8+len(address))
 	buf[0] = 3
 	binary.BigEndian.PutUint16(buf[1:3], idx)
 	switch network {
@@ -376,24 +379,31 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	}
 	buf[4] = uint8(len(address))
 	copy(buf[8:], []byte(address))
+
 	_, err = srv.Write(buf)
 	if err != nil {
-		c.IDPool <- idx
-		return nil, err
+		goto Fail
 	}
 	_, err = io.ReadFull(sio.ReaderReader, buf[:8])
 	if err != nil || buf[3] != 0 {
-		c.IDPool <- idx
-		return nil, errors.New("daze: general server failure")
+		err = errors.New("daze: general server failure")
+		goto Fail
 	}
+
 	go c.Proxy(ctx, sio, srv, idx)
+
 	return sio, nil
+Fail:
+	sio.Close()
+	sio.CloseOther()
+	c.IDPool <- idx
+	return nil, err
 }
 
 // Proxy.
 func (c *Client) Proxy(ctx *daze.Context, sio *SioConn, srv io.ReadWriteCloser, idx uint16) {
 	var (
-		buf = make([]byte, 2048)
+		buf = make([]byte, Conf.MaximumTransmissionUnit)
 		err error
 		n   int
 	)
@@ -418,7 +428,7 @@ func (c *Client) Proxy(ctx *daze.Context, sio *SioConn, srv io.ReadWriteCloser, 
 }
 
 // Serve creates an establish connection to crow server.
-func (c *Client) Serve() {
+func (c *Client) Serve(ctx *daze.Context) {
 	var (
 		asheClient *ashe.Client
 		closedChan = make(chan int)
@@ -428,21 +438,19 @@ func (c *Client) Serve() {
 	goto Tag2
 Tag1:
 	time.Sleep(Conf.ClientLinkRetry)
-Tag2:
-	select {
-	case <-c.Closed:
+	if atomic.LoadUint32(&c.Closed) != 0 {
 		return
-	default:
 	}
+Tag2:
 	srv, err = daze.Conf.Dialer.Dial("tcp", c.Server)
 	if err != nil {
-		log.Println(err)
+		log.Println(ctx.Cid, " error", err)
 		goto Tag1
 	}
 	asheClient = &ashe.Client{Cipher: c.Cipher}
-	srv, err = asheClient.WithCipher(&daze.Context{Cid: "00000000"}, srv)
+	srv, err = asheClient.WithCipher(ctx, srv)
 	if err != nil {
-		log.Println(err)
+		log.Println(ctx.Cid, " error", err)
 		goto Tag1
 	}
 	srv = NewLioConn(srv)
@@ -458,11 +466,10 @@ Tag2:
 	}()
 
 	var (
-		buf    = make([]byte, 2048)
+		buf    = make([]byte, Conf.MaximumTransmissionUnit)
 		cmd    uint8
 		idx    uint16
 		msgLen uint16
-		ok     bool
 		sio    *SioConn
 	)
 	for {
@@ -471,46 +478,44 @@ Tag2:
 			break
 		}
 		if Conf.LogClient != 0 {
-			log.Printf("%s   recv data=[% x]", "cccccccc", buf[:8])
+			log.Printf("%s   recv data=[% x]", ctx.Cid, buf[:8])
 		}
 		cmd = buf[0]
 		switch cmd {
 		case 1:
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
-			doa.Doa(msgLen <= 2040)
 			buf[0] = 2
 			srv.Write(buf[:8+msgLen])
 		case 2:
 			idx = binary.BigEndian.Uint16(buf[1:3])
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
-			doa.Doa(int(msgLen) <= 2040)
-			_, err = io.ReadFull(srv, buf[:msgLen])
+			_, err = io.ReadFull(srv, buf[0:msgLen])
 			if err != nil {
 				break
 			}
-			sio, ok = c.Harbor[idx]
-			if ok {
-				sio.ReaderWriter.Write(buf[0:msgLen])
+			sio = c.Harbor[idx]
+			if sio != nil {
+				sio.ReaderWriter.Write(buf[:msgLen])
 			}
 		case 3:
 			idx = binary.BigEndian.Uint16(buf[1:3])
-			sio, ok = c.Harbor[idx]
-			doa.Doa(ok)
-			if ok {
+			sio = c.Harbor[idx]
+			if sio != nil {
 				sio.ReaderWriter.Write(buf[:8])
 			}
 		case 4:
 			idx = binary.BigEndian.Uint16(buf[1:3])
-			sio, ok = c.Harbor[idx]
-			doa.Doa(ok)
-			if ok {
+			sio = c.Harbor[idx]
+			if sio != nil {
 				sio.CloseOther()
 			}
 		}
 	}
 
 	for _, sio := range c.Harbor {
-		sio.CloseOther()
+		if sio != nil {
+			sio.CloseOther()
+		}
 	}
 
 	closedChan <- 0
@@ -519,7 +524,7 @@ Tag2:
 
 // Close the static link.
 func (c *Client) Close() error {
-	close(c.Closed)
+	atomic.StoreUint32(&c.Closed, 1)
 	select {
 	case srv := <-c.Srv:
 		return srv.Close()
@@ -530,18 +535,18 @@ func (c *Client) Close() error {
 
 // NewClient returns a new Client. A secret data needs to be passed in Cipher, as a sign to interface with the Server.
 func NewClient(server, cipher string) *Client {
-	idpool := make(chan uint16, 256)
-	for i := uint16(1); i < 256; i++ {
-		idpool <- i
+	idpool := make(chan uint16, Conf.HarborSize)
+	for i := 1; i < Conf.HarborSize; i++ {
+		idpool <- uint16(i)
 	}
 	client := &Client{
 		Server: server,
 		Cipher: md5.Sum([]byte(cipher)),
-		Closed: make(chan int),
-		Harbor: map[uint16]*SioConn{},
+		Closed: 0,
+		Harbor: make([]*SioConn, Conf.HarborSize),
 		IDPool: idpool,
-		Srv:    make(chan io.ReadWriteCloser, 1),
+		Srv:    make(chan io.ReadWriteCloser),
 	}
-	go client.Serve()
+	go client.Serve(&daze.Context{Cid: "000serve"})
 	return client
 }
