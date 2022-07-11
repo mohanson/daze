@@ -72,7 +72,7 @@ var Conf = struct {
 	ClientLinkRetry:         time.Second * 4,
 	ClientLinkTimeout:       time.Second * 8,
 	HarborSize:              256,
-	MaximumTransmissionUnit: 2048,
+	MaximumTransmissionUnit: 4096,
 	LogClient:               0,
 	LogServer:               0,
 }
