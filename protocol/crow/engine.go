@@ -162,7 +162,7 @@ type Server struct {
 }
 
 // ServeSio.
-func (s *Server) ServeSio(ctx *daze.Context, sio *SioConn, cli io.ReadWriteCloser, idx uint16) {
+func (s *Server) ServeSrv(ctx *daze.Context, srv net.Conn, cli io.ReadWriteCloser, idx uint16) {
 	var (
 		buf = make([]byte, Conf.MaximumTransmissionUnit)
 		err error
@@ -171,7 +171,7 @@ func (s *Server) ServeSio(ctx *daze.Context, sio *SioConn, cli io.ReadWriteClose
 	buf[0] = 2
 	binary.BigEndian.PutUint16(buf[1:3], idx)
 	for {
-		n, err = sio.WriterReader.Read(buf[8:])
+		n, err = srv.Read(buf[8:])
 		if n != 0 {
 			binary.BigEndian.PutUint16(buf[3:5], uint16(n))
 			cli.Write(buf[:8+n])
@@ -180,8 +180,10 @@ func (s *Server) ServeSio(ctx *daze.Context, sio *SioConn, cli io.ReadWriteClose
 			break
 		}
 	}
-	doa.Doa(err == io.EOF || err == io.ErrClosedPipe)
-	if err == io.EOF {
+	// Server close, err=EOF
+	// Server crash, err=read: connection reset by peer
+	// Client close  err=use of closed network connection
+	if !errors.Is(err, net.ErrClosed) {
 		buf[0] = 4
 		cli.Write(buf[:8])
 	}
@@ -208,11 +210,10 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		dst    string
 		dstLen uint8
 		dstNet uint8
-		harbor = make([]*SioConn, Conf.HarborSize)
+		harbor = make([]net.Conn, Conf.HarborSize)
 		idx    uint16
 		msgLen uint16
-		srv    io.ReadWriteCloser
-		sio    *SioConn
+		srv    net.Conn
 	)
 	for {
 		_, err = io.ReadFull(cli, buf[:8])
@@ -235,10 +236,10 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			if err != nil {
 				break
 			}
-			sio = harbor[idx]
-			if sio != nil {
+			srv = harbor[idx]
+			if srv != nil {
 				// Errors can be safely ignored. Don't ask me why, it's magic.
-				sio.ReaderWriter.Write(buf[8 : 8+msgLen])
+				srv.Write(buf[8 : 8+msgLen])
 			}
 		case 3:
 			idx = binary.BigEndian.Uint16(buf[1:3])
@@ -253,19 +254,15 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			case 0x01:
 				log.Printf("%s   dial network=tcp address=%s", ctx.Cid, dst)
 				srv, err = daze.Conf.Dialer.Dial("tcp", dst)
-				srv = ashe.NewTCPConn(srv)
 			case 0x03:
 				log.Printf("%s   dial network=udp address=%s", ctx.Cid, dst)
 				srv, err = daze.Conf.Dialer.Dial("udp", dst)
-				srv = ashe.NewUDPConn(srv)
 			}
 			buf[0] = 3
 			if err == nil {
 				buf[3] = 0
-				sio = NewSioConn()
-				harbor[idx] = sio
-				go daze.Link(srv, sio)
-				go s.ServeSio(ctx, sio, cli, idx)
+				harbor[idx] = srv
+				go s.ServeSrv(ctx, srv, cli, idx)
 			} else {
 				buf[3] = 1
 				log.Println(ctx.Cid, " error", err)
@@ -273,16 +270,16 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			cli.Write(buf[:8])
 		case 4:
 			idx = binary.BigEndian.Uint16(buf[1:3])
-			sio = harbor[idx]
-			if sio != nil {
-				sio.CloseOther()
+			srv = harbor[idx]
+			if srv != nil {
+				srv.Close()
 			}
 		}
 	}
 
-	for _, sio := range harbor {
-		if sio != nil {
-			sio.CloseOther()
+	for _, srv := range harbor {
+		if srv != nil {
+			srv.Close()
 		}
 	}
 
