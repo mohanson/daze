@@ -129,8 +129,8 @@ func (c *SioConn) Close() error {
 	return nil
 }
 
-// CloseOther close the other half of the pipe.
-func (c *SioConn) CloseOther() error {
+// Esolc close the other half of the pipe.
+func (c *SioConn) Esolc() error {
 	err1 := c.ReaderWriter.Close()
 	err2 := c.WriterReader.Close()
 	if err1 != nil {
@@ -393,7 +393,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	return sio, nil
 Fail:
 	sio.Close()
-	sio.CloseOther()
+	sio.Esolc()
 	c.IDPool <- idx
 	return nil, err
 }
@@ -505,14 +505,14 @@ Tag2:
 			idx = binary.BigEndian.Uint16(buf[1:3])
 			sio = c.Harbor[idx]
 			if sio != nil {
-				sio.CloseOther()
+				sio.Esolc()
 			}
 		}
 	}
 
 	for _, sio := range c.Harbor {
 		if sio != nil {
-			sio.CloseOther()
+			sio.Esolc()
 		}
 	}
 
