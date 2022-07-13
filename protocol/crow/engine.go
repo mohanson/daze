@@ -354,7 +354,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		buf []byte
 		err error
 		idx uint16
-		sio *SioConn
+		srv *SioConn
 		cli io.ReadWriteCloser
 	)
 	select {
@@ -363,8 +363,8 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		return nil, errors.New("daze: dial timeout")
 	}
 	idx = <-c.IDPool
-	sio = NewSioConn()
-	c.Harbor[idx] = sio
+	srv = NewSioConn()
+	c.Harbor[idx] = srv
 
 	buf = make([]byte, 8+len(address))
 	buf[0] = 3
@@ -382,18 +382,18 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	if err != nil {
 		goto Fail
 	}
-	_, err = io.ReadFull(sio.ReaderReader, buf[:8])
+	_, err = io.ReadFull(srv.ReaderReader, buf[:8])
 	if err != nil || buf[3] != 0 {
 		err = errors.New("daze: general server failure")
 		goto Fail
 	}
 
-	go c.Proxy(ctx, sio, cli, idx)
+	go c.Proxy(ctx, srv, cli, idx)
 
-	return sio, nil
+	return srv, nil
 Fail:
-	sio.Close()
-	sio.Esolc()
+	srv.Close()
+	srv.Esolc()
 	c.IDPool <- idx
 	return nil, err
 }
