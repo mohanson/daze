@@ -342,10 +342,10 @@ func NewServer(listen string, cipher string) *Server {
 type Client struct {
 	Server string
 	Cipher [16]byte
+	Cli    chan io.ReadWriteCloser
 	Closed uint32
 	Harbor []*SioConn
 	IDPool chan uint16
-	Srv    chan io.ReadWriteCloser
 }
 
 // Dial connects to the address on the named network.
@@ -355,10 +355,10 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		err error
 		idx uint16
 		sio *SioConn
-		srv io.ReadWriteCloser
+		cli io.ReadWriteCloser
 	)
 	select {
-	case srv = <-c.Srv:
+	case cli = <-c.Cli:
 	case <-time.NewTimer(Conf.ClientLinkTimeout).C:
 		return nil, errors.New("daze: dial timeout")
 	}
@@ -378,7 +378,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	buf[4] = uint8(len(address))
 	copy(buf[8:], []byte(address))
 
-	_, err = srv.Write(buf)
+	_, err = cli.Write(buf)
 	if err != nil {
 		goto Fail
 	}
@@ -388,7 +388,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		goto Fail
 	}
 
-	go c.Proxy(ctx, sio, srv, idx)
+	go c.Proxy(ctx, sio, cli, idx)
 
 	return sio, nil
 Fail:
@@ -399,7 +399,7 @@ Fail:
 }
 
 // Proxy.
-func (c *Client) Proxy(ctx *daze.Context, sio *SioConn, srv io.ReadWriteCloser, idx uint16) {
+func (c *Client) Proxy(ctx *daze.Context, srv *SioConn, cli io.ReadWriteCloser, idx uint16) {
 	var (
 		buf = make([]byte, Conf.MaximumTransmissionUnit)
 		err error
@@ -408,10 +408,10 @@ func (c *Client) Proxy(ctx *daze.Context, sio *SioConn, srv io.ReadWriteCloser, 
 	buf[0] = 2
 	binary.BigEndian.PutUint16(buf[1:3], idx)
 	for {
-		n, err = sio.WriterReader.Read(buf[8:])
+		n, err = srv.WriterReader.Read(buf[8:])
 		if n != 0 {
 			binary.BigEndian.PutUint16(buf[3:5], uint16(n))
-			srv.Write(buf[:8+n])
+			cli.Write(buf[:8+n])
 		}
 		if err != nil {
 			break
@@ -435,8 +435,8 @@ func (c *Client) Serve(ctx *daze.Context) {
 		err        error
 		idx        uint16
 		msgLen     uint16
-		sio        *SioConn
-		srv        io.ReadWriteCloser
+		srv        *SioConn
+		cli        io.ReadWriteCloser
 	)
 	goto Tag2
 Tag1:
@@ -445,23 +445,23 @@ Tag1:
 		return
 	}
 Tag2:
-	srv, err = daze.Conf.Dialer.Dial("tcp", c.Server)
+	cli, err = daze.Conf.Dialer.Dial("tcp", c.Server)
 	if err != nil {
 		log.Println(ctx.Cid, " error", err)
 		goto Tag1
 	}
 	asheClient = &ashe.Client{Cipher: c.Cipher}
-	srv, err = asheClient.WithCipher(ctx, srv)
+	cli, err = asheClient.WithCipher(ctx, cli)
 	if err != nil {
 		log.Println(ctx.Cid, " error", err)
 		goto Tag1
 	}
-	srv = NewLioConn(srv)
+	cli = NewLioConn(cli)
 
 	go func() {
 		for {
 			select {
-			case c.Srv <- srv:
+			case c.Cli <- cli:
 			case <-closedChan:
 				return
 			}
@@ -469,7 +469,7 @@ Tag2:
 	}()
 
 	for {
-		_, err = io.ReadFull(srv, buf[:8])
+		_, err = io.ReadFull(cli, buf[:8])
 		if err != nil {
 			break
 		}
@@ -481,33 +481,33 @@ Tag2:
 		case 1:
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
 			buf[0] = 2
-			srv.Write(buf[:8+msgLen])
+			cli.Write(buf[:8+msgLen])
 		case 2:
 			idx = binary.BigEndian.Uint16(buf[1:3])
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
-			io.ReadFull(srv, buf[0:msgLen])
-			sio = c.Harbor[idx]
-			if sio != nil {
-				sio.ReaderWriter.Write(buf[:msgLen])
+			io.ReadFull(cli, buf[0:msgLen])
+			srv = c.Harbor[idx]
+			if srv != nil {
+				srv.ReaderWriter.Write(buf[:msgLen])
 			}
 		case 3:
 			idx = binary.BigEndian.Uint16(buf[1:3])
-			sio = c.Harbor[idx]
-			if sio != nil {
-				sio.ReaderWriter.Write(buf[:8])
+			srv = c.Harbor[idx]
+			if srv != nil {
+				srv.ReaderWriter.Write(buf[:8])
 			}
 		case 4:
 			idx = binary.BigEndian.Uint16(buf[1:3])
-			sio = c.Harbor[idx]
-			if sio != nil {
-				sio.Esolc()
+			srv = c.Harbor[idx]
+			if srv != nil {
+				srv.Esolc()
 			}
 		}
 	}
 
-	for _, sio := range c.Harbor {
-		if sio != nil {
-			sio.Esolc()
+	for _, srv := range c.Harbor {
+		if srv != nil {
+			srv.Esolc()
 		}
 	}
 
@@ -519,8 +519,8 @@ Tag2:
 func (c *Client) Close() error {
 	atomic.StoreUint32(&c.Closed, 1)
 	select {
-	case srv := <-c.Srv:
-		return srv.Close()
+	case cli := <-c.Cli:
+		return cli.Close()
 	default:
 		return nil
 	}
@@ -535,10 +535,10 @@ func NewClient(server, cipher string) *Client {
 	client := &Client{
 		Server: server,
 		Cipher: md5.Sum([]byte(cipher)),
+		Cli:    make(chan io.ReadWriteCloser),
 		Closed: 0,
 		Harbor: make([]*SioConn, Conf.HarborSize),
 		IDPool: idpool,
-		Srv:    make(chan io.ReadWriteCloser),
 	}
 	go client.Serve(&daze.Context{Cid: "000serve"})
 	return client
