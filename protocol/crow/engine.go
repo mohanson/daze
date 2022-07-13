@@ -383,7 +383,10 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		goto Fail
 	}
 	_, err = io.ReadFull(srv.ReaderReader, buf[:8])
-	if err != nil || buf[3] != 0 {
+	if err != nil {
+		goto Fail
+	}
+	if buf[3] != 0 {
 		err = errors.New("daze: general server failure")
 		goto Fail
 	}
