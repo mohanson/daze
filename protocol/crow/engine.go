@@ -429,8 +429,13 @@ func (c *Client) Proxy(ctx *daze.Context, sio *SioConn, srv io.ReadWriteCloser, 
 func (c *Client) Serve(ctx *daze.Context) {
 	var (
 		asheClient *ashe.Client
+		buf        = make([]byte, Conf.MaximumTransmissionUnit)
 		closedChan = make(chan int)
+		cmd        uint8
 		err        error
+		idx        uint16
+		msgLen     uint16
+		sio        *SioConn
 		srv        io.ReadWriteCloser
 	)
 	goto Tag2
@@ -463,13 +468,6 @@ Tag2:
 		}
 	}()
 
-	var (
-		buf    = make([]byte, Conf.MaximumTransmissionUnit)
-		cmd    uint8
-		idx    uint16
-		msgLen uint16
-		sio    *SioConn
-	)
 	for {
 		_, err = io.ReadFull(srv, buf[:8])
 		if err != nil {
@@ -487,10 +485,7 @@ Tag2:
 		case 2:
 			idx = binary.BigEndian.Uint16(buf[1:3])
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
-			_, err = io.ReadFull(srv, buf[0:msgLen])
-			if err != nil {
-				break
-			}
+			io.ReadFull(srv, buf[0:msgLen])
 			sio = c.Harbor[idx]
 			if sio != nil {
 				sio.ReaderWriter.Write(buf[:msgLen])
