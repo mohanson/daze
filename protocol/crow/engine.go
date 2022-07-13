@@ -430,13 +430,13 @@ func (c *Client) Serve(ctx *daze.Context) {
 	var (
 		asheClient *ashe.Client
 		buf        = make([]byte, Conf.MaximumTransmissionUnit)
+		cli        io.ReadWriteCloser
 		closedChan = make(chan int)
 		cmd        uint8
 		err        error
 		idx        uint16
 		msgLen     uint16
 		srv        *SioConn
-		cli        io.ReadWriteCloser
 	)
 	goto Tag2
 Tag1:
