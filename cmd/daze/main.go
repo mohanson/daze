@@ -83,6 +83,7 @@ func main() {
 			if *flExtend != "" {
 				server.Masker = *flExtend
 			}
+			defer server.Close()
 			doa.Nil(server.Run())
 		case "crow":
 			server := crow.NewServer(*flListen, *flCipher)
