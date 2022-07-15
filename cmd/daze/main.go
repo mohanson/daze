@@ -61,7 +61,7 @@ func main() {
 	case "server":
 		var (
 			flListen = flag.String("l", "0.0.0.0:1081", "listen address")
-			flCipher = flag.String("k", "daze", "password, should be same as client")
+			flCipher = flag.String("k", "daze", "password, should be same with the one specified by client")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
 			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon, crow}")
 			flExtend = flag.String("e", "", "extend data for different protocols")
@@ -94,7 +94,7 @@ func main() {
 		var (
 			flListen = flag.String("l", "127.0.0.1:1080", "listen address")
 			flServer = flag.String("s", "127.0.0.1:1081", "server address")
-			flCipher = flag.String("k", "daze", "password, should be same as server")
+			flCipher = flag.String("k", "daze", "password, should be same with the one specified by server")
 			flFilter = flag.String("f", "rule", "filter {rule, remote, locale}")
 			flRulels = flag.String("r", filepath.Join(resExec, Conf.PathRule), "rule path")
 			flCIDRls = flag.String("c", filepath.Join(resExec, Conf.PathCIDR), "cidr path")
@@ -182,6 +182,10 @@ func main() {
 			}
 			return []*net.IPNet{}
 		}()
+		if len(cidr) == 0 {
+			flag.Usage()
+			return
+		}
 		f := doa.Try(os.OpenFile(filepath.Join(resExec, Conf.PathCIDR), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644))
 		defer f.Close()
 		for _, e := range cidr {
