@@ -62,31 +62,31 @@ import (
 
 // Conf is acting as package level configuration.
 var Conf = struct {
-	ClientLinkRetry         time.Duration
-	ClientLinkTimeout       time.Duration
-	HarborSize              int
-	MaximumTransmissionUnit int
-	LogClient               int
-	LogServer               int
+	ClientLink time.Duration
+	ClientWait time.Duration
+	LogClient  int
+	LogServer  int
+	Mtu        int
+	Usr        int
 }{
-	ClientLinkRetry:         time.Second * 4,
-	ClientLinkTimeout:       time.Second * 8,
-	HarborSize:              256,
-	MaximumTransmissionUnit: 4096,
-	LogClient:               0,
-	LogServer:               0,
+	ClientLink: time.Second * 4,
+	ClientWait: time.Second * 8,
+	LogClient:  0,
+	LogServer:  0,
+	Mtu:        4096,
+	Usr:        256,
 }
 
 // LioConn is concurrency safe in write.
 type LioConn struct {
 	io.ReadWriteCloser
-	Lock *sync.Mutex
+	mu *sync.Mutex
 }
 
 // Write implements the Conn Write method.
 func (c *LioConn) Write(p []byte) (int, error) {
-	c.Lock.Lock()
-	defer c.Lock.Unlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return c.ReadWriteCloser.Write(p)
 }
 
@@ -94,7 +94,7 @@ func (c *LioConn) Write(p []byte) (int, error) {
 func NewLioConn(c io.ReadWriteCloser) *LioConn {
 	return &LioConn{
 		ReadWriteCloser: c,
-		Lock:            &sync.Mutex{},
+		mu:              &sync.Mutex{},
 	}
 }
 
@@ -176,15 +176,15 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	cli = NewLioConn(cli)
 
 	var (
-		buf    = make([]byte, Conf.MaximumTransmissionUnit)
+		buf    = make([]byte, Conf.Mtu)
 		cmd    uint8
 		dst    string
 		dstLen uint8
 		dstNet uint8
-		harbor = make([]net.Conn, Conf.HarborSize)
 		idx    uint16
 		msgLen uint16
 		srv    net.Conn
+		usb    = make([]net.Conn, Conf.Usr)
 	)
 	for {
 		_, err = io.ReadFull(cli, buf[:8])
@@ -207,7 +207,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			if err != nil {
 				break
 			}
-			srv = harbor[idx]
+			srv = usb[idx]
 			if srv != nil {
 				// Errors can be safely ignored. Don't ask me why, it's magic.
 				srv.Write(buf[8 : 8+msgLen])
@@ -224,7 +224,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 
 			go func(idx uint16, dstNet uint8, dst string) {
 				var (
-					buf = make([]byte, Conf.MaximumTransmissionUnit)
+					buf = make([]byte, Conf.Mtu)
 					err error
 					n   int
 					srv net.Conn
@@ -246,7 +246,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 					return
 				}
 				buf[3] = 0
-				harbor[idx] = srv
+				usb[idx] = srv
 				cli.Write(buf[:8])
 				buf[0] = 2
 				for {
@@ -271,14 +271,14 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			}(idx, dstNet, dst)
 		case 4:
 			idx = binary.BigEndian.Uint16(buf[1:3])
-			srv = harbor[idx]
+			srv = usb[idx]
 			if srv != nil {
 				srv.Close()
 			}
 		}
 	}
 
-	for _, srv := range harbor {
+	for _, srv := range usb {
 		if srv != nil {
 			srv.Close()
 		}
@@ -344,8 +344,8 @@ type Client struct {
 	Cipher [16]byte
 	Cli    chan io.ReadWriteCloser
 	Closed uint32
-	Harbor []*SioConn
 	IDPool chan uint16
+	Usr    []*SioConn
 }
 
 // Dial connects to the address on the named network.
@@ -359,12 +359,12 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	)
 	select {
 	case cli = <-c.Cli:
-	case <-time.NewTimer(Conf.ClientLinkTimeout).C:
+	case <-time.NewTimer(Conf.ClientWait).C:
 		return nil, errors.New("daze: dial timeout")
 	}
 	idx = <-c.IDPool
 	srv = NewSioConn()
-	c.Harbor[idx] = srv
+	c.Usr[idx] = srv
 
 	buf = make([]byte, 8+len(address))
 	buf[0] = 3
@@ -404,7 +404,7 @@ Fail:
 // Proxy.
 func (c *Client) Proxy(ctx *daze.Context, srv *SioConn, cli io.ReadWriteCloser, idx uint16) {
 	var (
-		buf = make([]byte, Conf.MaximumTransmissionUnit)
+		buf = make([]byte, Conf.Mtu)
 		err error
 		n   int
 	)
@@ -432,7 +432,7 @@ func (c *Client) Proxy(ctx *daze.Context, srv *SioConn, cli io.ReadWriteCloser, 
 func (c *Client) Serve(ctx *daze.Context) {
 	var (
 		asheClient *ashe.Client
-		buf        = make([]byte, Conf.MaximumTransmissionUnit)
+		buf        = make([]byte, Conf.Mtu)
 		cli        io.ReadWriteCloser
 		closedChan = make(chan int)
 		cmd        uint8
@@ -443,7 +443,7 @@ func (c *Client) Serve(ctx *daze.Context) {
 	)
 	goto Tag2
 Tag1:
-	time.Sleep(Conf.ClientLinkRetry)
+	time.Sleep(Conf.ClientLink)
 	if atomic.LoadUint32(&c.Closed) != 0 {
 		return
 	}
@@ -489,26 +489,26 @@ Tag2:
 			idx = binary.BigEndian.Uint16(buf[1:3])
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
 			io.ReadFull(cli, buf[0:msgLen])
-			srv = c.Harbor[idx]
+			srv = c.Usr[idx]
 			if srv != nil {
 				srv.ReaderWriter.Write(buf[:msgLen])
 			}
 		case 3:
 			idx = binary.BigEndian.Uint16(buf[1:3])
-			srv = c.Harbor[idx]
+			srv = c.Usr[idx]
 			if srv != nil {
 				srv.ReaderWriter.Write(buf[:8])
 			}
 		case 4:
 			idx = binary.BigEndian.Uint16(buf[1:3])
-			srv = c.Harbor[idx]
+			srv = c.Usr[idx]
 			if srv != nil {
 				srv.Esolc()
 			}
 		}
 	}
 
-	for _, srv := range c.Harbor {
+	for _, srv := range c.Usr {
 		if srv != nil {
 			srv.Esolc()
 		}
@@ -531,8 +531,8 @@ func (c *Client) Close() error {
 
 // NewClient returns a new Client. A secret data needs to be passed in Cipher, as a sign to interface with the Server.
 func NewClient(server, cipher string) *Client {
-	idpool := make(chan uint16, Conf.HarborSize)
-	for i := 1; i < Conf.HarborSize; i++ {
+	idpool := make(chan uint16, Conf.Usr)
+	for i := 1; i < Conf.Usr; i++ {
 		idpool <- uint16(i)
 	}
 	client := &Client{
@@ -540,8 +540,8 @@ func NewClient(server, cipher string) *Client {
 		Cipher: md5.Sum([]byte(cipher)),
 		Cli:    make(chan io.ReadWriteCloser),
 		Closed: 0,
-		Harbor: make([]*SioConn, Conf.HarborSize),
 		IDPool: idpool,
+		Usr:    make([]*SioConn, Conf.Usr),
 	}
 	go client.Serve(&daze.Context{Cid: "000serve"})
 	return client
