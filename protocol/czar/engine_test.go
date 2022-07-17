@@ -58,6 +58,65 @@ func TestProtocalCrowTCP(t *testing.T) {
 	}
 }
 
+func TestProtocalCrowTCPClientDialFailed(t *testing.T) {
+	dazeClient := NewClient(DazeServerListenOn, Password)
+	defer dazeClient.Close()
+	ctx := &daze.Context{Cid: "00000000"}
+	_, err := dazeClient.Dial(ctx, "tcp", "127.0.0.1:65535")
+	if err == nil {
+		t.FailNow()
+	}
+	if err.Error() != "daze: dial timeout" {
+		t.FailNow()
+	}
+}
+
+func TestProtocalCrowTCPClientHighLoad(t *testing.T) {
+	defer time.Sleep(time.Second)
+	echoListener := doa.Try(net.Listen("tcp", EchoServerListenOn))
+	defer echoListener.Close()
+	go func() {
+		for {
+			c, err := echoListener.Accept()
+			if err != nil {
+				if !errors.Is(err, net.ErrClosed) {
+					log.Println(err)
+				}
+				break
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				_, err := io.CopyN(io.Discard, c, 32*1024*1024)
+				if err != nil {
+					c.Write([]byte{1})
+				} else {
+					c.Write([]byte{0})
+				}
+			}(c)
+		}
+	}()
+
+	dazeServer := NewServer(DazeServerListenOn, Password)
+	defer dazeServer.Close()
+	dazeServer.Run()
+
+	dazeClient := NewClient(DazeServerListenOn, Password)
+	defer dazeClient.Close()
+	ctx := &daze.Context{Cid: "00000000"}
+	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
+	defer cli.Close()
+
+	buf := make([]byte, 32*1024)
+	for i := 0; i < 1024; i++ {
+		daze.Conf.Random.Read(buf)
+		cli.Write(buf)
+	}
+	io.ReadFull(cli, buf[:1])
+	if buf[0] != 0 {
+		t.FailNow()
+	}
+}
+
 func TestProtocalCrowTCPServerClose(t *testing.T) {
 	defer time.Sleep(time.Second)
 	echoListener := doa.Try(net.Listen("tcp", EchoServerListenOn))
@@ -96,19 +155,6 @@ func TestProtocalCrowTCPServerClose(t *testing.T) {
 	}
 }
 
-func TestProtocalCrowTCPClientDialFailed(t *testing.T) {
-	dazeClient := NewClient(DazeServerListenOn, Password)
-	defer dazeClient.Close()
-	ctx := &daze.Context{Cid: "00000000"}
-	_, err := dazeClient.Dial(ctx, "tcp", "127.0.0.1:65535")
-	if err == nil {
-		t.FailNow()
-	}
-	if err.Error() != "daze: dial timeout" {
-		t.FailNow()
-	}
-}
-
 func TestProtocalCrowTCPServerDialFailed(t *testing.T) {
 	defer time.Sleep(time.Second)
 
@@ -121,6 +167,49 @@ func TestProtocalCrowTCPServerDialFailed(t *testing.T) {
 	ctx := &daze.Context{Cid: "00000000"}
 	_, err := dazeClient.Dial(ctx, "tcp", "127.0.0.1:65535")
 	if err == nil {
+		t.FailNow()
+	}
+}
+
+func TestProtocalCrowTCPServerHighLoad(t *testing.T) {
+	defer time.Sleep(time.Second)
+	echoListener := doa.Try(net.Listen("tcp", EchoServerListenOn))
+	defer echoListener.Close()
+	go func() {
+		for {
+			c, err := echoListener.Accept()
+			if err != nil {
+				if !errors.Is(err, net.ErrClosed) {
+					log.Println(err)
+				}
+				break
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				buf := make([]byte, 32*1024)
+				for i := 0; i < 1024; i++ {
+					daze.Conf.Random.Read(buf)
+					_, err := c.Write(buf)
+					if err != nil {
+						break
+					}
+				}
+			}(c)
+		}
+	}()
+
+	dazeServer := NewServer(DazeServerListenOn, Password)
+	defer dazeServer.Close()
+	dazeServer.Run()
+
+	dazeClient := NewClient(DazeServerListenOn, Password)
+	defer dazeClient.Close()
+	ctx := &daze.Context{Cid: "00000000"}
+	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
+	defer cli.Close()
+
+	_, err := io.CopyN(io.Discard, cli, 32*1024*1024)
+	if err != nil {
 		t.FailNow()
 	}
 }
