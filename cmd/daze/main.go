@@ -13,7 +13,7 @@ import (
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/protocol/ashe"
 	"github.com/mohanson/daze/protocol/baboon"
-	"github.com/mohanson/daze/protocol/crow"
+	"github.com/mohanson/daze/protocol/czar"
 )
 
 var Conf = struct {
@@ -63,7 +63,7 @@ func main() {
 			flListen = flag.String("l", "0.0.0.0:1081", "listen address")
 			flCipher = flag.String("k", "daze", "password, should be same with the one specified by client")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
-			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon, crow}")
+			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon, czar}")
 			flExtend = flag.String("e", "", "extend data for different protocols")
 		)
 		flag.Parse()
@@ -85,8 +85,8 @@ func main() {
 			}
 			defer server.Close()
 			doa.Nil(server.Run())
-		case "crow":
-			server := crow.NewServer(*flListen, *flCipher)
+		case "czar":
+			server := czar.NewServer(*flListen, *flCipher)
 			defer server.Close()
 			doa.Nil(server.Run())
 		}
@@ -100,7 +100,7 @@ func main() {
 			flRulels = flag.String("r", filepath.Join(resExec, Conf.PathRule), "rule path")
 			flCIDRls = flag.String("c", filepath.Join(resExec, Conf.PathCIDR), "cidr path")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
-			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon, crow}")
+			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon, czar}")
 		)
 		flag.Parse()
 		log.Println("remote server is", *flServer)
@@ -116,8 +116,8 @@ func main() {
 				return ashe.NewClient(*flServer, *flCipher)
 			case "baboon":
 				return baboon.NewClient(*flServer, *flCipher)
-			case "crow":
-				return crow.NewClient(*flServer, *flCipher)
+			case "czar":
+				return czar.NewClient(*flServer, *flCipher)
 			}
 			panic("unreachable")
 		}()

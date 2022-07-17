@@ -1,4 +1,4 @@
-package crow
+package czar
 
 import (
 	"bytes"

@@ -1,4 +1,4 @@
-package crow
+package czar
 
 import (
 	"crypto/md5"
@@ -17,7 +17,7 @@ import (
 	"github.com/mohanson/daze/protocol/ashe"
 )
 
-// The crow protocol is a proxy protocol built on TCP multiplexing technology. It eliminates some common characteristics
+// The czar protocol is a proxy protocol built on TCP multiplexing technology. It eliminates some common characteristics
 // of proxy software, such as frequent connection establishment and disconnection when browsing websites. It makes it
 // more difficult to be detected by firewalls.
 //
@@ -154,7 +154,7 @@ func NewSioConn() *SioConn {
 	}
 }
 
-// Server implemented the crow protocol.
+// Server implemented the czar protocol.
 type Server struct {
 	Listen string
 	Cipher [16]byte
@@ -338,7 +338,7 @@ func NewServer(listen string, cipher string) *Server {
 	}
 }
 
-// Client implemented the crow protocol.
+// Client implemented the czar protocol.
 type Client struct {
 	Server string
 	Cipher [16]byte
@@ -428,7 +428,7 @@ func (c *Client) Proxy(ctx *daze.Context, srv *SioConn, cli io.ReadWriteCloser, 
 	c.IDPool <- idx
 }
 
-// Serve creates an establish connection to crow server.
+// Serve creates an establish connection to czar server.
 func (c *Client) Serve(ctx *daze.Context) {
 	var (
 		asheClient *ashe.Client
