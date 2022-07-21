@@ -15,11 +15,11 @@ import (
 	"github.com/mohanson/daze"
 )
 
-// This document specifies an Internet protocol for the Internet community. For traverse a firewall transparently and
-// securely, ASHE used rc4 encryption with one-time password. In order to fight replay attacks, ASHE get inspiration
-// from cookie, added a timestamp inside the frame.
+// This document describes a TCP-based cryptographic proxy protocol. The main purpose of this protocol is to bypass
+// firewalls while providing a good user experience, so it only provides minimal security, which is one of the reasons
+// for choosing the RC4 algorithm(RC4 is cryptographically broken and should not be used for secure applications).
 //
-// The client connects to the server, and sends a version identifier/method selection message:
+// The client connects to the server, and sends a request details:
 //
 // +-----+-----------+------+-----+---------+---------+
 // | OTA | Handshake | Time | Net | DST.Len | DST     |
@@ -27,12 +27,14 @@ import (
 // | 128 | 2         | 8    |  1  | 1       | 0 - 255 |
 // +-----+-----------+------+-----+---------+---------+
 //
-// - OTA: random 128 bytes for rc4 key
-// - Handshake: must be 0xff, 0xff
-// - Time: timestamp of request
-// - Net: tcp(0x01), udp(0x03)
-// - DST.Len: len of DST. If DST is https://google.com, DST.Len is 0x12
-// - DST: desired destination address
+// - OTA       : Random 128 bytes for rc4 key, all data will be transmitted encrypted after there
+// - Handshake : Must be 0xff, 0xff, used to quickly verify the client's key
+// - Time      : Timestamp of request. The server will reject requests with past or future timestamps to prevent replay
+//               attacks.
+// - Net       : 0x01 : TCP
+//               0x03 : UDP
+// - DST.Len   : Len of DST. If DST is https://google.com, DST.Len is 0x12
+// - DST       : Desired destination address
 //
 // The server returns:
 //
@@ -45,7 +47,9 @@ import (
 // - Code: 0x00: succeed
 //         0x01: general server failure
 
+// Conf is acting as package level configuration.
 var Conf = struct {
+	// The time error allowed by the server in seconds.
 	LifeExpired int
 }{
 	LifeExpired: 120,
@@ -104,7 +108,7 @@ type Server struct {
 	Closer io.Closer
 }
 
-// ServeCipher create encrypted channel.
+// ServeCipher creates an encrypted channel.
 func (s *Server) ServeCipher(ctx *daze.Context, raw io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	var (
 		buf     = make([]byte, 144)
@@ -135,17 +139,16 @@ func (s *Server) ServeCipher(ctx *daze.Context, raw io.ReadWriteCloser) (io.Read
 }
 
 // Serve. Parameter raw will be closed automatically when the function exits.
-func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
+func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 	var (
 		buf    = make([]byte, 256)
-		cli    io.ReadWriteCloser
 		dst    string
 		dstLen uint8
 		dstNet uint8
 		srv    io.ReadWriteCloser
 		err    error
 	)
-	cli, err = s.ServeCipher(ctx, raw)
+	cli, err = s.ServeCipher(ctx, cli)
 	if err != nil {
 		return err
 	}
@@ -183,7 +186,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	return nil
 }
 
-// Close listener.
+// Close listener. Established connections will not be closed.
 func (s *Server) Close() error {
 	if s.Closer != nil {
 		return s.Closer.Close()
@@ -226,7 +229,7 @@ func (s *Server) Run() error {
 	return nil
 }
 
-// NewServer returns a new Server. A secret data needs to be passed in Cipher, as a sign to interface with the Client.
+// NewServer returns a new Server.
 func NewServer(listen string, cipher string) *Server {
 	return &Server{
 		Listen: listen,
@@ -240,7 +243,7 @@ type Client struct {
 	Cipher [16]byte
 }
 
-// WithCipher create encrypted channel.
+// WithCipher creates an encrypted channel.
 func (c *Client) WithCipher(ctx *daze.Context, raw io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	var (
 		buf = make([]byte, 144)
