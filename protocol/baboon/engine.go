@@ -19,7 +19,12 @@ import (
 
 // Protocol baboon disguise the ashe protocol through the HTTP protocol.
 
+// Conf is acting as package level configuration.
 var Conf = struct {
+	// Fake website, requests with incorrect signatures will be redirected to this address. Note that if you use the
+	// baboon protocol, specify a local address whenever possible. For a cloud service provider, if it finds that you
+	// are accessing an external address and sends the received data back to an in-wall connection, it may determine
+	// that you are using a proxy server.
 	Masker string
 }{
 	Masker: "http://www.baidu.com",
@@ -59,8 +64,6 @@ func (s *Server) ServeMask(w http.ResponseWriter, r *http.Request) {
 func (s *Server) ServeDaze(w http.ResponseWriter, r *http.Request) {
 	hj, _ := w.(http.Hijacker)
 	cc, rw, _ := hj.Hijack()
-	defer cc.Close()
-	defer rw.Flush()
 	io.WriteString(cc, "HTTP/1.1 200 OK\r\n")                                        // 17
 	io.WriteString(cc, "Content-Length: 0\r\n")                                      // 19
 	io.WriteString(cc, "Content-Type: text/plain; charset=utf-8\r\n")                // 41
@@ -83,28 +86,6 @@ func (s *Server) ServeDaze(w http.ResponseWriter, r *http.Request) {
 	log.Println(ctx.Cid, "closed")
 }
 
-// Route check the type of a HTTP request.
-func (s *Server) Route(r *http.Request) int {
-	authText := r.Header.Get("Authorization")
-	if authText == "" {
-		return 0
-	}
-	authData, err := hex.DecodeString(authText)
-	if err != nil {
-		return 0
-	}
-	hash := md5.New()
-	hash.Write(authData[:16])
-	hash.Write(s.Cipher[:])
-	sign := hash.Sum(nil)
-	for i := 0; i < 16; i++ {
-		if authData[16+i] != sign[i] {
-			return 0
-		}
-	}
-	return 1
-}
-
 // ServeHTTP implements http.Handler.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch s.Route(r) {
@@ -123,6 +104,31 @@ func (s *Server) Close() error {
 	return nil
 }
 
+// Route check if the request provided the correct signature.
+func (s *Server) Route(r *http.Request) int {
+	authText := r.Header.Get("Authorization")
+	if authText == "" {
+		return 0
+	}
+	authData, err := hex.DecodeString(authText)
+	if err != nil {
+		return 0
+	}
+	if len(authData) != 32 {
+		return 0
+	}
+	hash := md5.New()
+	hash.Write(authData[:16])
+	hash.Write(s.Cipher[:])
+	sign := hash.Sum(nil)
+	for i := 0; i < 16; i++ {
+		if authData[16+i] != sign[i] {
+			return 0
+		}
+	}
+	return 1
+}
+
 // Run.
 func (s *Server) Run() error {
 	ln, err := net.Listen("tcp", s.Listen)
@@ -136,7 +142,7 @@ func (s *Server) Run() error {
 	return nil
 }
 
-// NewServer returns a new Server. A secret data needs to be passed in Cipher, as a sign to interface with the Client.
+// NewServer returns a new Server.
 func NewServer(listen string, cipher string) *Server {
 	return &Server{
 		Listen: listen,
@@ -146,7 +152,7 @@ func NewServer(listen string, cipher string) *Server {
 	}
 }
 
-// Client implemented the ashe protocol.
+// Client implemented the baboon protocol.
 type Client struct {
 	Server string
 	Cipher [16]byte
@@ -184,7 +190,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	return ret, err
 }
 
-// NewClient returns a new Client. A secret data needs to be passed in Cipher, as a sign to interface with the Server.
+// NewClient returns a new Client.
 func NewClient(server string, cipher string) *Client {
 	return &Client{
 		Server: server,
