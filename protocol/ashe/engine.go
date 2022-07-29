@@ -165,10 +165,10 @@ func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 	dst = string(buf[:dstLen])
 	switch dstNet {
 	case 0x01:
-		log.Printf("%s   dial network=tcp address=%s", ctx.Cid, dst)
+		log.Printf("%08x   dial network=tcp address=%s", ctx.Cid, dst)
 		srv, err = daze.Conf.Dialer.Dial("tcp", dst)
 	case 0x03:
-		log.Printf("%s   dial network=udp address=%s", ctx.Cid, dst)
+		log.Printf("%08x   dial network=udp address=%s", ctx.Cid, dst)
 		srv, err = daze.Conf.Dialer.Dial("udp", dst)
 	}
 	if err != nil {
@@ -214,14 +214,14 @@ func (s *Server) Run() error {
 				break
 			}
 			idx += 1
-			ctx := &daze.Context{Cid: daze.Hu32(idx)}
-			log.Printf("%s accept remote=%s", ctx.Cid, cli.RemoteAddr())
+			ctx := &daze.Context{Cid: idx}
+			log.Printf("%08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
 			go func(cli net.Conn) {
 				defer cli.Close()
 				if err := s.Serve(ctx, cli); err != nil {
-					log.Println(ctx.Cid, " error", err)
+					log.Printf("%08x  error %s", ctx.Cid, err)
 				}
-				log.Println(ctx.Cid, "closed")
+				log.Printf("%08x closed", ctx.Cid)
 			}(cli)
 		}
 	}()

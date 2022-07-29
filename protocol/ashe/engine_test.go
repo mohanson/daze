@@ -42,7 +42,7 @@ func TestProtocolAsheTCP(t *testing.T) {
 	dazeServer.Run()
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
-	ctx := &daze.Context{Cid: "00000000"}
+	ctx := &daze.Context{}
 	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
 	defer cli.Close()
 
@@ -76,7 +76,7 @@ func TestProtocolAsheUDP(t *testing.T) {
 	dazeServer.Run()
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
-	ctx := &daze.Context{Cid: "00000000"}
+	ctx := &daze.Context{}
 	cli := doa.Try(dazeClient.Dial(ctx, "udp", EchoServerListenOn))
 	defer cli.Close()
 

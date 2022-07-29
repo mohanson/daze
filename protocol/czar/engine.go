@@ -192,7 +192,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			break
 		}
 		if Conf.LogServer != 0 {
-			log.Printf("%s   recv data=[% x]", ctx.Cid, buf[:8])
+			log.Printf("%08x   recv data=[% x]", ctx.Cid, buf[:8])
 		}
 		cmd = buf[0]
 		switch cmd {
@@ -231,16 +231,16 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 				)
 				switch dstNet {
 				case 0x01:
-					log.Printf("%s   dial network=tcp address=%s", ctx.Cid, dst)
+					log.Printf("%08x   dial network=tcp address=%s", ctx.Cid, dst)
 					srv, err = daze.Conf.Dialer.Dial("tcp", dst)
 				case 0x03:
-					log.Printf("%s   dial network=udp address=%s", ctx.Cid, dst)
+					log.Printf("%08x   dial network=udp address=%s", ctx.Cid, dst)
 					srv, err = daze.Conf.Dialer.Dial("udp", dst)
 				}
 				buf[0] = 3
 				binary.BigEndian.PutUint16(buf[1:3], idx)
 				if err != nil {
-					log.Println(ctx.Cid, " error", err)
+					log.Printf("%08x  error %s", ctx.Cid, err)
 					buf[3] = 1
 					cli.Write(buf[:8])
 					return
@@ -266,7 +266,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 					buf[0] = 4
 					cli.Write(buf[:8])
 				}
-				log.Printf("%s closed idx=%02x", ctx.Cid, idx)
+				log.Printf("%08x closed idx=%02x", ctx.Cid, idx)
 
 			}(idx, dstNet, dst)
 		case 4:
@@ -315,14 +315,14 @@ func (s *Server) Run() error {
 				break
 			}
 			idx += 1
-			ctx := &daze.Context{Cid: daze.Hu32(idx)}
-			log.Printf("%s accept remote=%s", ctx.Cid, cli.RemoteAddr())
+			ctx := &daze.Context{Cid: idx}
+			log.Printf("%08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
 			go func(cli net.Conn) {
 				defer cli.Close()
 				if err := s.Serve(ctx, cli); err != nil {
-					log.Println(ctx.Cid, " error", err)
+					log.Printf("%08x  error %s", ctx.Cid, err)
 				}
-				log.Println(ctx.Cid, "closed")
+				log.Printf("%08x closed", ctx.Cid)
 			}(cli)
 		}
 	}()
@@ -450,13 +450,13 @@ Tag1:
 Tag2:
 	cli, err = daze.Conf.Dialer.Dial("tcp", c.Server)
 	if err != nil {
-		log.Println(ctx.Cid, " error", err)
+		log.Printf("%08x  error %s", ctx.Cid, err)
 		goto Tag1
 	}
 	asheClient = &ashe.Client{Cipher: c.Cipher}
 	cli, err = asheClient.WithCipher(ctx, cli)
 	if err != nil {
-		log.Println(ctx.Cid, " error", err)
+		log.Printf("%08x  error %s", ctx.Cid, err)
 		goto Tag1
 	}
 	cli = NewLioConn(cli)
@@ -477,7 +477,7 @@ Tag2:
 			break
 		}
 		if Conf.LogClient != 0 {
-			log.Printf("%s   recv data=[% x]", ctx.Cid, buf[:8])
+			log.Printf("%08x   recv data=[% x]", ctx.Cid, buf[:8])
 		}
 		cmd = buf[0]
 		switch cmd {
@@ -543,6 +543,6 @@ func NewClient(server, cipher string) *Client {
 		IDPool: idpool,
 		Usr:    make([]*SioConn, Conf.Usr),
 	}
-	go client.Serve(&daze.Context{Cid: "000serve"})
+	go client.Serve(&daze.Context{Cid: math.MaxUint32})
 	return client
 }

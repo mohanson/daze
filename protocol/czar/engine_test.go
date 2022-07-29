@@ -45,7 +45,7 @@ func TestProtocalCrowTCP(t *testing.T) {
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
 	defer dazeClient.Close()
-	ctx := &daze.Context{Cid: "00000000"}
+	ctx := &daze.Context{}
 	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
 	defer cli.Close()
 
@@ -61,7 +61,7 @@ func TestProtocalCrowTCP(t *testing.T) {
 func TestProtocalCrowTCPClientDialFailed(t *testing.T) {
 	dazeClient := NewClient(DazeServerListenOn, Password)
 	defer dazeClient.Close()
-	ctx := &daze.Context{Cid: "00000000"}
+	ctx := &daze.Context{}
 	_, err := dazeClient.Dial(ctx, "tcp", "127.0.0.1:65535")
 	if err == nil {
 		t.FailNow()
@@ -102,7 +102,7 @@ func TestProtocalCrowTCPClientHighLoad(t *testing.T) {
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
 	defer dazeClient.Close()
-	ctx := &daze.Context{Cid: "00000000"}
+	ctx := &daze.Context{}
 	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
 	defer cli.Close()
 
@@ -142,7 +142,7 @@ func TestProtocalCrowTCPServerClose(t *testing.T) {
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
 	defer dazeClient.Close()
-	ctx := &daze.Context{Cid: "00000000"}
+	ctx := &daze.Context{}
 	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
 	defer cli.Close()
 
@@ -164,7 +164,7 @@ func TestProtocalCrowTCPServerDialFailed(t *testing.T) {
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
 	defer dazeClient.Close()
-	ctx := &daze.Context{Cid: "00000000"}
+	ctx := &daze.Context{}
 	_, err := dazeClient.Dial(ctx, "tcp", "127.0.0.1:65535")
 	if err == nil {
 		t.FailNow()
@@ -204,7 +204,7 @@ func TestProtocalCrowTCPServerHighLoad(t *testing.T) {
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
 	defer dazeClient.Close()
-	ctx := &daze.Context{Cid: "00000000"}
+	ctx := &daze.Context{}
 	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
 	defer cli.Close()
 
@@ -237,7 +237,7 @@ func TestProtocolCrowUDP(t *testing.T) {
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
 	defer dazeClient.Close()
-	ctx := &daze.Context{Cid: "00000000"}
+	ctx := &daze.Context{}
 	cli := doa.Try(dazeClient.Dial(ctx, "udp", EchoServerListenOn))
 	defer cli.Close()
 

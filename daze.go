@@ -96,7 +96,7 @@ type ReadWriteCloser struct {
 
 // Context carries infomations for a tcp connection.
 type Context struct {
-	Cid string
+	Cid uint32
 }
 
 // Dialer abstracts the way to establish network connections.
@@ -148,9 +148,9 @@ func (l *Locale) ServeProxy(ctx *Context, app io.ReadWriteCloser) error {
 			}
 
 			if r.Method == "CONNECT" {
-				log.Println(ctx.Cid, " proto", "format=tunnel")
+				log.Printf("%08x  proto format=tunnel", ctx.Cid)
 			} else {
-				log.Println(ctx.Cid, " proto", "format=hproxy")
+				log.Printf("%08x  proto format=hproxy", ctx.Cid)
 			}
 
 			srv, err := l.Dialer.Dial(ctx, "tcp", r.URL.Hostname()+":"+port)
@@ -239,7 +239,7 @@ func (l *Locale) ServeSocks4(ctx *Context, app io.ReadWriteCloser) error {
 		dstHost = net.IP(fDstIP).String()
 	}
 	dst = dstHost + ":" + strconv.Itoa(int(dstPort))
-	log.Println(ctx.Cid, " proto", "format=socks4")
+	log.Printf("%08x  proto format=socks4", ctx.Cid)
 	switch fCode {
 	case 0x01:
 		srv, err = l.Dialer.Dial(ctx, "tcp", dst)
@@ -323,7 +323,7 @@ func (l *Locale) ServeSocks5(ctx *Context, app io.ReadWriteCloser) error {
 
 // Socks5 TCP protocol.
 func (l *Locale) ServeSocks5TCP(ctx *Context, app io.ReadWriteCloser, dst string) error {
-	log.Println(ctx.Cid, " proto", "format=socks5")
+	log.Printf("%08x  proto format=socks5", ctx.Cid)
 	srv, err := l.Dialer.Dial(ctx, "tcp", dst)
 	if err == nil {
 		defer srv.Close()
@@ -431,10 +431,10 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 			goto init
 		}
 	init:
-		log.Println(ctx.Cid, " proto", "format=socks5")
+		log.Printf("%08x  proto format=socks5", ctx.Cid)
 		srv, err = l.Dialer.Dial(ctx, "udp", dst)
 		if err != nil {
-			log.Println(ctx.Cid, " error", err)
+			log.Printf("%08x  error %s", ctx.Cid, err)
 			continue
 		}
 		cpl[dst] = srv
@@ -461,7 +461,7 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 	send:
 		_, err = srv.Write(buf[appHeadSize:appSize])
 		if err != nil {
-			log.Println(ctx.Cid, " error", err)
+			log.Printf("%08x  error %s", ctx.Cid, err)
 			continue
 		}
 	}
@@ -530,14 +530,14 @@ func (l *Locale) Run() error {
 				break
 			}
 			idx += 1
-			ctx := &Context{Cid: Hu32(idx)}
-			log.Printf("%s accept remote=%s", ctx.Cid, cli.RemoteAddr())
+			ctx := &Context{idx}
+			log.Printf("%08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
 			go func(ctx *Context, cli net.Conn) {
 				defer cli.Close()
 				if err := l.Serve(ctx, cli); err != nil {
-					log.Println(ctx.Cid, " error", err)
+					log.Printf("%08x  error %s", ctx.Cid, err)
 				}
-				log.Println(ctx.Cid, "closed")
+				log.Printf("%08x closed", ctx.Cid)
 			}(ctx, cli)
 		}
 	}()
@@ -614,7 +614,7 @@ func (r *RouterIPNet) road(ctx *Context, host string) Road {
 	}
 	l, err := Conf.Dialer.Resolver.LookupIPAddr(context.Background(), host)
 	if err != nil {
-		log.Println(ctx.Cid, " error", err)
+		log.Printf("%08x  error %s", ctx.Cid, err)
 		return RoadPuzzle
 	}
 	if len(l) == 0 {
@@ -632,7 +632,7 @@ func (r *RouterIPNet) road(ctx *Context, host string) Road {
 // Road implements daze.Router.
 func (r *RouterIPNet) Road(ctx *Context, host string) Road {
 	road := r.road(ctx, host)
-	log.Printf("%s  route router=ipnet road=%s", ctx.Cid, road)
+	log.Printf("%08x  route router=ipnet road=%s", ctx.Cid, road)
 	return road
 }
 
@@ -666,7 +666,7 @@ type RouterRight struct {
 
 // Road implements daze.Router.
 func (r *RouterRight) Road(ctx *Context, host string) Road {
-	log.Printf("%s  route router=right road=%s", ctx.Cid, r.R)
+	log.Printf("%08x  route router=right road=%s", ctx.Cid, r.R)
 	return r.R
 }
 
@@ -738,7 +738,7 @@ func (r *RouterCache) Road(ctx *Context, host string) Road {
 	r.m.Lock()
 	defer r.m.Unlock()
 	road := r.road(ctx, host)
-	log.Printf("%s  route router=cache road=%s", ctx.Cid, road)
+	log.Printf("%08x  route router=cache road=%s", ctx.Cid, road)
 	return road
 }
 
@@ -771,7 +771,7 @@ func (r *RouterClump) road(ctx *Context, host string) Road {
 // Road implements daze.Router.
 func (r *RouterClump) Road(ctx *Context, host string) Road {
 	road := r.road(ctx, host)
-	log.Printf("%s  route router=clump road=%s", ctx.Cid, road)
+	log.Printf("%08x  route router=clump road=%s", ctx.Cid, road)
 	return road
 }
 
@@ -829,7 +829,7 @@ func (r *RouterRules) road(ctx *Context, host string) Road {
 // Road implements daze.Router.
 func (r *RouterRules) Road(ctx *Context, host string) Road {
 	road := r.road(ctx, host)
-	log.Printf("%s  route router=rules road=%s", ctx.Cid, road)
+	log.Printf("%08x  route router=rules road=%s", ctx.Cid, road)
 	return road
 }
 
@@ -873,7 +873,7 @@ type Aimbot struct {
 
 // Dialer contains options for connecting to an address.
 func (s *Aimbot) Dial(ctx *Context, network string, address string) (io.ReadWriteCloser, error) {
-	log.Printf("%s   dial network=%s address=%s", ctx.Cid, network, address)
+	log.Printf("%08x   dial network=%s address=%s", ctx.Cid, network, address)
 	host, _, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, err

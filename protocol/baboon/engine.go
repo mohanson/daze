@@ -78,12 +78,12 @@ func (s *Server) ServeDaze(w http.ResponseWriter, r *http.Request) {
 		Listen: s.Listen,
 		Cipher: s.Cipher,
 	}
-	ctx := &daze.Context{Cid: daze.Hu32(atomic.AddUint32(&s.NextID, 1))}
-	log.Printf("%s accept remote=%s", ctx.Cid, cc.RemoteAddr())
+	ctx := &daze.Context{Cid: atomic.AddUint32(&s.NextID, 1)}
+	log.Printf("%08x accept remote=%s", ctx.Cid, cc.RemoteAddr())
 	if err := srv.Serve(ctx, app); err != nil {
-		log.Println(ctx.Cid, " error", err)
+		log.Printf("%08x  error %s", ctx.Cid, err)
 	}
-	log.Println(ctx.Cid, "closed")
+	log.Printf("%08x closed", ctx.Cid)
 }
 
 // ServeHTTP implements http.Handler.
