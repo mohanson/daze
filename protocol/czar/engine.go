@@ -61,12 +61,12 @@ import (
 
 // Conf is acting as package level configuration.
 var Conf = struct {
-	ClientLink              time.Duration
+	ClientReconnectInterval time.Duration
 	ClientWait              time.Duration
 	ConnectionPoolLimit     int
 	MaximumTransmissionUnit int
 }{
-	ClientLink:              time.Second * 4,
+	ClientReconnectInterval: time.Second * 4,
 	ClientWait:              time.Second * 8,
 	ConnectionPoolLimit:     256,
 	MaximumTransmissionUnit: 4096,
@@ -428,7 +428,7 @@ func (c *Client) Serve(ctx *daze.Context) {
 	)
 	goto Tag2
 Tag1:
-	time.Sleep(Conf.ClientLink)
+	time.Sleep(Conf.ClientReconnectInterval)
 	if atomic.LoadUint32(&c.Closed) != 0 {
 		return
 	}
@@ -512,19 +512,19 @@ func (c *Client) Close() error {
 	}
 }
 
-// NewClient returns a new Client. A secret data needs to be passed in Cipher, as a sign to interface with the Server.
+// NewClient returns a new Client.
 func NewClient(server, cipher string) *Client {
 	idpool := make(chan uint16, Conf.ConnectionPoolLimit)
 	for i := 1; i < Conf.ConnectionPoolLimit; i++ {
 		idpool <- uint16(i)
 	}
 	client := &Client{
-		Server:   server,
 		Cipher:   md5.Sum([]byte(cipher)),
 		Cli:      make(chan io.ReadWriteCloser),
 		Closed:   0,
 		IDPool:   idpool,
 		Priority: daze.NewPriority(2),
+		Server:   server,
 		Usr:      make([]*SioConn, Conf.ConnectionPoolLimit),
 	}
 	go client.Serve(&daze.Context{Cid: math.MaxUint32})
