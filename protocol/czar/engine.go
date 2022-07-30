@@ -61,19 +61,15 @@ import (
 
 // Conf is acting as package level configuration.
 var Conf = struct {
-	ClientLink time.Duration
-	ClientWait time.Duration
-	LogClient  int
-	LogServer  int
-	Mtu        int
-	Usr        int
+	ClientLink              time.Duration
+	ClientWait              time.Duration
+	ConnectionPoolLimit     int
+	MaximumTransmissionUnit int
 }{
-	ClientLink: time.Second * 4,
-	ClientWait: time.Second * 8,
-	LogClient:  0,
-	LogServer:  0,
-	Mtu:        4096,
-	Usr:        256,
+	ClientLink:              time.Second * 4,
+	ClientWait:              time.Second * 8,
+	ConnectionPoolLimit:     256,
+	MaximumTransmissionUnit: 4096,
 }
 
 // Server implemented the czar protocol.
@@ -97,7 +93,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 	}
 
 	var (
-		buf      = make([]byte, Conf.Mtu)
+		buf      = make([]byte, Conf.MaximumTransmissionUnit)
 		cmd      uint8
 		dst      string
 		dstLen   uint8
@@ -106,15 +102,12 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		msgLen   uint16
 		priority = daze.NewPriority(2)
 		srv      net.Conn
-		usb      = make([]net.Conn, Conf.Usr)
+		usb      = make([]net.Conn, Conf.ConnectionPoolLimit)
 	)
 	for {
 		_, err = io.ReadFull(cli, buf[:8])
 		if err != nil {
 			break
-		}
-		if Conf.LogServer != 0 {
-			log.Printf("%08x   recv data=[% x]", ctx.Cid, buf[:8])
 		}
 		cmd = buf[0]
 		switch cmd {
@@ -148,7 +141,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 
 			go func(idx uint16, dstNet uint8, dst string) {
 				var (
-					buf = make([]byte, Conf.Mtu)
+					buf = make([]byte, Conf.MaximumTransmissionUnit)
 					err error
 					n   int
 					srv net.Conn
@@ -395,7 +388,7 @@ Fail:
 // Proxy.
 func (c *Client) Proxy(ctx *daze.Context, srv *SioConn, cli io.ReadWriteCloser, idx uint16) {
 	var (
-		buf = make([]byte, Conf.Mtu)
+		buf = make([]byte, Conf.MaximumTransmissionUnit)
 		err error
 		n   int
 	)
@@ -425,7 +418,7 @@ func (c *Client) Proxy(ctx *daze.Context, srv *SioConn, cli io.ReadWriteCloser, 
 func (c *Client) Serve(ctx *daze.Context) {
 	var (
 		asheClient *ashe.Client
-		buf        = make([]byte, Conf.Mtu)
+		buf        = make([]byte, Conf.MaximumTransmissionUnit)
 		cli        io.ReadWriteCloser
 		closedChan = make(chan int)
 		cmd        uint8
