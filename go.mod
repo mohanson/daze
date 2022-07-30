@@ -4,5 +4,5 @@ go 1.18
 
 require (
 	github.com/godump/doa v0.1.2
-	github.com/godump/lru v0.1.0
+	github.com/godump/lru v0.1.2
 )
