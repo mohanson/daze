@@ -54,7 +54,7 @@ var Conf = struct {
 		Timeout:  time.Second * 8,
 	},
 	Random:      rand.New(rand.NewSource(time.Now().Unix())),
-	RouterCache: 64,
+	RouterCache: 128,
 }
 
 // Resolver returns a new Resolver used by the package-level Lookup functions and by Dialers without a specified
@@ -939,6 +939,11 @@ func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
 	}
 }
 
+// Hang prevent program from exiting.
+func Hang() {
+	select {}
+}
+
 // OpenFile select the appropriate method to open the file based on the incoming args automatically.
 //
 // Examples:
@@ -956,16 +961,29 @@ func OpenFile(name string) (io.ReadCloser, error) {
 	}
 }
 
-// Encode uint32 to hex string.
-func Hu32(u uint32) string {
-	p := make([]byte, 4)
-	binary.BigEndian.PutUint32(p, u)
-	return hex.EncodeToString(p[:4])
+// A Priority is a mutual exclusion lock with priority.
+type Priority struct {
+	mu []*sync.Mutex
 }
 
-// Hang prevent program from exiting.
-func Hang() {
-	select {}
+// Priority locks m with priority n, execute f at pass.
+func (p *Priority) Priority(n int, f func()) {
+	for i := n; i < len(p.mu); i++ {
+		p.mu[i].Lock()
+		defer p.mu[i].Unlock()
+	}
+	f()
+}
+
+// NewPriority returns a new Priority.
+func NewPriority(n int) *Priority {
+	mu := make([]*sync.Mutex, n)
+	for i := 0; i < n; i++ {
+		mu[i] = &sync.Mutex{}
+	}
+	return &Priority{
+		mu: mu,
+	}
 }
 
 // ============================================================================
