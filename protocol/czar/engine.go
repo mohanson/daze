@@ -111,13 +111,14 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		}
 		cmd = buf[0]
 		switch cmd {
-		case 1:
+		case 0x01:
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
-			buf[0] = 2
+			buf[0] = 0x02
+			daze.Conf.Random.Read(buf[8 : 8+msgLen])
 			priority.Priority(0, func() {
 				cli.Write(buf[0 : 8+msgLen])
 			})
-		case 2:
+		case 0x02:
 			idx = binary.BigEndian.Uint16(buf[1:3])
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
 			_, err = io.ReadFull(cli, buf[8:8+msgLen])
@@ -126,10 +127,9 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 			}
 			srv = usb[idx]
 			if srv != nil {
-				// Errors can be safely ignored. Don't ask me why, it's magic.
 				srv.Write(buf[8 : 8+msgLen])
 			}
-		case 3:
+		case 0x03:
 			idx = binary.BigEndian.Uint16(buf[1:3])
 			dstNet = buf[3]
 			dstLen = buf[4]
@@ -154,22 +154,22 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 					log.Printf("%08x   dial network=udp address=%s", ctx.Cid, dst)
 					srv, err = daze.Conf.Dialer.Dial("udp", dst)
 				}
-				buf[0] = 3
+				buf[0] = 0x03
 				binary.BigEndian.PutUint16(buf[1:3], idx)
 				if err != nil {
 					log.Printf("%08x  error %s", ctx.Cid, err)
-					buf[3] = 1
+					buf[3] = 0x01
 					priority.Priority(1, func() {
 						cli.Write(buf[0:8])
 					})
 					return
 				}
-				buf[3] = 0
+				buf[3] = 0x00
 				usb[idx] = srv
 				priority.Priority(1, func() {
 					cli.Write(buf[0:8])
 				})
-				buf[0] = 2
+				buf[0] = 0x02
 				for {
 					n, err = srv.Read(buf[8:])
 					if n != 0 {
@@ -186,15 +186,14 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 				// Server crash, err=read: connection reset by peer
 				// Client close  err=use of closed network connection
 				if !errors.Is(err, net.ErrClosed) {
-					buf[0] = 4
+					buf[0] = 0x04
 					priority.Priority(1, func() {
 						cli.Write(buf[0:8])
 					})
 				}
 				log.Printf("%08x closed idx=%02x", ctx.Cid, idx)
-
 			}(idx, dstNet, dst)
-		case 4:
+		case 0x04:
 			idx = binary.BigEndian.Uint16(buf[1:3])
 			srv = usb[idx]
 			if srv != nil {
