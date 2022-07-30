@@ -16,29 +16,34 @@ import (
 	"github.com/mohanson/daze/protocol/ashe"
 )
 
-// The czar protocol is a proxy protocol built on TCP multiplexing technology. It eliminates some common characteristics
-// of proxy software, such as frequent connection establishment and disconnection when browsing websites. It makes it
-// more difficult to be detected by firewalls.
+// The czar protocol is a proxy protocol built on TCP multiplexing technology. By establishing multiple TCP connections
+// in one TCP channel, czar protocol effectively reduces the consumption of establishing connections between the client
+// and the server:
+//
+// Client port: a.com ------------┐                   ┌------------ Server port: a.com
+// Client port: b.com ----------┐ |                   | ┌---------- Server port: b.com
+// Client port: c.com ----------+-+-- czar protocol --+-+---------- Server port: c.com
+// Client port: d.com ----------┘ |                   | └---------- Server port: d.com
+// Client port: e.com ------------┘                   └------------ Server port: e.com
 //
 // When the client is initialized, it needs to establish and maintain a connection with the server. After that, the
 // client and server communicate through the following commands.
 //
-// The server and client can request each other to send random data of a specified size and simply discarded.
-// The purpose of this command is to shape traffic to avoid being identified.
+// The server and client can request each other to send random data of a specified size. The purpose of this command is
+// to shape traffic to avoid being identified.
 //
 // +-----+-----+-----+-----+-----+-----+-----+-----+
 // |  1  |    Idx    |    Len    |       Rsv       |
 // +-----+-----+-----+-----+-----+-----+-----+-----+
 //
-// Both server and client can push data to each other. The ID in command can be obtained in next command.
+// Both server and client can push data to each other.
 //
 // +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
 // |  2  |    Idx    |    Len    |       Rsv       |                      Msg                      |
 // +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
 //
-// Client wishes to establish a connection. The client needs to transmit two network and destination address. The server
-// will typically evaluate the request based on network and destination addresses, and return one reply messages, as
-// appropriate for the request type.
+// Client requests to establish a connection and marks the connection with an idx. The server will typically evaluate
+// the request based on network and destination addresses, and return one reply messages.
 //
 // +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
 // |  3  |    Idx    | Net | Len |       Rsv       |                      Dst                      |
