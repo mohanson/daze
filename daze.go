@@ -939,6 +939,11 @@ func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
 	}
 }
 
+// Hang prevent program from exiting.
+func Hang() {
+	select {}
+}
+
 // OpenFile select the appropriate method to open the file based on the incoming args automatically.
 //
 // Examples:
@@ -954,18 +959,6 @@ func OpenFile(name string) (io.ReadCloser, error) {
 	} else {
 		return os.Open(name)
 	}
-}
-
-// Encode uint32 to hex string.
-func Hu32(u uint32) string {
-	p := make([]byte, 4)
-	binary.BigEndian.PutUint32(p, u)
-	return hex.EncodeToString(p[:4])
-}
-
-// Hang prevent program from exiting.
-func Hang() {
-	select {}
 }
 
 // ============================================================================

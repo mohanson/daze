@@ -77,6 +77,28 @@ var Conf = struct {
 	Usr:        256,
 }
 
+type Priority struct {
+	mu []*sync.Mutex
+}
+
+func (p *Priority) Priority(n int, f func()) {
+	for i := n; i < len(p.mu); i++ {
+		p.mu[i].Lock()
+		defer p.mu[i].Unlock()
+	}
+	f()
+}
+
+func NewPriority(n int) *Priority {
+	mu := make([]*sync.Mutex, n)
+	for i := 0; i < n; i++ {
+		mu[i] = &sync.Mutex{}
+	}
+	return &Priority{
+		mu: mu,
+	}
+}
+
 // LioConn is concurrency safe in write.
 type LioConn struct {
 	io.ReadWriteCloser
