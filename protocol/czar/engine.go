@@ -332,7 +332,7 @@ type Client struct {
 // Dial connects to the address on the named network.
 func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.ReadWriteCloser, error) {
 	var (
-		buf []byte
+		buf = make([]byte, 8+len(address))
 		err error
 		idx uint16
 		srv *SioConn
@@ -347,14 +347,13 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	srv = NewSioConn()
 	c.Usr[idx] = srv
 
-	buf = make([]byte, 8+len(address))
-	buf[0] = 3
+	buf[0] = 0x03
 	binary.BigEndian.PutUint16(buf[1:3], idx)
 	switch network {
 	case "tcp":
-		buf[3] = 1
+		buf[3] = 0x01
 	case "udp":
-		buf[3] = 3
+		buf[3] = 0x03
 	}
 	buf[4] = uint8(len(address))
 	copy(buf[8:], []byte(address))
@@ -391,7 +390,7 @@ func (c *Client) Proxy(ctx *daze.Context, srv *SioConn, cli io.ReadWriteCloser, 
 		err error
 		n   int
 	)
-	buf[0] = 2
+	buf[0] = 0x02
 	binary.BigEndian.PutUint16(buf[1:3], idx)
 	for {
 		n, err = srv.WriterReader.Read(buf[8:])
@@ -407,8 +406,10 @@ func (c *Client) Proxy(ctx *daze.Context, srv *SioConn, cli io.ReadWriteCloser, 
 	}
 	doa.Doa(err == io.EOF || err == io.ErrClosedPipe)
 	if err == io.EOF {
-		buf[0] = 4
-		srv.Write(buf[:8])
+		buf[0] = 0x04
+		c.Priority.Priority(1, func() {
+			cli.Write(buf[0:8])
+		})
 	}
 	c.IDPool <- idx
 }
