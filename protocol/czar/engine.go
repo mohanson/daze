@@ -461,9 +461,6 @@ Tag2:
 		if err != nil {
 			break
 		}
-		if Conf.LogClient != 0 {
-			log.Printf("%08x   recv data=[% x]", ctx.Cid, buf[:8])
-		}
 		cmd = buf[0]
 		switch cmd {
 		case 1:
@@ -518,8 +515,8 @@ func (c *Client) Close() error {
 
 // NewClient returns a new Client. A secret data needs to be passed in Cipher, as a sign to interface with the Server.
 func NewClient(server, cipher string) *Client {
-	idpool := make(chan uint16, Conf.Usr)
-	for i := 1; i < Conf.Usr; i++ {
+	idpool := make(chan uint16, Conf.ConnectionPoolLimit)
+	for i := 1; i < Conf.ConnectionPoolLimit; i++ {
 		idpool <- uint16(i)
 	}
 	client := &Client{
@@ -529,7 +526,7 @@ func NewClient(server, cipher string) *Client {
 		Closed:   0,
 		IDPool:   idpool,
 		Priority: daze.NewPriority(2),
-		Usr:      make([]*SioConn, Conf.Usr),
+		Usr:      make([]*SioConn, Conf.ConnectionPoolLimit),
 	}
 	go client.Serve(&daze.Context{Cid: math.MaxUint32})
 	return client
