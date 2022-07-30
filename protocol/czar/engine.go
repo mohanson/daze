@@ -61,13 +61,13 @@ import (
 
 // Conf is acting as package level configuration.
 var Conf = struct {
+	ClientDialTimeout       time.Duration
 	ClientReconnectInterval time.Duration
-	ClientWait              time.Duration
 	ConnectionPoolLimit     int
 	MaximumTransmissionUnit int
 }{
+	ClientDialTimeout:       time.Second * 8,
 	ClientReconnectInterval: time.Second * 4,
-	ClientWait:              time.Second * 8,
 	ConnectionPoolLimit:     256,
 	MaximumTransmissionUnit: 4096,
 }
@@ -340,7 +340,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	)
 	select {
 	case cli = <-c.Cli:
-	case <-time.NewTimer(Conf.ClientWait).C:
+	case <-time.NewTimer(Conf.ClientDialTimeout).C:
 		return nil, errors.New("daze: dial timeout")
 	}
 	idx = <-c.IDPool
