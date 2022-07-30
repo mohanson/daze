@@ -254,7 +254,7 @@ func (s *Server) Run() error {
 	return nil
 }
 
-// NewServer returns a new Server. A secret data needs to be passed in Cipher, as a sign to interface with the Client.
+// NewServer returns a new Server.
 func NewServer(listen string, cipher string) *Server {
 	return &Server{
 		Listen: listen,
