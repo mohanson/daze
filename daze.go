@@ -961,6 +961,31 @@ func OpenFile(name string) (io.ReadCloser, error) {
 	}
 }
 
+// A Priority is a mutual exclusion lock with priority.
+type Priority struct {
+	mu []*sync.Mutex
+}
+
+// Priority locks m with priority n, execute f at pass.
+func (p *Priority) Priority(n int, f func()) {
+	for i := n; i < len(p.mu); i++ {
+		p.mu[i].Lock()
+		defer p.mu[i].Unlock()
+	}
+	f()
+}
+
+// NewPriority returns a new Priority.
+func NewPriority(n int) *Priority {
+	mu := make([]*sync.Mutex, n)
+	for i := 0; i < n; i++ {
+		mu[i] = &sync.Mutex{}
+	}
+	return &Priority{
+		mu: mu,
+	}
+}
+
 // ============================================================================
 //                 ___           ___           ___           ___
 //                /\  \         /\  \         /\  \         /\  \

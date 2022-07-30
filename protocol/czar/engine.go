@@ -8,7 +8,6 @@ import (
 	"log"
 	"math"
 	"net"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -77,84 +76,6 @@ var Conf = struct {
 	Usr:        256,
 }
 
-type Priority struct {
-	mu []*sync.Mutex
-}
-
-func (p *Priority) Priority(n int, f func()) {
-	for i := n; i < len(p.mu); i++ {
-		p.mu[i].Lock()
-		defer p.mu[i].Unlock()
-	}
-	f()
-}
-
-func NewPriority(n int) *Priority {
-	mu := make([]*sync.Mutex, n)
-	for i := 0; i < n; i++ {
-		mu[i] = &sync.Mutex{}
-	}
-	return &Priority{
-		mu: mu,
-	}
-}
-
-// SioConn is a combination of two pipes and it implements io.ReadWriteCloser.
-type SioConn struct {
-	ReaderReader *io.PipeReader
-	ReaderWriter *io.PipeWriter
-	WriterReader *io.PipeReader
-	WriterWriter *io.PipeWriter
-}
-
-// Read implements io.Reader.
-func (c *SioConn) Read(p []byte) (int, error) {
-	return c.ReaderReader.Read(p)
-}
-
-// Write implements io.Writer.
-func (c *SioConn) Write(p []byte) (int, error) {
-	return c.WriterWriter.Write(p)
-}
-
-// Close implements io.Closer. Note that it only closes the pipe on SioConn side.
-func (c *SioConn) Close() error {
-	err1 := c.ReaderReader.Close()
-	err2 := c.WriterWriter.Close()
-	if err1 != nil {
-		return err1
-	}
-	if err2 != nil {
-		return err2
-	}
-	return nil
-}
-
-// Esolc close the other half of the pipe.
-func (c *SioConn) Esolc() error {
-	err1 := c.ReaderWriter.Close()
-	err2 := c.WriterReader.Close()
-	if err1 != nil {
-		return err1
-	}
-	if err2 != nil {
-		return err2
-	}
-	return nil
-}
-
-// NewSioConn returns a new MioConn.
-func NewSioConn() *SioConn {
-	rr, rw := io.Pipe()
-	wr, ww := io.Pipe()
-	return &SioConn{
-		ReaderReader: rr,
-		ReaderWriter: rw,
-		WriterReader: wr,
-		WriterWriter: ww,
-	}
-}
-
 // Server implemented the czar protocol.
 type Server struct {
 	Listen string
@@ -183,7 +104,7 @@ func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
 		dstNet   uint8
 		idx      uint16
 		msgLen   uint16
-		priority = NewPriority(2)
+		priority = daze.NewPriority(2)
 		srv      net.Conn
 		usb      = make([]net.Conn, Conf.Usr)
 	)
@@ -349,6 +270,62 @@ func NewServer(listen string, cipher string) *Server {
 	}
 }
 
+// SioConn is a combination of two pipes and it implements io.ReadWriteCloser.
+type SioConn struct {
+	ReaderReader *io.PipeReader
+	ReaderWriter *io.PipeWriter
+	WriterReader *io.PipeReader
+	WriterWriter *io.PipeWriter
+}
+
+// Read implements io.Reader.
+func (c *SioConn) Read(p []byte) (int, error) {
+	return c.ReaderReader.Read(p)
+}
+
+// Write implements io.Writer.
+func (c *SioConn) Write(p []byte) (int, error) {
+	return c.WriterWriter.Write(p)
+}
+
+// Close implements io.Closer. Note that it only closes the pipe on SioConn side.
+func (c *SioConn) Close() error {
+	err1 := c.ReaderReader.Close()
+	err2 := c.WriterWriter.Close()
+	if err1 != nil {
+		return err1
+	}
+	if err2 != nil {
+		return err2
+	}
+	return nil
+}
+
+// Esolc close the other half of the pipe.
+func (c *SioConn) Esolc() error {
+	err1 := c.ReaderWriter.Close()
+	err2 := c.WriterReader.Close()
+	if err1 != nil {
+		return err1
+	}
+	if err2 != nil {
+		return err2
+	}
+	return nil
+}
+
+// NewSioConn returns a new MioConn.
+func NewSioConn() *SioConn {
+	rr, rw := io.Pipe()
+	wr, ww := io.Pipe()
+	return &SioConn{
+		ReaderReader: rr,
+		ReaderWriter: rw,
+		WriterReader: wr,
+		WriterWriter: ww,
+	}
+}
+
 // Client implemented the czar protocol.
 type Client struct {
 	Server   string
@@ -356,7 +333,7 @@ type Client struct {
 	Cli      chan io.ReadWriteCloser
 	Closed   uint32
 	IDPool   chan uint16
-	Priority *Priority
+	Priority *daze.Priority
 	Usr      []*SioConn
 }
 
@@ -558,7 +535,7 @@ func NewClient(server, cipher string) *Client {
 		Cli:      make(chan io.ReadWriteCloser),
 		Closed:   0,
 		IDPool:   idpool,
-		Priority: NewPriority(2),
+		Priority: daze.NewPriority(2),
 		Usr:      make([]*SioConn, Conf.Usr),
 	}
 	go client.Serve(&daze.Context{Cid: math.MaxUint32})
