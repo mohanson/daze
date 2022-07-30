@@ -54,7 +54,7 @@ var Conf = struct {
 		Timeout:  time.Second * 8,
 	},
 	Random:      rand.New(rand.NewSource(time.Now().Unix())),
-	RouterCache: 64,
+	RouterCache: 128,
 }
 
 // Resolver returns a new Resolver used by the package-level Lookup functions and by Dialers without a specified
