@@ -244,19 +244,18 @@ type Client struct {
 }
 
 // WithCipher creates an encrypted channel.
-func (c *Client) WithCipher(ctx *daze.Context, raw io.ReadWriteCloser) (io.ReadWriteCloser, error) {
+func (c *Client) WithCipher(ctx *daze.Context, srv io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	var (
 		buf = make([]byte, 144)
 		err error
-		srv io.ReadWriteCloser
 	)
 	daze.Conf.Random.Read(buf[:128])
-	_, err = raw.Write(buf[:128])
+	_, err = srv.Write(buf[:128])
 	if err != nil {
 		return nil, err
 	}
 	copy(buf[128:144], c.Cipher[:])
-	srv = daze.Gravity(raw, buf[:144])
+	srv = daze.Gravity(srv, buf[:144])
 	buf[0x00] = 0xff
 	buf[0x01] = 0xff
 	binary.BigEndian.PutUint64(buf[2:10], uint64(time.Now().Unix()))
