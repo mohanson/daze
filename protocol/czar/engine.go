@@ -320,12 +320,12 @@ func NewSioConn() *SioConn {
 
 // Client implemented the czar protocol.
 type Client struct {
-	Server   string
 	Cipher   [16]byte
 	Cli      chan io.ReadWriteCloser
 	Closed   uint32
 	IDPool   chan uint16
 	Priority *daze.Priority
+	Server   string
 	Usr      []*SioConn
 }
 
@@ -462,27 +462,31 @@ Tag2:
 		}
 		cmd = buf[0]
 		switch cmd {
-		case 1:
+		case 0x01:
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
-			buf[0] = 2
+			buf[0] = 0x02
+			daze.Conf.Random.Read(buf[0 : 8+msgLen])
 			c.Priority.Priority(0, func() {
 				cli.Write(buf[0 : 8+msgLen])
 			})
-		case 2:
+		case 0x02:
 			idx = binary.BigEndian.Uint16(buf[1:3])
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
-			io.ReadFull(cli, buf[0:msgLen])
+			_, err = io.ReadFull(cli, buf[0:msgLen])
+			if err != nil {
+				break
+			}
 			srv = c.Usr[idx]
 			if srv != nil {
 				srv.ReaderWriter.Write(buf[:msgLen])
 			}
-		case 3:
+		case 0x03:
 			idx = binary.BigEndian.Uint16(buf[1:3])
 			srv = c.Usr[idx]
 			if srv != nil {
 				srv.ReaderWriter.Write(buf[:8])
 			}
-		case 4:
+		case 0x04:
 			idx = binary.BigEndian.Uint16(buf[1:3])
 			srv = c.Usr[idx]
 			if srv != nil {
