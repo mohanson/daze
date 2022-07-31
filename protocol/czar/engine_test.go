@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync/atomic"
 	"testing"
 
 	"github.com/godump/doa"
@@ -52,6 +53,50 @@ func TestProtocalCrowTCP(t *testing.T) {
 	buf1 := make([]byte, 12)
 	io.ReadFull(cli, buf1)
 	if !bytes.Equal(buf0, buf1) {
+		t.FailNow()
+	}
+}
+
+func TestProtocalCrowTCPClientClose(t *testing.T) {
+	echoListener := doa.Try(net.Listen("tcp", EchoServerListenOn))
+	defer echoListener.Close()
+	chanLive := make(chan uint32, 1)
+	go func() {
+		live := uint32(0)
+		for {
+			c, err := echoListener.Accept()
+			if err != nil {
+				if !errors.Is(err, net.ErrClosed) {
+					log.Println(err)
+				}
+				break
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				atomic.AddUint32(&live, 1)
+				chanLive <- live
+				io.Copy(c, c)
+				atomic.AddUint32(&live, ^uint32(0))
+				chanLive <- live
+			}(c)
+		}
+	}()
+
+	dazeServer := NewServer(DazeServerListenOn, Password)
+	defer dazeServer.Close()
+	dazeServer.Run()
+
+	dazeClient := NewClient(DazeServerListenOn, Password)
+	defer dazeClient.Close()
+	ctx := &daze.Context{}
+	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
+	defer cli.Close()
+
+	if <-chanLive != 1 {
+		t.FailNow()
+	}
+	cli.Close()
+	if <-chanLive != 0 {
 		t.FailNow()
 	}
 }
