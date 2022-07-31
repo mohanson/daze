@@ -7,7 +7,6 @@ import (
 	"log"
 	"net"
 	"testing"
-	"time"
 
 	"github.com/godump/doa"
 	"github.com/mohanson/daze"
@@ -20,7 +19,6 @@ const (
 )
 
 func TestProtocalCrowTCP(t *testing.T) {
-	defer time.Sleep(time.Second)
 	echoListener := doa.Try(net.Listen("tcp", EchoServerListenOn))
 	defer echoListener.Close()
 	go func() {
@@ -72,7 +70,6 @@ func TestProtocalCrowTCPClientDialFailed(t *testing.T) {
 }
 
 func TestProtocalCrowTCPClientHighLoad(t *testing.T) {
-	defer time.Sleep(time.Second)
 	echoListener := doa.Try(net.Listen("tcp", EchoServerListenOn))
 	defer echoListener.Close()
 	go func() {
@@ -118,7 +115,6 @@ func TestProtocalCrowTCPClientHighLoad(t *testing.T) {
 }
 
 func TestProtocalCrowTCPServerClose(t *testing.T) {
-	defer time.Sleep(time.Second)
 	echoListener := doa.Try(net.Listen("tcp", EchoServerListenOn))
 	defer echoListener.Close()
 	go func() {
@@ -156,8 +152,6 @@ func TestProtocalCrowTCPServerClose(t *testing.T) {
 }
 
 func TestProtocalCrowTCPServerDialFailed(t *testing.T) {
-	defer time.Sleep(time.Second)
-
 	dazeServer := NewServer(DazeServerListenOn, Password)
 	defer dazeServer.Close()
 	dazeServer.Run()
@@ -172,7 +166,6 @@ func TestProtocalCrowTCPServerDialFailed(t *testing.T) {
 }
 
 func TestProtocalCrowTCPServerHighLoad(t *testing.T) {
-	defer time.Sleep(time.Second)
 	echoListener := doa.Try(net.Listen("tcp", EchoServerListenOn))
 	defer echoListener.Close()
 	go func() {
@@ -215,7 +208,6 @@ func TestProtocalCrowTCPServerHighLoad(t *testing.T) {
 }
 
 func TestProtocolCrowUDP(t *testing.T) {
-	defer time.Sleep(time.Second)
 	echoAddr := doa.Try(net.ResolveUDPAddr("udp", EchoServerListenOn))
 	echoServer := doa.Try(net.ListenUDP("udp", echoAddr))
 	defer echoServer.Close()
