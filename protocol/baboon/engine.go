@@ -27,13 +27,13 @@ var Conf = struct {
 	// that you are using a proxy server.
 	Masker string
 }{
-	Masker: "http://www.baidu.com",
+	Masker: "https://www.zhihu.com",
 }
 
 // Server implemented the baboon protocol.
 type Server struct {
 	Listen string
-	Cipher [16]byte
+	Cipher []byte
 	Closer io.Closer
 	Masker string
 	NextID uint32
@@ -119,7 +119,7 @@ func (s *Server) Route(r *http.Request) int {
 	}
 	hash := md5.New()
 	hash.Write(authData[:16])
-	hash.Write(s.Cipher[:])
+	hash.Write(s.Cipher[:16])
 	sign := hash.Sum(nil)
 	for i := 0; i < 16; i++ {
 		if authData[16+i] != sign[i] {
@@ -146,7 +146,7 @@ func (s *Server) Run() error {
 func NewServer(listen string, cipher string) *Server {
 	return &Server{
 		Listen: listen,
-		Cipher: md5.Sum([]byte(cipher)),
+		Cipher: daze.Salt(cipher),
 		Masker: Conf.Masker,
 		NextID: uint32(math.MaxUint32),
 	}
@@ -155,7 +155,7 @@ func NewServer(listen string, cipher string) *Server {
 // Client implemented the baboon protocol.
 type Client struct {
 	Server string
-	Cipher [16]byte
+	Cipher []byte
 }
 
 // Dial connects to the address on the named network.
@@ -171,7 +171,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		return nil, err
 	}
 	daze.Conf.Random.Read(buf[:16])
-	copy(buf[16:32], c.Cipher[:])
+	copy(buf[16:32], c.Cipher[:16])
 	sign := md5.Sum(buf[:32])
 	copy(buf[16:32], sign[:])
 	req = doa.Try(http.NewRequest("POST", "http://"+c.Server+"/sync", http.NoBody))
@@ -194,6 +194,6 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 func NewClient(server string, cipher string) *Client {
 	return &Client{
 		Server: server,
-		Cipher: md5.Sum([]byte(cipher)),
+		Cipher: daze.Salt(cipher),
 	}
 }

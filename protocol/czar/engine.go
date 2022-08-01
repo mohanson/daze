@@ -1,7 +1,6 @@
 package czar
 
 import (
-	"crypto/md5"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -80,7 +79,7 @@ var Conf = struct {
 // Server implemented the czar protocol.
 type Server struct {
 	Listen string
-	Cipher [16]byte
+	Cipher []byte
 	Closer io.Closer
 }
 
@@ -263,7 +262,7 @@ func (s *Server) Run() error {
 func NewServer(listen string, cipher string) *Server {
 	return &Server{
 		Listen: listen,
-		Cipher: md5.Sum([]byte(cipher)),
+		Cipher: daze.Salt(cipher),
 	}
 }
 
@@ -325,7 +324,7 @@ func NewSioConn() *SioConn {
 
 // Client implemented the czar protocol.
 type Client struct {
-	Cipher   [16]byte
+	Cipher   []byte
 	Cli      chan io.ReadWriteCloser
 	Closed   uint32
 	IDPool   chan uint16
@@ -529,7 +528,7 @@ func NewClient(server, cipher string) *Client {
 		idpool <- uint16(i)
 	}
 	client := &Client{
-		Cipher:   md5.Sum([]byte(cipher)),
+		Cipher:   daze.Salt(cipher),
 		Cli:      make(chan io.ReadWriteCloser),
 		Closed:   0,
 		IDPool:   idpool,

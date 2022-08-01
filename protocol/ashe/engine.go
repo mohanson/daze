@@ -1,7 +1,6 @@
 package ashe
 
 import (
-	"crypto/md5"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -21,20 +20,19 @@ import (
 //
 // The client connects to the server, and sends a request details:
 //
-// +-----+-----------+------+-----+---------+---------+
-// | OTA | Handshake | Time | Net | DST.Len | DST     |
-// +-----+-----------+------+-----+---------+---------+
-// | 128 | 2         | 8    |  1  | 1       | 0 - 255 |
-// +-----+-----------+------+-----+---------+---------+
+// +------+------+-----+---------+---------+
+// | Salt | Time | Net | DST.Len | DST     |
+// +------+------+-----+---------+---------+
+// | 128  | 8    | 1   | 1       | 0 - 255 |
+// +------+------+-----+---------+---------+
 //
-// - OTA       : Random 128 bytes for rc4 key, all data will be transmitted encrypted after there
-// - Handshake : Must be 0xff, 0xff, used to quickly verify the client's key
-// - Time      : Timestamp of request. The server will reject requests with past or future timestamps to prevent replay
-//               attacks.
-// - Net       : 0x01 : TCP
-//               0x03 : UDP
-// - DST.Len   : Len of DST. If DST is https://google.com, DST.Len is 0x12
-// - DST       : Desired destination address
+// - Salt    : Random 128 bytes for rc4 key, all data will be transmitted encrypted after there
+// - Time    : Timestamp of request. The server will reject requests with past or future timestamps to prevent replay
+//             attacks
+// - Net     : 0x01 : TCP
+//             0x03 : UDP
+// - DST.Len : Len of DST
+// - DST     : Desired destination address
 //
 // The server returns:
 //
@@ -104,14 +102,14 @@ func (c *UDPConn) Write(p []byte) (int, error) {
 // destination addresses, and return one or more reply messages, as appropriate for the request type.
 type Server struct {
 	Listen string
-	Cipher [16]byte
+	Cipher []byte
 	Closer io.Closer
 }
 
 // ServeCipher creates an encrypted channel.
 func (s *Server) ServeCipher(ctx *daze.Context, raw io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	var (
-		buf     = make([]byte, 144)
+		buf     = make([]byte, 256)
 		cli     io.ReadWriteCloser
 		err     error
 		gap     int64
@@ -121,16 +119,13 @@ func (s *Server) ServeCipher(ctx *daze.Context, raw io.ReadWriteCloser) (io.Read
 	if err != nil {
 		return nil, err
 	}
-	copy(buf[128:144], s.Cipher[:])
-	cli = daze.Gravity(raw, buf[:144])
-	_, err = io.ReadFull(cli, buf[:10])
+	copy(buf[128:256], s.Cipher[:])
+	cli = daze.Gravity(raw, buf[:])
+	_, err = io.ReadFull(cli, buf[:8])
 	if err != nil {
 		return nil, err
 	}
-	if buf[0] != 0xff || buf[1] != 0xff {
-		return nil, errors.New("daze: request malformed")
-	}
-	gap = time.Now().Unix() - int64(binary.BigEndian.Uint64(buf[2:10]))
+	gap = time.Now().Unix() - int64(binary.BigEndian.Uint64(buf[:8]))
 	gapSign = gap >> 63
 	if gap^gapSign-gapSign > int64(Conf.LifeExpired) {
 		return nil, errors.New("daze: request expired")
@@ -233,20 +228,20 @@ func (s *Server) Run() error {
 func NewServer(listen string, cipher string) *Server {
 	return &Server{
 		Listen: listen,
-		Cipher: md5.Sum([]byte(cipher)),
+		Cipher: daze.Salt(cipher),
 	}
 }
 
 // Client implemented the ashe protocol.
 type Client struct {
 	Server string
-	Cipher [16]byte
+	Cipher []byte
 }
 
 // WithCipher creates an encrypted channel.
 func (c *Client) WithCipher(ctx *daze.Context, srv io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	var (
-		buf = make([]byte, 144)
+		buf = make([]byte, 256)
 		err error
 	)
 	daze.Conf.Random.Read(buf[:128])
@@ -254,12 +249,10 @@ func (c *Client) WithCipher(ctx *daze.Context, srv io.ReadWriteCloser) (io.ReadW
 	if err != nil {
 		return nil, err
 	}
-	copy(buf[128:144], c.Cipher[:])
-	srv = daze.Gravity(srv, buf[:144])
-	buf[0x00] = 0xff
-	buf[0x01] = 0xff
-	binary.BigEndian.PutUint64(buf[2:10], uint64(time.Now().Unix()))
-	_, err = srv.Write(buf[:10])
+	copy(buf[128:256], c.Cipher[:])
+	srv = daze.Gravity(srv, buf[:])
+	binary.BigEndian.PutUint64(buf[:8], uint64(time.Now().Unix()))
+	_, err = srv.Write(buf[:8])
 	if err != nil {
 		return nil, err
 	}
@@ -328,6 +321,6 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 func NewClient(server, cipher string) *Client {
 	return &Client{
 		Server: server,
-		Cipher: md5.Sum([]byte(cipher)),
+		Cipher: daze.Salt(cipher),
 	}
 }
