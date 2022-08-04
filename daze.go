@@ -874,22 +874,30 @@ type Aimbot struct {
 
 // Dialer contains options for connecting to an address.
 func (s *Aimbot) Dial(ctx *Context, network string, address string) (io.ReadWriteCloser, error) {
+	var (
+		dst string
+		err error
+		rwc io.ReadWriteCloser
+	)
 	log.Printf("%08x   dial network=%s address=%s", ctx.Cid, network, address)
-	host, _, err := net.SplitHostPort(address)
+	dst, _, err = net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
 	}
-	switch s.Router.Road(ctx, host) {
+	switch s.Router.Road(ctx, dst) {
 	case RoadLocale:
-		return s.Locale.Dial(ctx, network, address)
+		rwc, err = s.Locale.Dial(ctx, network, address)
 	case RoadRemote:
-		return s.Remote.Dial(ctx, network, address)
+		rwc, err = s.Remote.Dial(ctx, network, address)
 	case RoadFucked:
-		return nil, fmt.Errorf("daze: %s has been blocked", host)
+		err = fmt.Errorf("daze: %s has been blocked", dst)
 	case RoadPuzzle:
-		return s.Remote.Dial(ctx, network, address)
+		rwc, err = s.Remote.Dial(ctx, network, address)
 	}
-	panic("unreachable")
+	if err == nil {
+		log.Printf("%08x  estab", ctx.Cid)
+	}
+	return rwc, err
 }
 
 // ============================================================================
