@@ -69,7 +69,7 @@ func (s *Server) ServeDaze(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(cc, "Content-Type: text/plain; charset=utf-8\r\n")                // 41
 	io.WriteString(cc, fmt.Sprintf("Date: %s\r\n", time.Now().Format(time.RFC1123))) // 37
 	io.WriteString(cc, "X-Content-Type-Options: nosniff\r\n")                        // 33
-	app := &daze.ReadWriteCloser{
+	cli := &daze.ReadWriteCloser{
 		Reader: rw,
 		Writer: cc,
 		Closer: cc,
@@ -80,7 +80,7 @@ func (s *Server) ServeDaze(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := &daze.Context{Cid: atomic.AddUint32(&s.NextID, 1)}
 	log.Printf("%08x accept remote=%s", ctx.Cid, cc.RemoteAddr())
-	if err := srv.Serve(ctx, app); err != nil {
+	if err := srv.Serve(ctx, cli); err != nil {
 		log.Printf("%08x  error %s", ctx.Cid, err)
 	}
 	log.Printf("%08x closed", ctx.Cid)

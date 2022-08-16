@@ -19,7 +19,7 @@ const (
 	Password           = "password"
 )
 
-func TestProtocalCrowTCP(t *testing.T) {
+func TestProtocalCzarTCP(t *testing.T) {
 	echoListener := doa.Try(net.Listen("tcp", EchoServerListenOn))
 	defer echoListener.Close()
 	go func() {
@@ -57,7 +57,7 @@ func TestProtocalCrowTCP(t *testing.T) {
 	}
 }
 
-func TestProtocalCrowTCPClientClose(t *testing.T) {
+func TestProtocalCzarTCPClientClose(t *testing.T) {
 	echoListener := doa.Try(net.Listen("tcp", EchoServerListenOn))
 	defer echoListener.Close()
 	chanLive := make(chan uint32, 1)
@@ -101,7 +101,7 @@ func TestProtocalCrowTCPClientClose(t *testing.T) {
 	}
 }
 
-func TestProtocalCrowTCPClientDialFailed(t *testing.T) {
+func TestProtocalCzarTCPClientDialFailed(t *testing.T) {
 	dazeClient := NewClient(DazeServerListenOn, Password)
 	defer dazeClient.Close()
 	ctx := &daze.Context{}
@@ -114,7 +114,7 @@ func TestProtocalCrowTCPClientDialFailed(t *testing.T) {
 	}
 }
 
-func TestProtocalCrowTCPClientHighLoad(t *testing.T) {
+func TestProtocalCzarTCPClientHighLoad(t *testing.T) {
 	echoListener := doa.Try(net.Listen("tcp", EchoServerListenOn))
 	defer echoListener.Close()
 	go func() {
@@ -159,7 +159,7 @@ func TestProtocalCrowTCPClientHighLoad(t *testing.T) {
 	}
 }
 
-func TestProtocalCrowTCPServerClose(t *testing.T) {
+func TestProtocalCzarTCPServerClose(t *testing.T) {
 	echoListener := doa.Try(net.Listen("tcp", EchoServerListenOn))
 	defer echoListener.Close()
 	go func() {
@@ -196,7 +196,7 @@ func TestProtocalCrowTCPServerClose(t *testing.T) {
 	}
 }
 
-func TestProtocalCrowTCPServerDialFailed(t *testing.T) {
+func TestProtocalCzarTCPServerDialFailed(t *testing.T) {
 	dazeServer := NewServer(DazeServerListenOn, Password)
 	defer dazeServer.Close()
 	dazeServer.Run()
@@ -210,7 +210,7 @@ func TestProtocalCrowTCPServerDialFailed(t *testing.T) {
 	}
 }
 
-func TestProtocalCrowTCPServerHighLoad(t *testing.T) {
+func TestProtocalCzarTCPServerHighLoad(t *testing.T) {
 	echoListener := doa.Try(net.Listen("tcp", EchoServerListenOn))
 	defer echoListener.Close()
 	go func() {

@@ -107,20 +107,19 @@ type Server struct {
 }
 
 // ServeCipher creates an encrypted channel.
-func (s *Server) ServeCipher(ctx *daze.Context, raw io.ReadWriteCloser) (io.ReadWriteCloser, error) {
+func (s *Server) ServeCipher(ctx *daze.Context, cli io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	var (
 		buf     = make([]byte, 256)
-		cli     io.ReadWriteCloser
 		err     error
 		gap     int64
 		gapSign int64
 	)
-	_, err = io.ReadFull(raw, buf[:128])
+	_, err = io.ReadFull(cli, buf[:128])
 	if err != nil {
 		return nil, err
 	}
 	copy(buf[128:256], s.Cipher[:])
-	cli = daze.Gravity(raw, buf[:])
+	cli = daze.Gravity(cli, buf[:])
 	_, err = io.ReadFull(cli, buf[:8])
 	if err != nil {
 		return nil, err
@@ -133,7 +132,7 @@ func (s *Server) ServeCipher(ctx *daze.Context, raw io.ReadWriteCloser) (io.Read
 	return cli, nil
 }
 
-// Serve. Parameter raw will be closed automatically when the function exits.
+// Serve. Parameter cli will be closed automatically when the function exits.
 func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 	var (
 		buf    = make([]byte, 256)

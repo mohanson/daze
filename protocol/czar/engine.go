@@ -83,15 +83,14 @@ type Server struct {
 	Closer io.Closer
 }
 
-// Serve. Parameter raw will be closed automatically when the function exits.
-func (s *Server) Serve(ctx *daze.Context, raw io.ReadWriteCloser) error {
+// Serve. Parameter cli will be closed automatically when the function exits.
+func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 	var (
 		asheServer *ashe.Server
-		cli        io.ReadWriteCloser
 		err        error
 	)
 	asheServer = &ashe.Server{Cipher: s.Cipher}
-	cli, err = asheServer.ServeCipher(ctx, raw)
+	cli, err = asheServer.ServeCipher(ctx, cli)
 	if err != nil {
 		return err
 	}
