@@ -96,16 +96,16 @@ func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 	}
 
 	var (
-		buf      = make([]byte, Conf.MaximumTransmissionUnit)
-		cmd      uint8
-		dst      string
-		dstLen   uint8
-		dstNet   uint8
-		idx      uint16
-		msgLen   uint16
-		priority = daze.NewPriority(2)
-		srv      net.Conn
-		usb      = make([]net.Conn, Conf.ConnectionPoolLimit)
+		buf    = make([]byte, Conf.MaximumTransmissionUnit)
+		cmd    uint8
+		dst    string
+		dstLen uint8
+		dstNet uint8
+		idx    uint16
+		msgLen uint16
+		pri    = daze.NewPriority(2)
+		srv    net.Conn
+		usb    = make([]net.Conn, Conf.ConnectionPoolLimit)
 	)
 	for {
 		_, err = io.ReadFull(cli, buf[:8])
@@ -118,8 +118,8 @@ func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
 			buf[0] = 0x02
 			daze.Conf.Random.Read(buf[8 : 8+msgLen])
-			priority.Priority(0, func() {
-				cli.Write(buf[0 : 8+msgLen])
+			pri.Priority(0, func() error {
+				return doa.Err(cli.Write(buf[0 : 8+msgLen]))
 			})
 		case 0x02:
 			idx = binary.BigEndian.Uint16(buf[1:3])
@@ -162,23 +162,23 @@ func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 				if err != nil {
 					log.Printf("%08x  error %s", ctx.Cid, err)
 					buf[3] = 0x01
-					priority.Priority(1, func() {
-						cli.Write(buf[0:8])
+					pri.Priority(1, func() error {
+						return doa.Err(cli.Write(buf[0:8]))
 					})
 					return
 				}
 				buf[3] = 0x00
 				usb[idx] = srv
-				priority.Priority(1, func() {
-					cli.Write(buf[0:8])
+				pri.Priority(1, func() error {
+					return doa.Err(cli.Write(buf[0:8]))
 				})
 				buf[0] = 0x02
 				for {
 					n, err = srv.Read(buf[8:])
 					if n != 0 {
 						binary.BigEndian.PutUint16(buf[3:5], uint16(n))
-						priority.Priority(0, func() {
-							cli.Write(buf[0 : 8+n])
+						pri.Priority(0, func() error {
+							return doa.Err(cli.Write(buf[0 : 8+n]))
 						})
 					}
 					if err != nil {
@@ -190,8 +190,8 @@ func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 				// Client close  err=use of closed network connection
 				if !errors.Is(err, net.ErrClosed) {
 					buf[0] = 0x04
-					priority.Priority(1, func() {
-						cli.Write(buf[0:8])
+					pri.Priority(1, func() error {
+						return doa.Err(cli.Write(buf[0:8]))
 					})
 				}
 				log.Printf("%08x closed idx=%02x", ctx.Cid, idx)
@@ -323,13 +323,13 @@ func NewSioConn() *SioConn {
 
 // Client implemented the czar protocol.
 type Client struct {
-	Cipher   []byte
-	Cli      chan io.ReadWriteCloser
-	Closed   uint32
-	IDPool   chan uint16
-	Priority *daze.Priority
-	Server   string
-	Usr      []*SioConn
+	Cipher []byte
+	Cli    chan io.ReadWriteCloser
+	Closed uint32
+	IDPool chan uint16
+	Pri    *daze.Priority
+	Server string
+	Usr    []*SioConn
 }
 
 // Dial connects to the address on the named network.
@@ -361,8 +361,8 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	buf[4] = uint8(len(address))
 	copy(buf[8:], []byte(address))
 
-	c.Priority.Priority(1, func() {
-		_, err = cli.Write(buf)
+	err = c.Pri.Priority(1, func() error {
+		return doa.Err(cli.Write(buf))
 	})
 	if err != nil {
 		goto Fail
@@ -399,8 +399,8 @@ func (c *Client) Proxy(ctx *daze.Context, srv *SioConn, cli io.ReadWriteCloser, 
 		n, err = srv.WriterReader.Read(buf[8:])
 		if n != 0 {
 			binary.BigEndian.PutUint16(buf[3:5], uint16(n))
-			c.Priority.Priority(0, func() {
-				cli.Write(buf[0 : 8+n])
+			c.Pri.Priority(0, func() error {
+				return doa.Err(cli.Write(buf[0 : 8+n]))
 			})
 		}
 		if err != nil {
@@ -410,8 +410,8 @@ func (c *Client) Proxy(ctx *daze.Context, srv *SioConn, cli io.ReadWriteCloser, 
 	doa.Doa(err == io.EOF || err == io.ErrClosedPipe)
 	if err == io.EOF {
 		buf[0] = 0x04
-		c.Priority.Priority(1, func() {
-			cli.Write(buf[0:8])
+		c.Pri.Priority(1, func() error {
+			return doa.Err(cli.Write(buf[0:8]))
 		})
 	}
 	c.IDPool <- idx
@@ -470,8 +470,8 @@ Tag2:
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
 			buf[0] = 0x02
 			daze.Conf.Random.Read(buf[0 : 8+msgLen])
-			c.Priority.Priority(0, func() {
-				cli.Write(buf[0 : 8+msgLen])
+			c.Pri.Priority(0, func() error {
+				return doa.Err(cli.Write(buf[0 : 8+msgLen]))
 			})
 		case 0x02:
 			idx = binary.BigEndian.Uint16(buf[1:3])
@@ -527,13 +527,13 @@ func NewClient(server, cipher string) *Client {
 		idpool <- uint16(i)
 	}
 	client := &Client{
-		Cipher:   daze.Salt(cipher),
-		Cli:      make(chan io.ReadWriteCloser),
-		Closed:   0,
-		IDPool:   idpool,
-		Priority: daze.NewPriority(2),
-		Server:   server,
-		Usr:      make([]*SioConn, Conf.ConnectionPoolLimit),
+		Cipher: daze.Salt(cipher),
+		Cli:    make(chan io.ReadWriteCloser),
+		Closed: 0,
+		IDPool: idpool,
+		Pri:    daze.NewPriority(2),
+		Server: server,
+		Usr:    make([]*SioConn, Conf.ConnectionPoolLimit),
 	}
 	go client.Serve(&daze.Context{Cid: math.MaxUint32})
 	return client
