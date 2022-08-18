@@ -96,6 +96,20 @@ func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 	}
 
 	var (
+		inc = io.NopCloser(daze.Conf.Random)
+		rwc io.ReadWriteCloser
+		srv = make([]io.ReadWriteCloser, Conf.ConnectionPoolLimit)
+	)
+	rwc = &daze.ReadWriteCloser{
+		Reader: inc,
+		Writer: io.Discard,
+		Closer: inc,
+	}
+	for i := 0; i < len(srv); i++ {
+		srv[i] = rwc
+	}
+
+	var (
 		buf    = make([]byte, Conf.MaximumTransmissionUnit)
 		cmd    uint8
 		dst    string
@@ -104,12 +118,11 @@ func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 		idx    uint16
 		msgLen uint16
 		pri    = daze.NewPriority(2)
-		srv    net.Conn
-		usb    = make([]net.Conn, Conf.ConnectionPoolLimit)
 	)
 	for {
 		_, err = io.ReadFull(cli, buf[:8])
 		if err != nil {
+			log.Printf("%08x  error %s", ctx.Cid, err)
 			break
 		}
 		cmd = buf[0]
@@ -118,7 +131,7 @@ func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
 			buf[0] = 0x02
 			daze.Conf.Random.Read(buf[8 : 8+msgLen])
-			pri.Priority(0, func() error {
+			err = pri.Priority(0, func() error {
 				return doa.Err(cli.Write(buf[0 : 8+msgLen]))
 			})
 		case 0x02:
@@ -128,10 +141,8 @@ func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 			if err != nil {
 				break
 			}
-			srv = usb[idx]
-			if srv != nil {
-				srv.Write(buf[8 : 8+msgLen])
-			}
+			rwc = srv[idx]
+			_, err = rwc.Write(buf[8 : 8+msgLen])
 		case 0x03:
 			idx = binary.BigEndian.Uint16(buf[1:3])
 			dstNet = buf[3]
@@ -147,15 +158,15 @@ func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 					buf = make([]byte, Conf.MaximumTransmissionUnit)
 					err error
 					n   int
-					srv net.Conn
+					rwc net.Conn
 				)
 				switch dstNet {
 				case 0x01:
-					log.Printf("%08x   dial network=tcp address=%s", ctx.Cid, dst)
-					srv, err = daze.Conf.Dialer.Dial("tcp", dst)
+					log.Printf("%08x   dial idx=%02x network=tcp address=%s", ctx.Cid, idx, dst)
+					rwc, err = daze.Conf.Dialer.Dial("tcp", dst)
 				case 0x03:
-					log.Printf("%08x   dial network=udp address=%s", ctx.Cid, dst)
-					srv, err = daze.Conf.Dialer.Dial("udp", dst)
+					log.Printf("%08x   dial idx=%02x network=udp address=%s", ctx.Cid, idx, dst)
+					rwc, err = daze.Conf.Dialer.Dial("udp", dst)
 				}
 				buf[0] = 0x03
 				binary.BigEndian.PutUint16(buf[1:3], idx)
@@ -168,13 +179,13 @@ func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 					return
 				}
 				buf[3] = 0x00
-				usb[idx] = srv
+				srv[idx] = rwc
 				pri.Priority(1, func() error {
 					return doa.Err(cli.Write(buf[0:8]))
 				})
 				buf[0] = 0x02
 				for {
-					n, err = srv.Read(buf[8:])
+					n, err = rwc.Read(buf[8:])
 					if n != 0 {
 						binary.BigEndian.PutUint16(buf[3:5], uint16(n))
 						pri.Priority(0, func() error {
@@ -198,17 +209,16 @@ func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 			}(idx, dstNet, dst)
 		case 0x04:
 			idx = binary.BigEndian.Uint16(buf[1:3])
-			srv = usb[idx]
-			if srv != nil {
-				srv.Close()
-			}
+			rwc = srv[idx]
+			err = rwc.Close()
+		}
+		if err != nil {
+			log.Printf("%08x  error %s", ctx.Cid, err)
 		}
 	}
 
-	for _, srv := range usb {
-		if srv != nil {
-			srv.Close()
-		}
+	for _, rwc = range srv {
+		rwc.Close()
 	}
 
 	return nil
