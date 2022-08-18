@@ -977,11 +977,15 @@ type Priority struct {
 
 // Priority locks m with priority n, execute f at pass.
 func (p *Priority) Priority(n int, f func() error) error {
-	for i := n; i < len(p.mu); i++ {
+	m := len(p.mu) - 1
+	for i := n; i <= m; i++ {
 		p.mu[i].Lock()
-		defer p.mu[i].Unlock()
 	}
-	return f()
+	r := f()
+	for i := m; i >= n; i-- {
+		p.mu[i].Unlock()
+	}
+	return r
 }
 
 // NewPriority returns a new Priority.
