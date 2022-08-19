@@ -276,7 +276,7 @@ func (s *Server) Run() error {
 				}
 				break
 			}
-			idx += 1
+			idx++
 			ctx := &daze.Context{Cid: idx}
 			log.Printf("%08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
 			go func(cli net.Conn) {

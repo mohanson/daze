@@ -134,7 +134,7 @@ func (s *Server) ServeCipher(ctx *daze.Context, cli io.ReadWriteCloser) (io.Read
 	return cli, nil
 }
 
-// Serve. Parameter cli will be closed automatically when the function exits.
+// Serve incoming connections. Parameter cli will be closed automatically when the function exits.
 func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 	var (
 		buf    = make([]byte, 256)
@@ -190,7 +190,7 @@ func (s *Server) Close() error {
 	return nil
 }
 
-// Run.
+// Run it.
 func (s *Server) Run() error {
 	ln, err := net.Listen("tcp", s.Listen)
 	if err != nil {
@@ -209,7 +209,7 @@ func (s *Server) Run() error {
 				}
 				break
 			}
-			idx += 1
+			idx++
 			ctx := &daze.Context{Cid: idx}
 			log.Printf("%08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
 			go func(cli net.Conn) {

@@ -60,7 +60,7 @@ func (s *Server) ServeMask(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, ret.Body)
 }
 
-// ServeDaze. Degenerate HTTP protocol and run ashe protocol on it.
+// ServeDaze degenerate HTTP protocol and run ashe protocol on it.
 func (s *Server) ServeDaze(w http.ResponseWriter, r *http.Request) {
 	hj, _ := w.(http.Hijacker)
 	cc, rw, _ := hj.Hijack()
@@ -129,7 +129,7 @@ func (s *Server) Route(r *http.Request) int {
 	return 1
 }
 
-// Run.
+// Run it.
 func (s *Server) Run() error {
 	ln, err := net.Listen("tcp", s.Listen)
 	if err != nil {

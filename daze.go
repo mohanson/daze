@@ -120,7 +120,7 @@ type Locale struct {
 	Closer io.Closer
 }
 
-// Serve traffic in HTTP Proxy/Tunnel format.
+// ServeProxy serves traffic in HTTP Proxy/Tunnel format.
 //
 // Introduction:
 //   See https://en.wikipedia.org/wiki/Proxy_server
@@ -197,7 +197,7 @@ func (l *Locale) ServeProxy(ctx *Context, app io.ReadWriteCloser) error {
 	return err
 }
 
-// Serve traffic in SOCKS4/SOCKS4a format.
+// ServeSocks4 serves traffic in SOCKS4/SOCKS4a format.
 //
 // Introduction:
 //   See https://en.wikipedia.org/wiki/SOCKS
@@ -244,22 +244,21 @@ func (l *Locale) ServeSocks4(ctx *Context, app io.ReadWriteCloser) error {
 	switch fCode {
 	case 0x01:
 		srv, err = l.Dialer.Dial(ctx, "tcp", dst)
-		if err == nil {
+		if err != nil {
+			app.Write([]byte{0x00, 0x5b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		} else {
 			defer srv.Close()
 			app.Write([]byte{0x00, 0x5a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 			Link(app, srv)
-			return nil
-		} else {
-			app.Write([]byte{0x00, 0x5b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-			return err
 		}
+		return err
 	case 0x02:
 		panic("unreachable")
 	}
 	return nil
 }
 
-// Serve traffic in SOCKS5 format.
+// ServeSocks5 serves traffic in SOCKS5 format.
 //
 // Introduction:
 //   See https://en.wikipedia.org/wiki/SOCKS
@@ -322,22 +321,21 @@ func (l *Locale) ServeSocks5(ctx *Context, app io.ReadWriteCloser) error {
 	return nil
 }
 
-// Socks5 TCP protocol.
+// ServeSocks5TCP serves socks5 TCP protocol.
 func (l *Locale) ServeSocks5TCP(ctx *Context, app io.ReadWriteCloser, dst string) error {
 	log.Printf("%08x  proto format=socks5", ctx.Cid)
 	srv, err := l.Dialer.Dial(ctx, "tcp", dst)
-	if err == nil {
+	if err != nil {
+		app.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+	} else {
 		defer srv.Close()
 		app.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 		Link(app, srv)
-		return nil
-	} else {
-		app.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-		return err
 	}
+	return err
 }
 
-// Socks5 UDP protocol.
+// ServeSocks5UDP serves socks5 UDP protocol.
 func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 	var (
 		bndAddr     *net.UDPAddr
@@ -472,8 +470,7 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 	return nil
 }
 
-// We should be very clear about what it does. It judges the traffic type and processes it with a different
-// handler(ServeProxy/ServeSocks4/ServeSocks5).
+// Serve serves incoming connections and handle it with a different handler(ServeProxy/ServeSocks4/ServeSocks5).
 func (l *Locale) Serve(ctx *Context, app io.ReadWriteCloser) error {
 	var (
 		buf = make([]byte, 1)
@@ -511,7 +508,7 @@ func (l *Locale) Close() error {
 	return nil
 }
 
-// Run.
+// Run it.
 func (l *Locale) Run() error {
 	s, err := net.Listen("tcp", l.Listen)
 	if err != nil {
@@ -530,7 +527,7 @@ func (l *Locale) Run() error {
 				}
 				break
 			}
-			idx += 1
+			idx++
 			ctx := &Context{idx}
 			log.Printf("%08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
 			go func(ctx *Context, cli net.Conn) {
@@ -572,10 +569,14 @@ func NewLocale(listen string, dialer Dialer) *Locale {
 type Road uint32
 
 const (
-	RoadLocale Road = iota // Don't need a proxy
-	RoadRemote             // This network are accessed through daze
-	RoadFucked             // Pure rubbish
-	RoadPuzzle             // ?
+	// RoadLocale means it don't need a proxy
+	RoadLocale Road = iota
+	// RoadRemote means it should accessed through proxy
+	RoadRemote
+	// RoadFucked means it is pure rubbish
+	RoadFucked
+	// RoadPuzzle means ?
+	RoadPuzzle
 )
 
 func (r Road) String() string {
@@ -601,7 +602,7 @@ type Router interface {
 	Road(ctx *Context, host string) Road
 }
 
-// IPNet is a router by IPNets. It judges whether an IP or domain name is within its range, if so, it returns Y,
+// RouterIPNet is a router by IPNets. It judges whether an IP or domain name is within its range, if so, it returns Y,
 // otherwise it returns N.
 type RouterIPNet struct {
 	L []*net.IPNet
@@ -637,7 +638,7 @@ func (r *RouterIPNet) Road(ctx *Context, host string) Road {
 	return road
 }
 
-// Load a CIDR file from reader.
+// FromReader loads a CIDR file from reader.
 func (r *RouterIPNet) FromReader(f io.Reader) error {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
@@ -652,7 +653,7 @@ func (r *RouterIPNet) FromReader(f io.Reader) error {
 	return scanner.Err()
 }
 
-// NewIPNet returns a new IPNet object.
+// NewRouterIPNet returns a new RouterIPNet object.
 func NewRouterIPNet(ipnets []*net.IPNet, road Road) *RouterIPNet {
 	return &RouterIPNet{
 		L: ipnets,
@@ -671,11 +672,13 @@ func (r *RouterRight) Road(ctx *Context, host string) Road {
 	return r.R
 }
 
-// NewRouterRight.
+// NewRouterRight returns a new RouterRight.
 func NewRouterRight(road Road) *RouterRight {
 	return &RouterRight{R: road}
 }
 
+// NewRouterLocal returns reserved ip addresses.
+//
 // Introduction:
 //   See https://en.wikipedia.org/wiki/Reserved_IP_addresses
 func NewRouterLocal() *RouterIPNet {
@@ -717,7 +720,7 @@ func NewRouterLocal() *RouterIPNet {
 	return NewRouterIPNet(r, RoadLocale)
 }
 
-// Cache cache routing results for next use.
+// RouterCache cache routing results for next use.
 type RouterCache struct {
 	Pit Router
 	Box *lru.Lru
@@ -743,7 +746,7 @@ func (r *RouterCache) Road(ctx *Context, host string) Road {
 	return road
 }
 
-// NewCache returns a new Cache object.
+// NewRouterCache returns a new Cache object.
 func NewRouterCache(r Router) *RouterCache {
 	return &RouterCache{
 		Pit: r,
@@ -783,7 +786,7 @@ func NewRouterClump(router ...Router) *RouterClump {
 	}
 }
 
-// RULE file aims to be a minimal configuration file format that's easy to read due to obvious semantics.
+// RouterRules aims to be a minimal configuration file format that's easy to read due to obvious semantics.
 // There are two parts per line on RULE file: mode and glob. mode are on the left of the space sign and glob are on the
 // right. mode is an char and describes whether the host should go proxy, glob supported glob-style patterns:
 //
@@ -834,7 +837,7 @@ func (r *RouterRules) Road(ctx *Context, host string) Road {
 	return road
 }
 
-// Load a RULE file from reader.
+// FromReader loads a RULE file from reader.
 func (r *RouterRules) FromReader(f io.Reader) error {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
@@ -872,7 +875,7 @@ type Aimbot struct {
 	Router Router
 }
 
-// Dialer contains options for connecting to an address.
+// Dial connects to the address on the named network.
 func (s *Aimbot) Dial(ctx *Context, network string, address string) (io.ReadWriteCloser, error) {
 	var (
 		dst string
@@ -937,7 +940,7 @@ func GravityWriter(w io.Writer, k []byte) io.Writer {
 	return cipher.StreamWriter{S: cw, W: w}
 }
 
-// Double gravity, double happiness.
+// Gravity double, happiness double.
 func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
 	cr := doa.Try(rc4.NewCipher(k))
 	cw := doa.Try(rc4.NewCipher(k))
@@ -965,9 +968,8 @@ func OpenFile(name string) (io.ReadCloser, error) {
 			return nil, err
 		}
 		return resp.Body, nil
-	} else {
-		return os.Open(name)
 	}
+	return os.Open(name)
 }
 
 // A Priority is a mutual exclusion lock with priority.
@@ -1023,7 +1025,8 @@ func Salt(s string) []byte {
 //                ~~            \/__/                       \/__/
 // ============================================================================
 
-// Load remote resource. APNIC is the Regional Internet Registry administering IP addresses for the Asia Pacific.
+// LoadApnic loads remote resource. APNIC is the Regional Internet Registry administering IP addresses for the Asia
+// Pacific.
 func LoadApnic() map[string][]*net.IPNet {
 	f := doa.Try(OpenFile("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest"))
 	defer f.Close()
