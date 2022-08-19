@@ -124,6 +124,8 @@ func (s *Server) ServeCipher(ctx *daze.Context, cli io.ReadWriteCloser) (io.Read
 	if err != nil {
 		return nil, err
 	}
+	// Get absolute value. Hacker's Delight, 2-4, Absolute Value Function.
+	// See https://doc.lagout.org/security/Hackers%20Delight.pdf
 	gap = time.Now().Unix() - int64(binary.BigEndian.Uint64(buf[:8]))
 	gapSign = gap >> 63
 	if gap^gapSign-gapSign > int64(Conf.LifeExpired) {
