@@ -166,11 +166,11 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		req *http.Request
 		err error
 	)
-	srv, err = daze.Conf.Dialer.Dial("tcp", c.Server)
+	srv, err = daze.Dial("tcp", c.Server)
 	if err != nil {
 		return nil, err
 	}
-	daze.Conf.Random.Read(buf[:16])
+	daze.Random.Read(buf[:16])
 	copy(buf[16:32], c.Cipher[:16])
 	sign := md5.Sum(buf[:32])
 	copy(buf[16:32], sign[:])

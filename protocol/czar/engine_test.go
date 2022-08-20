@@ -150,7 +150,7 @@ func TestProtocalCzarTCPClientHighLoad(t *testing.T) {
 
 	buf := make([]byte, 32*1024)
 	for i := 0; i < 1024; i++ {
-		daze.Conf.Random.Read(buf)
+		daze.Random.Read(buf)
 		cli.Write(buf)
 	}
 	io.ReadFull(cli, buf[:1])
@@ -226,7 +226,7 @@ func TestProtocalCzarTCPServerHighLoad(t *testing.T) {
 				defer c.Close()
 				buf := make([]byte, 32*1024)
 				for i := 0; i < 1024; i++ {
-					daze.Conf.Random.Read(buf)
+					daze.Random.Read(buf)
 					_, err := c.Write(buf)
 					if err != nil {
 						break

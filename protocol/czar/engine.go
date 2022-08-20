@@ -86,7 +86,7 @@ type ServerConn struct {
 	wg1 sync.WaitGroup
 }
 
-// Serve.
+// Serve incoming connections.
 func (s *ServerConn) Serve() {
 	var (
 		buf    = make([]byte, Conf.MaximumTransmissionUnit)
@@ -110,7 +110,7 @@ func (s *ServerConn) Serve() {
 		case 0x01:
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
 			buf[0] = 0x02
-			daze.Conf.Random.Read(buf[8 : 8+msgLen])
+			daze.Random.Read(buf[8 : 8+msgLen])
 			err = s.pri.Priority(0, func() error {
 				return doa.Err(s.cli.Write(buf[0 : 8+msgLen]))
 			})
@@ -162,10 +162,10 @@ func (s *ServerConn) serve(idx uint16, dstNet uint8, dst string) {
 	switch dstNet {
 	case 0x01:
 		log.Printf("%08x   dial idx=%02x network=tcp address=%s", s.ctx.Cid, idx, dst)
-		rwc, err = daze.Conf.Dialer.Dial("tcp", dst)
+		rwc, err = daze.Dial("tcp", dst)
 	case 0x03:
 		log.Printf("%08x   dial idx=%02x network=udp address=%s", s.ctx.Cid, idx, dst)
-		rwc, err = daze.Conf.Dialer.Dial("udp", dst)
+		rwc, err = daze.Dial("udp", dst)
 	}
 	if err != nil {
 		s.wg1.Done()
@@ -232,7 +232,7 @@ type Server struct {
 	Closer io.Closer
 }
 
-// Serve. Parameter cli will be closed automatically when the function exits.
+// Serve incoming connections. Parameter cli will be closed automatically when the function exits.
 func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 	var (
 		asheServer *ashe.Server
@@ -257,7 +257,7 @@ func (s *Server) Close() error {
 	return nil
 }
 
-// Run.
+// Run it.
 func (s *Server) Run() error {
 	ln, err := net.Listen("tcp", s.Listen)
 	if err != nil {
@@ -417,7 +417,7 @@ Fail:
 	return nil, err
 }
 
-// Proxy.
+// Proxy conn.
 func (c *Client) Proxy(ctx *daze.Context, cli *ClientConn, srv io.ReadWriteCloser, idx uint16) {
 	var (
 		buf = make([]byte, Conf.MaximumTransmissionUnit)
@@ -468,7 +468,7 @@ Tag1:
 		return
 	}
 Tag2:
-	srv, err = daze.Conf.Dialer.Dial("tcp", c.Server)
+	srv, err = daze.Dial("tcp", c.Server)
 	if err != nil {
 		log.Printf("%08x  error %s", ctx.Cid, err)
 		goto Tag1
@@ -501,7 +501,7 @@ Tag2:
 		case 0x01:
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
 			buf[0] = 0x02
-			daze.Conf.Random.Read(buf[0 : 8+msgLen])
+			daze.Random.Read(buf[0 : 8+msgLen])
 			err = c.Pri.Priority(0, func() error {
 				return doa.Err(srv.Write(buf[0 : 8+msgLen]))
 			})

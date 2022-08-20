@@ -71,7 +71,7 @@ func main() {
 		log.Println("server cipher is", *flCipher)
 		log.Println("protocol is used", *flProtoc)
 		if *flDnserv != "" {
-			daze.Conf.Dialer.Resolver = daze.Resolver(*flDnserv)
+			net.DefaultResolver = daze.Resolver(*flDnserv)
 			log.Println("domain server is", *flDnserv)
 		}
 		switch *flProtoc {
@@ -108,7 +108,7 @@ func main() {
 		log.Println("client cipher is", *flCipher)
 		log.Println("protocol is used", *flProtoc)
 		if *flDnserv != "" {
-			daze.Conf.Dialer.Resolver = daze.Resolver(*flDnserv)
+			net.DefaultResolver = daze.Resolver(*flDnserv)
 			log.Println("domain server is", *flDnserv)
 		}
 		client := func() daze.Dialer {

@@ -46,16 +46,11 @@ import (
 
 // Conf is acting as package level configuration.
 var Conf = struct {
-	Dialer      net.Dialer
-	Random      *rand.Rand
-	RouterCache int
+	DialerTimeout time.Duration
+	RouterLruSize int
 }{
-	Dialer: net.Dialer{
-		Resolver: net.DefaultResolver,
-		Timeout:  time.Second * 8,
-	},
-	Random:      rand.New(rand.NewSource(time.Now().Unix())),
-	RouterCache: 128,
+	DialerTimeout: time.Second * 8,
+	RouterLruSize: 128,
 }
 
 // Resolver returns a new Resolver used by the package-level Lookup functions and by Dialers without a specified
@@ -69,7 +64,7 @@ func Resolver(addr string) *net.Resolver {
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 			d := net.Dialer{
-				Timeout: Conf.Dialer.Timeout,
+				Timeout: Conf.DialerTimeout,
 			}
 			return d.DialContext(ctx, "udp", addr)
 		},
@@ -110,7 +105,7 @@ type Direct struct{}
 
 // Dial implements daze.Dialer.
 func (d *Direct) Dial(ctx *Context, network string, address string) (io.ReadWriteCloser, error) {
-	return Conf.Dialer.Dial(network, address)
+	return Dial(network, address)
 }
 
 // Locale is the main process of daze. In most cases, it is usually deployed as a daemon on a local machine.
@@ -614,7 +609,7 @@ func (r *RouterIPNet) road(ctx *Context, host string) Road {
 	if len(r.L) == 0 {
 		return RoadPuzzle
 	}
-	l, err := Conf.Dialer.Resolver.LookupIPAddr(context.Background(), host)
+	l, err := net.DefaultResolver.LookupIPAddr(context.Background(), host)
 	if err != nil {
 		log.Printf("%08x  error %s", ctx.Cid, err)
 		return RoadPuzzle
@@ -750,7 +745,7 @@ func (r *RouterCache) Road(ctx *Context, host string) Road {
 func NewRouterCache(r Router) *RouterCache {
 	return &RouterCache{
 		Pit: r,
-		Box: lru.New[string, Road](Conf.RouterCache),
+		Box: lru.New[string, Road](Conf.RouterLruSize),
 		m:   sync.Mutex{},
 	}
 }
@@ -927,6 +922,19 @@ var (
 	_ Router = (*RouterRight)(nil)
 	_ Router = (*RouterRules)(nil)
 )
+
+var (
+	// Random is a source of random numbers.
+	Random = rand.New(rand.NewSource(time.Now().Unix()))
+)
+
+// Dial connects to the address on the named network.
+func Dial(network string, address string) (net.Conn, error) {
+	d := net.Dialer{
+		Timeout: Conf.DialerTimeout,
+	}
+	return d.Dial(network, address)
+}
 
 // GravityReader wraps an io.Reader with RC4 crypto.
 func GravityReader(r io.Reader, k []byte) io.Reader {

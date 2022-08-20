@@ -162,10 +162,10 @@ func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 	switch dstNet {
 	case 0x01:
 		log.Printf("%08x   dial network=tcp address=%s", ctx.Cid, dst)
-		srv, err = daze.Conf.Dialer.Dial("tcp", dst)
+		srv, err = daze.Dial("tcp", dst)
 	case 0x03:
 		log.Printf("%08x   dial network=udp address=%s", ctx.Cid, dst)
-		srv, err = daze.Conf.Dialer.Dial("udp", dst)
+		srv, err = daze.Dial("udp", dst)
 	}
 	if err != nil {
 		cli.Write([]byte{1})
@@ -245,7 +245,7 @@ func (c *Client) WithCipher(ctx *daze.Context, srv io.ReadWriteCloser) (io.ReadW
 		buf = make([]byte, 256)
 		err error
 	)
-	daze.Conf.Random.Read(buf[:128])
+	daze.Random.Read(buf[:128])
 	_, err = srv.Write(buf[:128])
 	if err != nil {
 		return nil, err
@@ -307,7 +307,7 @@ func (c *Client) With(ctx *daze.Context, srv io.ReadWriteCloser, network string,
 
 // Dial connects to the address on the named network.
 func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.ReadWriteCloser, error) {
-	srv, err := daze.Conf.Dialer.Dial("tcp", c.Server)
+	srv, err := daze.Dial("tcp", c.Server)
 	if err != nil {
 		return nil, err
 	}
