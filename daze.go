@@ -723,14 +723,14 @@ func NewRouterLocal() *RouterIPNet {
 // RouterCache cache routing results for next use.
 type RouterCache struct {
 	Pit Router
-	Box *lru.Lru
+	Box *lru.Lru[string, Road]
 	m   sync.Mutex
 }
 
 // Road implements daze.Router.
 func (r *RouterCache) road(ctx *Context, host string) Road {
-	if a, b := r.Box.Get(host); b {
-		return a.(Road)
+	if a, b := r.Box.GetExists(host); b {
+		return a
 	}
 	a := r.Pit.Road(ctx, host)
 	r.Box.Set(host, a)
@@ -750,7 +750,7 @@ func (r *RouterCache) Road(ctx *Context, host string) Road {
 func NewRouterCache(r Router) *RouterCache {
 	return &RouterCache{
 		Pit: r,
-		Box: lru.NewLru(Conf.RouterCache),
+		Box: lru.New[string, Road](Conf.RouterCache),
 		m:   sync.Mutex{},
 	}
 }
