@@ -106,16 +106,17 @@ func (s *ServerConn) Serve() {
 			break
 		}
 		cmd = buf[0]
+		idx = binary.BigEndian.Uint16(buf[1:3])
 		switch cmd {
 		case 0x01:
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
 			buf[0] = 0x02
-			daze.Random.Read(buf[8 : 8+msgLen])
-			err = s.pri.Priority(0, func() error {
-				return doa.Err(s.cli.Write(buf[0 : 8+msgLen]))
-			})
+			_, err = daze.Random.Read(buf[8 : 8+msgLen])
+			if err != nil {
+				break
+			}
+			err = s.WritePri0(buf[0 : 8+msgLen])
 		case 0x02:
-			idx = binary.BigEndian.Uint16(buf[1:3])
 			msgLen = binary.BigEndian.Uint16(buf[3:5])
 			_, err = io.ReadFull(s.cli, buf[8:8+msgLen])
 			if err != nil {
@@ -124,7 +125,6 @@ func (s *ServerConn) Serve() {
 			rwc = s.srv[idx]
 			_, err = rwc.Write(buf[8 : 8+msgLen])
 		case 0x03:
-			idx = binary.BigEndian.Uint16(buf[1:3])
 			dstNet = buf[3]
 			dstLen = buf[4]
 			_, err = io.ReadFull(s.cli, buf[8:8+dstLen])
@@ -135,12 +135,11 @@ func (s *ServerConn) Serve() {
 			s.wg1.Add(1)
 			go s.serve(idx, dstNet, dst)
 		case 0x04:
-			idx = binary.BigEndian.Uint16(buf[1:3])
 			rwc = s.srv[idx]
 			err = rwc.Close()
 		}
 		if err != nil {
-			log.Printf("%08x  error %s", s.ctx.Cid, err)
+			log.Printf("%08x  error idx=%02x %s", s.ctx.Cid, idx, err)
 		}
 	}
 
@@ -169,27 +168,21 @@ func (s *ServerConn) serve(idx uint16, dstNet uint8, dst string) {
 	}
 	if err != nil {
 		s.wg1.Done()
-		log.Printf("%08x  error %s", s.ctx.Cid, err)
+		log.Printf("%08x  error idx=%02x %s", s.ctx.Cid, idx, err)
 		buf[3] = 0x01
-		s.pri.Priority(1, func() error {
-			return doa.Err(s.cli.Write(buf[0:8]))
-		})
+		s.WritePri1(buf[0:8])
 		return
 	}
 	buf[3] = 0x00
 	s.srv[idx] = rwc
 	s.wg1.Done()
-	s.pri.Priority(1, func() error {
-		return doa.Err(s.cli.Write(buf[0:8]))
-	})
+	s.WritePri1(buf[0:8])
 	buf[0] = 0x02
 	for {
 		n, err = rwc.Read(buf[8:])
 		if n != 0 {
 			binary.BigEndian.PutUint16(buf[3:5], uint16(n))
-			s.pri.Priority(0, func() error {
-				return doa.Err(s.cli.Write(buf[0 : 8+n]))
-			})
+			s.WritePri0(buf[0 : 8+n])
 		}
 		if err != nil {
 			break
@@ -200,11 +193,21 @@ func (s *ServerConn) serve(idx uint16, dstNet uint8, dst string) {
 	// Client close  err=use of closed network connection
 	if !errors.Is(err, net.ErrClosed) {
 		buf[0] = 0x04
-		s.pri.Priority(1, func() error {
-			return doa.Err(s.cli.Write(buf[0:8]))
-		})
+		s.WritePri1(buf[0:8])
 	}
 	log.Printf("%08x closed idx=%02x", s.ctx.Cid, idx)
+}
+
+func (s *ServerConn) WritePri0(p []byte) error {
+	return s.pri.Priority(0, func() error {
+		return doa.Err(s.cli.Write(p))
+	})
+}
+
+func (s *ServerConn) WritePri1(p []byte) error {
+	return s.pri.Priority(0, func() error {
+		return doa.Err(s.cli.Write(p))
+	})
 }
 
 // NewServerConn returns a new ServerConn.
