@@ -750,13 +750,13 @@ func NewRouterCache(r Router) *RouterCache {
 	}
 }
 
-// RouterClump concat multiple routers in series.
-type RouterClump struct {
+// RouterChain concat multiple routers in series.
+type RouterChain struct {
 	L []Router
 }
 
 // Road implements daze.Router.
-func (r *RouterClump) road(ctx *Context, host string) Road {
+func (r *RouterChain) road(ctx *Context, host string) Road {
 	var a Road
 	for _, e := range r.L {
 		a = e.Road(ctx, host)
@@ -768,15 +768,15 @@ func (r *RouterClump) road(ctx *Context, host string) Road {
 }
 
 // Road implements daze.Router.
-func (r *RouterClump) Road(ctx *Context, host string) Road {
+func (r *RouterChain) Road(ctx *Context, host string) Road {
 	road := r.road(ctx, host)
-	log.Printf("%08x  route router=clump road=%s", ctx.Cid, road)
+	log.Printf("%08x  route router=chain road=%s", ctx.Cid, road)
 	return road
 }
 
-// NewRouterClump returns a new RouterClump.
-func NewRouterClump(router ...Router) *RouterClump {
-	return &RouterClump{
+// NewRouterChain returns a new RouterClump.
+func NewRouterChain(router ...Router) *RouterChain {
+	return &RouterChain{
 		L: router,
 	}
 }
@@ -917,7 +917,7 @@ var (
 	_ Dialer = (*Aimbot)(nil)
 	_ Dialer = (*Direct)(nil)
 	_ Router = (*RouterCache)(nil)
-	_ Router = (*RouterClump)(nil)
+	_ Router = (*RouterChain)(nil)
 	_ Router = (*RouterIPNet)(nil)
 	_ Router = (*RouterRight)(nil)
 	_ Router = (*RouterRules)(nil)

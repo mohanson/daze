@@ -125,7 +125,7 @@ func main() {
 				routerLocal := daze.NewRouterLocal()
 				log.Println("find", len(routerLocal.L))
 				routerRight := daze.NewRouterRight(daze.RoadRemote)
-				routerClump := daze.NewRouterClump(routerLocal, routerRight)
+				routerClump := daze.NewRouterChain(routerLocal, routerRight)
 				routerCache := daze.NewRouterCache(routerClump)
 				return routerCache
 			}
@@ -149,7 +149,7 @@ func main() {
 				log.Println("find", len(routerApnic.L))
 
 				routerRight := daze.NewRouterRight(daze.RoadRemote)
-				routerClump := daze.NewRouterClump(routerRules, routerLocal, routerApnic, routerRight)
+				routerClump := daze.NewRouterChain(routerRules, routerLocal, routerApnic, routerRight)
 				routerCache := daze.NewRouterCache(routerClump)
 				return routerCache
 			}
