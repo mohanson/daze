@@ -980,35 +980,6 @@ func OpenFile(name string) (io.ReadCloser, error) {
 	return os.Open(name)
 }
 
-// A Priority is a mutual exclusion lock with priority.
-type Priority struct {
-	mu []*sync.Mutex
-}
-
-// Priority locks m with priority n, execute f at pass.
-func (p *Priority) Priority(n int, f func() error) error {
-	m := len(p.mu) - 1
-	for i := n; i <= m; i++ {
-		p.mu[i].Lock()
-	}
-	r := f()
-	for i := m; i >= n; i-- {
-		p.mu[i].Unlock()
-	}
-	return r
-}
-
-// NewPriority returns a new Priority.
-func NewPriority(n int) *Priority {
-	mu := make([]*sync.Mutex, n)
-	for i := 0; i < n; i++ {
-		mu[i] = &sync.Mutex{}
-	}
-	return &Priority{
-		mu: mu,
-	}
-}
-
 // Salt converts the stupid password passed in by the user to 128-sized byte array.
 func Salt(s string) []byte {
 	r := make([]byte, 128)
