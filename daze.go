@@ -12,7 +12,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"math"
 	"math/bits"
@@ -57,8 +56,8 @@ var Conf = struct {
 // Resolver.
 //
 // Examples:
-//   Resolver("8.8.8.8:53")
-//   Resolver("114.114.114.114:53")
+// Resolver("8.8.8.8:53")
+// Resolver("114.114.114.114:53")
 func Resolver(addr string) *net.Resolver {
 	return &net.Resolver{
 		PreferGo: true,
@@ -75,11 +74,9 @@ func Resolver(addr string) *net.Resolver {
 func Link(a, b io.ReadWriteCloser) {
 	go func() {
 		io.Copy(b, a)
-		a.Close()
 		b.Close()
 	}()
 	io.Copy(a, b)
-	b.Close()
 	a.Close()
 }
 
@@ -118,9 +115,9 @@ type Locale struct {
 // ServeProxy serves traffic in HTTP Proxy/Tunnel format.
 //
 // Introduction:
-//   See https://en.wikipedia.org/wiki/Proxy_server
-//   See https://en.wikipedia.org/wiki/HTTP_tunnel
-//   See https://www.infoq.com/articles/Web-Sockets-Proxy-Servers/
+// See https://en.wikipedia.org/wiki/Proxy_server
+// See https://en.wikipedia.org/wiki/HTTP_tunnel
+// See https://www.infoq.com/articles/Web-Sockets-Proxy-Servers/
 func (l *Locale) ServeProxy(ctx *Context, app io.ReadWriteCloser) error {
 	appReader := bufio.NewReader(app)
 	app = ReadWriteCloser{
@@ -195,8 +192,8 @@ func (l *Locale) ServeProxy(ctx *Context, app io.ReadWriteCloser) error {
 // ServeSocks4 serves traffic in SOCKS4/SOCKS4a format.
 //
 // Introduction:
-//   See https://en.wikipedia.org/wiki/SOCKS
-//   See http://ftp.icm.edu.pl/packages/socks/socks4/SOCKS4.protocol
+// See https://en.wikipedia.org/wiki/SOCKS
+// See http://ftp.icm.edu.pl/packages/socks/socks4/SOCKS4.protocol
 func (l *Locale) ServeSocks4(ctx *Context, app io.ReadWriteCloser) error {
 	appReader := bufio.NewReader(app)
 	app = ReadWriteCloser{
@@ -256,8 +253,8 @@ func (l *Locale) ServeSocks4(ctx *Context, app io.ReadWriteCloser) error {
 // ServeSocks5 serves traffic in SOCKS5 format.
 //
 // Introduction:
-//   See https://en.wikipedia.org/wiki/SOCKS
-//   See https://tools.ietf.org/html/rfc1928
+// See https://en.wikipedia.org/wiki/SOCKS
+// See https://tools.ietf.org/html/rfc1928
 func (l *Locale) ServeSocks5(ctx *Context, app io.ReadWriteCloser) error {
 	appReader := bufio.NewReader(app)
 	app = ReadWriteCloser{
@@ -363,7 +360,7 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 	// https://datatracker.ietf.org/doc/html/rfc1928, Page 7, UDP ASSOCIATE:
 	// A UDP association terminates when the TCP connection that the UDP ASSOCIATE request arrived on terminates.
 	go func() {
-		io.Copy(ioutil.Discard, app)
+		io.Copy(io.Discard, app)
 		bnd.Close()
 	}()
 
@@ -675,7 +672,7 @@ func NewRouterRight(road Road) *RouterRight {
 // NewRouterLocal returns reserved ip addresses.
 //
 // Introduction:
-//   See https://en.wikipedia.org/wiki/Reserved_IP_addresses
+// See https://en.wikipedia.org/wiki/Reserved_IP_addresses
 func NewRouterLocal() *RouterIPNet {
 	r := []*net.IPNet{}
 	for _, e := range [][2]string{
@@ -785,16 +782,16 @@ func NewRouterChain(router ...Router) *RouterChain {
 // There are two parts per line on RULE file: mode and glob. mode are on the left of the space sign and glob are on the
 // right. mode is an char and describes whether the host should go proxy, glob supported glob-style patterns:
 //
-//   h?llo matches hello, hallo and hxllo
-//   h*llo matches hllo and heeeello
-//   h[ae]llo matches hello and hallo, but not hillo
-//   h[^e]llo matches hallo, hbllo, ... but not hello
-//   h[a-b]llo matches hallo and hbllo
+// h?llo matches hello, hallo and hxllo
+// h*llo matches hllo and heeeello
+// h[ae]llo matches hello and hallo, but not hillo
+// h[^e]llo matches hallo, hbllo, ... but not hello
+// h[a-b]llo matches hallo and hbllo
 //
 // This is a RULE document:
-//   L a.com a.a.com
-//   R b.com *.b.com
-//   B c.com
+// L a.com a.a.com
+// R b.com *.b.com
+// B c.com
 //
 // L(ocale)  means using locale network
 // R(emote)  means using remote network
@@ -967,8 +964,8 @@ func Hang() {
 // OpenFile select the appropriate method to open the file based on the incoming args automatically.
 //
 // Examples:
-//   OpenFile("/etc/hosts")
-//   OpenFile("https://raw.githubusercontent.com/mohanson/daze/master/README.md")
+// OpenFile("/etc/hosts")
+// OpenFile("https://raw.githubusercontent.com/mohanson/daze/master/README.md")
 func OpenFile(name string) (io.ReadCloser, error) {
 	if strings.HasPrefix(name, "http://") || strings.HasPrefix(name, "https://") {
 		resp, err := http.Get(name)
