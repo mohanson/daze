@@ -73,3 +73,7 @@ Daze also use a CIDR(Classless Inter-Domain Routing) file to routing addresses. 
 You can find all the information here by using `daze server -h` and `daze client -h`.
 
 Have fun.
+
+# Links
+
+- [Iproyal Improved Security - Blazing Fast Sneaker Proxies](https://iproyal.cn?r=147480)

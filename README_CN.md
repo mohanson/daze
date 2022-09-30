@@ -73,3 +73,7 @@ Daze 同时使用一个 CIDR(Classless Inter-Domain Routing) 文件来进行基�
 你可以在 `daze server -h` 和 `daze client -h` 了解到所有信息.
 
 玩的开心.
+
+# 友情链接
+
+- [Iproyal Improved Security - Blazing Fast Sneaker Proxies](https://iproyal.cn?r=147480)
