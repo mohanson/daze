@@ -56,8 +56,9 @@ var Conf = struct {
 // Resolver.
 //
 // Examples:
-// Resolver("8.8.8.8:53")
-// Resolver("114.114.114.114:53")
+//
+//	Resolver("8.8.8.8:53")
+//	Resolver("114.114.114.114:53")
 func Resolver(addr string) *net.Resolver {
 	return &net.Resolver{
 		PreferGo: true,
@@ -72,12 +73,19 @@ func Resolver(addr string) *net.Resolver {
 
 // Link copies from src to dst and dst to src until either EOF is reached.
 func Link(a, b io.ReadWriteCloser) {
+	w := sync.WaitGroup{}
+	w.Add(2)
 	go func() {
 		io.Copy(b, a)
 		b.Close()
+		w.Done()
 	}()
-	io.Copy(a, b)
-	a.Close()
+	go func() {
+		io.Copy(a, b)
+		a.Close()
+		w.Done()
+	}()
+	w.Wait()
 }
 
 // ReadWriteCloser is the interface that groups the basic Read, Write and Close methods.
@@ -320,8 +328,8 @@ func (l *Locale) ServeSocks5TCP(ctx *Context, app io.ReadWriteCloser, dst string
 	if err != nil {
 		app.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 	} else {
-		defer srv.Close()
 		app.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+		// Since the Link function will close the srv, there is no need to close it manually.
 		Link(app, srv)
 	}
 	return err
@@ -375,15 +383,15 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 		// 	| 2  |  1   |  1   | Variable |    2     | Variable |
 		// 	+----+------+------+----------+----------+----------+
 		//    The fields in the UDP request header are:
-		// 		*  RSV  Reserved X'0000'
-		// 		*  FRAG    Current fragment number
-		// 		*  ATYP    address type of following addresses:
-		// 		   *  IP V4 address: X'01'
-		// 		   *  DOMAINNAME: X'03'
-		// 		   *  IP V6 address: X'04'
-		// 		*  DST.ADDR       desired destination address
-		// 		*  DST.PORT       desired destination port
-		// 		*  DATA     user data
+		// 	    *  RSV  Reserved X'0000'
+		// 	    *  FRAG    Current fragment number
+		// 	    *  ATYP    address type of following addresses:
+		// 	       *  IP V4 address: X'01'
+		// 	       *  DOMAINNAME: X'03'
+		// 	       *  IP V6 address: X'04'
+		// 	    *  DST.ADDR       desired destination address
+		// 	    *  DST.PORT       desired destination port
+		// 	    *  DATA     user data
 		doa.Doa(buf[0] == 0x00)
 		doa.Doa(buf[1] == 0x00)
 		// Implementation of fragmentation is optional; an implementation that does not support fragmentation MUST drop
@@ -589,8 +597,8 @@ func (r Road) String() string {
 type Router interface {
 	// The host must be a literal IP address, or a host name that can be resolved to IP addresses.
 	// Examples:
-	//	 Road("golang.org")
-	//	 Road("192.0.2.1")
+	//   Road("golang.org")
+	//   Road("192.0.2.1")
 	Road(ctx *Context, host string) Road
 }
 
@@ -1035,4 +1043,115 @@ func LoadApnic() map[string][]*net.IPNet {
 		}
 	}
 	return r
+}
+
+// ============================================================================
+//              ___           ___           ___           ___
+//             /\  \         /\  \         /\  \         /\  \
+//             \:\  \       /::\  \       /::\  \        \:\  \
+//              \:\  \     /:/\:\  \     /:/\ \  \        \:\  \
+//              /::\  \   /::\~\:\  \   _\:\~\ \  \       /::\  \
+//             /:/\:\__\ /:/\:\ \:\__\ /\ \:\ \ \__\     /:/\:\__\
+//            /:/  \/__/ \:\~\:\ \/__/ \:\ \:\ \/__/    /:/  \/__/
+//           /:/  /       \:\ \:\__\    \:\ \:\__\     /:/  /
+//           \/__/         \:\ \/__/     \:\/:/  /     \/__/
+//                          \:\__\        \::/  /            http://patorjk.com
+//                           \/__/         \/__/                     Isometric1
+// ============================================================================
+
+// A remote server for testing.
+type Tester struct {
+	Listen string
+	Closer io.Closer
+}
+
+// Run it on TCP.
+func (t *Tester) TCP() error {
+	s, err := net.Listen("tcp", t.Listen)
+	if err != nil {
+		return err
+	}
+	t.Closer = s
+	go func() {
+		for {
+			cli, err := s.Accept()
+			if err != nil {
+				if !errors.Is(err, net.ErrClosed) {
+					log.Println(err)
+				}
+				break
+			}
+			go t.TCPServe(cli)
+		}
+	}()
+	return nil
+}
+
+// TCPServe serves incoming connections.
+func (t *Tester) TCPServe(cli io.ReadWriteCloser) {
+	buf := make([]byte, 2048)
+	for {
+		_, err := io.ReadFull(cli, buf[:4])
+		if err != nil {
+			break
+		}
+		cmd := buf[0]
+		switch cmd {
+		case 0:
+			msg := binary.BigEndian.Uint16(buf[2:4])
+			doa.Doa(msg <= 2044)
+			Random.Read(buf[4 : 4+msg])
+			buf[0] = 1
+			cli.Write(buf[:4+msg])
+		case 1:
+			cli.Close()
+		}
+	}
+}
+
+// Run it on UDP.
+func (t *Tester) UDP() error {
+	addr := doa.Try(net.ResolveUDPAddr("udp", t.Listen))
+	conn := doa.Try(net.ListenUDP("udp", addr))
+	t.Closer = conn
+	go t.UDPServe(conn)
+	return nil
+}
+
+// UDPServe serves incoming connections.
+func (t *Tester) UDPServe(cli *net.UDPConn) error {
+	buf := make([]byte, 2048)
+	for {
+		_, addr, err := cli.ReadFromUDP(buf)
+		if err != nil {
+			break
+		}
+		cmd := buf[0]
+		switch cmd {
+		case 0:
+			msg := binary.BigEndian.Uint16(buf[2:4])
+			doa.Doa(msg <= 2044)
+			Random.Read(buf[4 : 4+msg])
+			buf[0] = 1
+			doa.Try(cli.WriteToUDP(buf[:4+msg], addr))
+		case 1:
+			cli.Close()
+		}
+	}
+	return nil
+}
+
+// Close listener.
+func (t *Tester) Close() error {
+	if t.Closer != nil {
+		return t.Closer.Close()
+	}
+	return nil
+}
+
+// NewTester returns a new Tester.
+func NewTester(listen string) *Tester {
+	return &Tester{
+		Listen: listen,
+	}
 }

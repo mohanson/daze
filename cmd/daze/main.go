@@ -13,6 +13,7 @@ import (
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/protocol/ashe"
 	"github.com/mohanson/daze/protocol/baboon"
+	"github.com/mohanson/daze/protocol/czar"
 )
 
 // Conf is acting as package level configuration.
@@ -63,7 +64,7 @@ func main() {
 			flListen = flag.String("l", "0.0.0.0:1081", "listen address")
 			flCipher = flag.String("k", "daze", "password, should be same with the one specified by client")
 			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
-			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon}")
+			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon, czar}")
 			flExtend = flag.String("e", "", "extend data for different protocols")
 		)
 		flag.Parse()
@@ -83,6 +84,10 @@ func main() {
 			if *flExtend != "" {
 				server.Masker = *flExtend
 			}
+			defer server.Close()
+			doa.Nil(server.Run())
+		case "czar":
+			server := czar.NewServer(*flListen, *flCipher)
 			defer server.Close()
 			doa.Nil(server.Run())
 		}
@@ -112,6 +117,8 @@ func main() {
 				return ashe.NewClient(*flServer, *flCipher)
 			case "baboon":
 				return baboon.NewClient(*flServer, *flCipher)
+			case "czar":
+				return czar.NewClient(*flServer, *flCipher)
 			}
 			panic("unreachable")
 		}()

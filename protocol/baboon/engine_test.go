@@ -2,10 +2,7 @@ package baboon
 
 import (
 	"bytes"
-	"errors"
 	"io"
-	"log"
-	"net"
 	"net/http"
 	"testing"
 
@@ -20,23 +17,9 @@ const (
 )
 
 func TestProtocolBaboonTCP(t *testing.T) {
-	echoListener := doa.Try(net.Listen("tcp", EchoServerListenOn))
-	defer echoListener.Close()
-	go func() {
-		for {
-			c, err := echoListener.Accept()
-			if err != nil {
-				if !errors.Is(err, net.ErrClosed) {
-					log.Println(err)
-				}
-				break
-			}
-			go func(c net.Conn) {
-				defer c.Close()
-				io.Copy(c, c)
-			}(c)
-		}
-	}()
+	remote := daze.NewTester(EchoServerListenOn)
+	defer remote.Close()
+	remote.TCP()
 
 	dazeServer := NewServer(DazeServerListenOn, Password)
 	defer dazeServer.Close()
@@ -47,30 +30,57 @@ func TestProtocolBaboonTCP(t *testing.T) {
 	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
 	defer cli.Close()
 
-	buf0 := []byte("Hello World!")
-	cli.Write(buf0)
-	buf1 := make([]byte, 12)
-	io.ReadFull(cli, buf1)
-	if !bytes.Equal(buf0, buf1) {
-		t.FailNow()
-	}
+	buf := make([]byte, 2048)
+	doa.Try(cli.Write([]byte{0x00, 0x00, 0x00, 0x80}))
+	doa.Try(io.ReadFull(cli, buf[:132]))
+}
+
+func TestProtocolBaboonTCPClientClose(t *testing.T) {
+	remote := daze.NewTester(EchoServerListenOn)
+	defer remote.Close()
+	remote.TCP()
+
+	dazeServer := NewServer(DazeServerListenOn, Password)
+	defer dazeServer.Close()
+	dazeServer.Run()
+
+	dazeClient := NewClient(DazeServerListenOn, Password)
+	ctx := &daze.Context{}
+	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
+	defer cli.Close()
+
+	cli.Close()
+	_, er1 := cli.Write([]byte{0x01, 0x00, 0x00, 0x00})
+	doa.Doa(er1 != nil)
+	buf := make([]byte, 2048)
+	_, er2 := io.ReadFull(cli, buf[:1])
+	doa.Doa(er2 != nil)
+}
+
+func TestProtocolBaboonTCPServerClose(t *testing.T) {
+	remote := daze.NewTester(EchoServerListenOn)
+	defer remote.Close()
+	remote.TCP()
+
+	dazeServer := NewServer(DazeServerListenOn, Password)
+	defer dazeServer.Close()
+	dazeServer.Run()
+
+	dazeClient := NewClient(DazeServerListenOn, Password)
+	ctx := &daze.Context{}
+	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
+	defer cli.Close()
+
+	buf := make([]byte, 2048)
+	doa.Try(cli.Write([]byte{0x01, 0x00, 0x00, 0x00}))
+	_, err := io.ReadFull(cli, buf[:1])
+	doa.Doa(err != nil)
 }
 
 func TestProtocolBaboonUDP(t *testing.T) {
-	echoAddr := doa.Try(net.ResolveUDPAddr("udp", EchoServerListenOn))
-	echoServer := doa.Try(net.ListenUDP("udp", echoAddr))
-	defer echoServer.Close()
-	go func() {
-		b := make([]byte, 2048)
-		for {
-			n, addr, err := echoServer.ReadFromUDP(b)
-			if err != nil {
-				break
-			}
-			m := doa.Try(echoServer.WriteToUDP(b[:n], addr))
-			doa.Doa(n == m)
-		}
-	}()
+	remote := daze.NewTester(EchoServerListenOn)
+	defer remote.Close()
+	remote.UDP()
 
 	dazeServer := NewServer(DazeServerListenOn, Password)
 	defer dazeServer.Close()
@@ -81,13 +91,9 @@ func TestProtocolBaboonUDP(t *testing.T) {
 	cli := doa.Try(dazeClient.Dial(ctx, "udp", EchoServerListenOn))
 	defer cli.Close()
 
-	buf0 := []byte("Hello World!")
-	cli.Write(buf0)
-	buf1 := make([]byte, 12)
-	io.ReadFull(cli, buf1)
-	if !bytes.Equal(buf0, buf1) {
-		t.FailNow()
-	}
+	buf := make([]byte, 2048)
+	doa.Try(cli.Write([]byte{0x00, 0x00, 0x00, 0x80}))
+	doa.Try(io.ReadFull(cli, buf[:132]))
 }
 
 func TestProtocolBaboonMasker(t *testing.T) {
@@ -105,7 +111,7 @@ func TestProtocolBaboonMasker(t *testing.T) {
 	if len(body) == 0 {
 		t.FailNow()
 	}
-	if !bytes.Contains(body, []byte("baidu")) {
+	if !bytes.Contains(body, []byte("zhihu")) {
 		t.FailNow()
 	}
 }

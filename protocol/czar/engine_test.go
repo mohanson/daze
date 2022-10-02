@@ -1,4 +1,4 @@
-package ashe
+package czar
 
 import (
 	"io"
@@ -14,7 +14,7 @@ const (
 	Password           = "password"
 )
 
-func TestProtocolAsheTCP(t *testing.T) {
+func TestProtocolCzarTCP(t *testing.T) {
 	remote := daze.NewTester(EchoServerListenOn)
 	defer remote.Close()
 	remote.TCP()
@@ -24,6 +24,7 @@ func TestProtocolAsheTCP(t *testing.T) {
 	dazeServer.Run()
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
+	defer dazeClient.Close()
 	ctx := &daze.Context{}
 	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
 	defer cli.Close()
@@ -33,7 +34,7 @@ func TestProtocolAsheTCP(t *testing.T) {
 	doa.Try(io.ReadFull(cli, buf[:132]))
 }
 
-func TestProtocolAsheTCPClientClose(t *testing.T) {
+func TestProtocolCzarTCPClientClose(t *testing.T) {
 	remote := daze.NewTester(EchoServerListenOn)
 	defer remote.Close()
 	remote.TCP()
@@ -43,19 +44,20 @@ func TestProtocolAsheTCPClientClose(t *testing.T) {
 	dazeServer.Run()
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
+	defer dazeClient.Close()
 	ctx := &daze.Context{}
 	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
 	defer cli.Close()
 
+	buf := make([]byte, 2048)
 	cli.Close()
 	_, er1 := cli.Write([]byte{0x01, 0x00, 0x00, 0x00})
 	doa.Doa(er1 != nil)
-	buf := make([]byte, 2048)
 	_, er2 := io.ReadFull(cli, buf[:1])
 	doa.Doa(er2 != nil)
 }
 
-func TestProtocolAsheTCPServerClose(t *testing.T) {
+func TestProtocolCzarTCPServerClose(t *testing.T) {
 	remote := daze.NewTester(EchoServerListenOn)
 	defer remote.Close()
 	remote.TCP()
@@ -65,6 +67,7 @@ func TestProtocolAsheTCPServerClose(t *testing.T) {
 	dazeServer.Run()
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
+	defer dazeClient.Close()
 	ctx := &daze.Context{}
 	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
 	defer cli.Close()
@@ -75,7 +78,7 @@ func TestProtocolAsheTCPServerClose(t *testing.T) {
 	doa.Doa(err != nil)
 }
 
-func TestProtocolAsheUDP(t *testing.T) {
+func TestProtocolCzarUDP(t *testing.T) {
 	remote := daze.NewTester(EchoServerListenOn)
 	defer remote.Close()
 	remote.UDP()
@@ -85,6 +88,7 @@ func TestProtocolAsheUDP(t *testing.T) {
 	dazeServer.Run()
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
+	defer dazeClient.Close()
 	ctx := &daze.Context{}
 	cli := doa.Try(dazeClient.Dial(ctx, "udp", EchoServerListenOn))
 	defer cli.Close()
