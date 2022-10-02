@@ -2,10 +2,12 @@ package czar
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"math"
 	"net"
+	"time"
 
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/protocol/ashe"
@@ -122,17 +124,21 @@ func (c *Client) Close() error {
 
 // Dial connects to the address on the named network.
 func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.ReadWriteCloser, error) {
-	mux := <-c.Mux
-	srv, err := mux.Open()
-	if err != nil {
-		return nil, err
+	select {
+	case mux := <-c.Mux:
+		srv, err := mux.Open()
+		if err != nil {
+			return nil, err
+		}
+		asheClient := &ashe.Client{Cipher: c.Cipher}
+		ret, err := asheClient.With(ctx, srv, network, address)
+		if err != nil {
+			srv.Close()
+		}
+		return ret, err
+	case <-time.After(daze.Conf.DialerTimeout):
+		return nil, fmt.Errorf("dial tcp: %s: i/o timeout", address)
 	}
-	asheClient := &ashe.Client{Cipher: c.Cipher}
-	ret, err := asheClient.With(ctx, srv, network, address)
-	if err != nil {
-		srv.Close()
-	}
-	return ret, err
 }
 
 // Run creates an establish connection to czar server.

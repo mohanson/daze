@@ -602,8 +602,8 @@ type Router interface {
 	Road(ctx *Context, host string) Road
 }
 
-// RouterIPNet is a router by IPNets. It judges whether an IP or domain name is within its range, if so, it returns Y,
-// otherwise it returns N.
+// RouterIPNet is a router by IPNets. It judges whether an IP or domain name is within its range, if so, it returns R,
+// otherwise it returns RoadPuzzle.
 type RouterIPNet struct {
 	L []*net.IPNet
 	R Road
