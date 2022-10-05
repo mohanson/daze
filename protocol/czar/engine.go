@@ -143,20 +143,18 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 
 // Run creates an establish connection to czar server.
 func (c *Client) Run() {
-L1:
-	srv, err := daze.Dial("tcp", c.Server)
-	if err != nil {
-		goto L1
-	}
-	mux := NewMuxClient(srv)
-L2:
-	select {
-	case c.Mux <- mux:
-		goto L2
-	case <-mux.RecvDone:
-		goto L1
-	case <-mux.SendDone:
-		goto L1
+	for {
+		srv := daze.Reno(func() (net.Conn, error) { return daze.Dial("tcp", c.Server) })
+		mux := NewMuxClient(srv)
+		for {
+			select {
+			case c.Mux <- mux:
+				continue
+			case <-mux.RecvDone:
+			case <-mux.SendDone:
+			}
+			break
+		}
 	}
 }
 

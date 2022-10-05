@@ -985,6 +985,22 @@ func OpenFile(name string) (io.ReadCloser, error) {
 	return os.Open(name)
 }
 
+// Reno is a slow start reconnection algorithm.
+func Reno(f func() (net.Conn, error)) net.Conn {
+	i := 0
+	for {
+		r, err := f()
+		if err == nil {
+			return r
+		}
+		log.Printf("0000reno  error %s", err)
+		time.Sleep(time.Second * time.Duration(math.Pow(2, float64(i))))
+		if i < 5 {
+			i++
+		}
+	}
+}
+
 // Salt converts the stupid password passed in by the user to 128-sized byte array.
 func Salt(s string) []byte {
 	r := make([]byte, 128)
