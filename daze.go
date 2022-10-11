@@ -986,12 +986,12 @@ func OpenFile(name string) (io.ReadCloser, error) {
 }
 
 // Reno is a slow start reconnection algorithm.
-func Reno(f func() (net.Conn, error)) net.Conn {
+func Reno(network string, address string) (net.Conn, error) {
 	i := 0
 	for {
-		r, err := f()
+		r, err := Dial(network, address)
 		if err == nil {
-			return r
+			return r, err
 		}
 		log.Printf("0000reno  error %s", err)
 		time.Sleep(time.Second * time.Duration(math.Pow(2, float64(i))))

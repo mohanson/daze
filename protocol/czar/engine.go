@@ -9,6 +9,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/godump/doa"
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/protocol/ashe"
 )
@@ -144,7 +145,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 // Run creates an establish connection to czar server.
 func (c *Client) Run() {
 	for {
-		srv := daze.Reno(func() (net.Conn, error) { return daze.Dial("tcp", c.Server) })
+		srv := doa.Try(daze.Reno("tcp", c.Server))
 		mux := NewMuxClient(srv)
 		for {
 			select {
