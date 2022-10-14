@@ -14,6 +14,6 @@ make() {
 }
 
 # https://golang.org/doc/install/source#environment
+make android arm64
 make linux amd64
-make linux arm64
 make windows amd64
