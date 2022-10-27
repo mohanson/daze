@@ -11,28 +11,30 @@ import (
 
 // A Stream managed by the multiplexer.
 type Stream struct {
-	ci chan uint8
-	cr chan []byte
-	// Closes when the Close function is called.
-	dn chan struct{}
-	id uint8
-	mx *Mux
-	// Protects closing.
-	on sync.Once
+	idp chan uint8
+	idx uint8
+	mux *Mux
+	rch chan []byte
+	rer error
+	rdn chan struct{}
+	ron sync.Once
+	wer error
+	wdn chan struct{}
+	won sync.Once
 }
 
 // Close implements io.Closer.
 func (s *Stream) Close() error {
-	s.on.Do(func() {
-		close(s.dn)
-		buf := make([]byte, 4)
-		buf[0] = s.id
-		buf[1] = 0x02
-		select {
-		case s.mx.Send <- buf:
-		case <-s.mx.SendDone:
-		}
-		s.ci <- s.id
+	s.ron.Do(func() {
+		s.rer = io.ErrClosedPipe
+		close(s.rdn)
+	})
+	s.won.Do(func() {
+		s.wer = io.ErrClosedPipe
+		close(s.wdn)
+		// Errors can be safely ignored.
+		s.mux.Write([]byte{s.idx, 0x02, 0x00, 0x00})
+		s.idp <- s.idx
 	})
 	return nil
 }
@@ -40,46 +42,42 @@ func (s *Stream) Close() error {
 // Read implements io.Reader.
 func (s *Stream) Read(p []byte) (int, error) {
 	select {
-	case <-s.dn:
-		return 0, io.ErrClosedPipe
-	default:
-	}
-	select {
-	case b, ok := <-s.cr:
-		if !ok {
-			return 0, io.EOF
-		}
+	case b := <-s.rch:
 		doa.Doa(len(p) >= len(b))
 		copy(p, b)
 		return len(b), nil
-	case <-s.mx.RecvDone:
-		return 0, io.ErrClosedPipe
+	case <-s.rdn:
+		return 0, s.rer
 	}
 }
 
 // A low level function, the length of the data to be written is always less than packet body size.
 func (s *Stream) write(p []byte) (int, error) {
+	select {
+	case <-s.wdn:
+		return 0, s.wer
+	default:
+	}
 	doa.Doa(len(p) <= 2044)
 	buf := make([]byte, 4+len(p))
-	buf[0] = s.id
+	buf[0] = s.idx
 	buf[1] = 0x01
 	binary.BigEndian.PutUint16(buf[2:4], uint16(len(p)))
 	copy(buf[4:], p)
-	select {
-	case s.mx.Send <- buf:
-		return len(p), nil
-	case <-s.mx.SendDone:
-		return 0, io.ErrClosedPipe
+	_, err := s.mux.Write(buf)
+	if err != nil {
+		s.won.Do(func() {
+			s.wer = err
+			close(s.wdn)
+		})
+		// In the czar protocol, data is sent as packet, if a packet is not fully sent, it is considered unsent.
+		return 0, err
 	}
+	return len(p), err
 }
 
 // Write implements io.Writer.
 func (s *Stream) Write(p []byte) (int, error) {
-	select {
-	case <-s.dn:
-		return 0, io.ErrClosedPipe
-	default:
-	}
 	f := 0
 	e := f + 2044
 	n := 0
@@ -102,131 +100,132 @@ func (s *Stream) Write(p []byte) (int, error) {
 }
 
 // NewStream returns a new Stream.
-func NewStream(id uint8, mx *Mux) *Stream {
+func NewStream(idx uint8, mux *Mux) *Stream {
 	return &Stream{
-		cr: make(chan []byte, 32),
-		dn: make(chan struct{}),
-		id: id,
-		mx: mx,
-		on: sync.Once{},
+		idp: nil,
+		idx: idx,
+		mux: mux,
+		rch: make(chan []byte, 32),
+		rer: nil,
+		rdn: make(chan struct{}),
+		ron: sync.Once{},
+		wer: nil,
+		wdn: make(chan struct{}),
+		won: sync.Once{},
 	}
 }
 
 // Mux implemented the czar mux protocol.
 type Mux struct {
-	// Accept is used to block until the next available stream is ready to be accepted.
-	Accept   chan *Stream
-	Conn     net.Conn
-	IDPool   chan uint8
-	Recv     chan []byte
-	RecvDone chan struct{}
-	Send     chan []byte
-	SendDone chan struct{}
-	Stream   []*Stream
+	accept chan *Stream
+	conn   net.Conn
+	done   chan struct{}
+	idpool chan uint8
+	lock   sync.Mutex
+	stream []*Stream
+}
+
+// Accept is used to block until the next available stream is ready to be accepted.
+func (m *Mux) Accept() chan *Stream {
+	return m.accept
 }
 
 // Close closes the connection.
 // Any blocked Read or Write operations will be unblocked and return errors.
 func (m *Mux) Close() error {
-	return m.Conn.Close()
+	return m.conn.Close()
 }
 
 // Stream is used to create a new stream as a net.Conn.
 func (m *Mux) Open() (*Stream, error) {
-	idx := <-m.IDPool
-	buf := make([]byte, 4)
-	buf[0] = idx
-	buf[1] = 0x00
-	select {
-	case m.Send <- buf:
-		stream := NewStream(idx, m)
-		stream.ci = m.IDPool
-		m.Stream[idx] = stream
-		return stream, nil
-	case <-m.RecvDone:
-		return nil, io.ErrClosedPipe
-	case <-m.SendDone:
-		return nil, io.ErrClosedPipe
+	idx := <-m.idpool
+	_, err := m.Write([]byte{idx, 0x00, 0x00, 0x00})
+	if err != nil {
+		m.idpool <- idx
+		return nil, err
 	}
+	stream := NewStream(idx, m)
+	stream.idp = m.idpool
+	m.stream[idx] = stream
+	return stream, nil
 }
 
-// Data processing and distribution.
-func (m *Mux) give() {
-	for buf := range m.Recv {
+// Spawn continues to receive data until a fatal error is encountered.
+func (m *Mux) Spawn() {
+	for {
+		buf := make([]byte, 2048)
+		_, err := io.ReadFull(m.conn, buf[:4])
+		if err != nil {
+			for _, stream := range m.stream {
+				if stream == nil {
+					continue
+				}
+				stream.ron.Do(func() {
+					stream.rer = err
+					close(stream.rdn)
+				})
+			}
+			close(m.accept)
+			close(m.done)
+			break
+		}
 		idx := buf[0]
 		cmd := buf[1]
 		switch cmd {
 		case 0x00:
+			// Make sure the stream has been closed properly.
+			if m.stream[idx] != nil {
+				select {
+				case <-m.stream[idx].rdn:
+				case <-m.stream[idx].wdn:
+				}
+			}
 			stream := NewStream(idx, m)
 			// The mux server does not need to using an id pool.
-			stream.ci = make(chan uint8, 1)
-			// Make sure the stream has been closed properly.
-			if m.Stream[idx] != nil {
-				<-m.Stream[idx].dn
-			}
-			m.Stream[idx] = stream
-			m.Accept <- stream
+			stream.idp = make(chan uint8, 1)
+			m.stream[idx] = stream
+			m.accept <- stream
 		case 0x01:
 			length := binary.BigEndian.Uint16(buf[2:4])
-			select {
-			case m.Stream[idx].cr <- buf[4 : 4+length]:
-			case <-m.Stream[idx].dn:
-			}
-		case 0x02:
-			close(m.Stream[idx].cr)
-		}
-	}
-	close(m.RecvDone)
-	close(m.Accept)
-}
-
-// Recv loop continues to receive data until a fatal error is encountered.
-func (m *Mux) recv() {
-	for {
-		buf := make([]byte, 2048)
-		_, err := io.ReadFull(m.Conn, buf[:4])
-		if err != nil {
-			break
-		}
-		cmd := buf[1]
-		if cmd == 0x01 {
-			msg := binary.BigEndian.Uint16(buf[2:4])
-			_, err := io.ReadFull(m.Conn, buf[4:4+msg])
+			end := length + 4
+			_, err := io.ReadFull(m.conn, buf[4:end])
 			if err != nil {
 				break
 			}
+			stream := m.stream[idx]
+			select {
+			case stream.rch <- buf[4:end]:
+			case <-stream.rdn:
+			}
+		case 0x02:
+			stream := m.stream[idx]
+			stream.ron.Do(func() {
+				stream.rer = io.EOF
+				close(stream.rdn)
+			})
 		}
-		m.Recv <- buf
 	}
-	close(m.Recv)
 }
 
-// Send loop is a long running goroutine that sends data.
-func (m *Mux) send() {
-	for data := range m.Send {
-		_, err := m.Conn.Write(data)
-		if err != nil {
-			break
-		}
-	}
-	close(m.SendDone)
+// Write writes data to the connection.
+func (m *Mux) Write(b []byte) (int, error) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+	return m.conn.Write(b)
 }
 
 // NewMux returns a new Mux.
 func NewMux(conn net.Conn) *Mux {
-	d := &Mux{
-		Accept:   make(chan *Stream),
-		Conn:     conn,
-		Recv:     make(chan []byte),
-		RecvDone: make(chan struct{}),
-		Send:     make(chan []byte),
-		SendDone: make(chan struct{}),
-		Stream:   make([]*Stream, 256),
+	m := &Mux{
+		accept: make(chan *Stream),
+		conn:   conn,
+		done:   make(chan struct{}),
+		idpool: nil,
+		lock:   sync.Mutex{},
+		stream: make([]*Stream, 256),
 	}
-	go d.give()
-	go d.recv()
-	go d.send()
-	return d
+	go m.Spawn()
+	return m
 }
 
 // NewMuxServer returns a new MuxServer.
@@ -241,6 +240,6 @@ func NewMuxClient(conn net.Conn) *Mux {
 		idp <- uint8(i)
 	}
 	mux := NewMux(conn)
-	mux.IDPool = idp
+	mux.idpool = idp
 	return mux
 }

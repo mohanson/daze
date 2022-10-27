@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
 	"testing"
 
 	"github.com/godump/doa"
@@ -26,7 +27,7 @@ func TestProtocolMux(t *testing.T) {
 	doa.Try(io.ReadFull(cli, buf[:132]))
 }
 
-func TestProtocolMuxClientClose(t *testing.T) {
+func TestProtocolMuxStreamClientClose(t *testing.T) {
 	remote := Tester{daze.NewTester(EchoServerListenOn)}
 	remote.Mux()
 	defer remote.Close()
@@ -34,13 +35,11 @@ func TestProtocolMuxClientClose(t *testing.T) {
 	mux := NewMuxClient(doa.Try(net.Dial("tcp", EchoServerListenOn)))
 	defer mux.Close()
 	cli := doa.Try(mux.Open())
-	defer cli.Close()
-
 	cli.Close()
 	doa.Doa(doa.Err(cli.Write([]byte{0x00, 0x00, 0x00, 0x80})) == io.ErrClosedPipe)
 }
 
-func TestProtocolMuxServerClose(t *testing.T) {
+func TestProtocolMuxStreamServerClose(t *testing.T) {
 	remote := Tester{daze.NewTester(EchoServerListenOn)}
 	remote.Mux()
 	defer remote.Close()
@@ -53,6 +52,26 @@ func TestProtocolMuxServerClose(t *testing.T) {
 	buf := make([]byte, 2048)
 	doa.Try(cli.Write([]byte{0x01, 0x00, 0x00, 0x80}))
 	doa.Doa(doa.Err(io.ReadFull(cli, buf[:1])) == io.EOF)
+}
+
+func TestProtocolMuxClientClose(t *testing.T) {
+	remote := Tester{daze.NewTester(EchoServerListenOn)}
+	remote.Mux()
+	defer remote.Close()
+
+	mux := NewMuxClient(doa.Try(net.Dial("tcp", EchoServerListenOn)))
+	defer mux.Close()
+	cli := doa.Try(mux.Open())
+	defer cli.Close()
+
+	mux.conn.Close()
+	buf := make([]byte, 2048)
+	er0 := doa.Err(mux.Open())
+	doa.Doa(strings.Contains(er0.Error(), "use of closed network connection"))
+	er1 := doa.Err(io.ReadFull(cli, buf[:1]))
+	doa.Doa(strings.Contains(er1.Error(), "use of closed network connection"))
+	er2 := doa.Err(cli.Write([]byte{0x00, 0x00, 0x00, 0x80}))
+	doa.Doa(strings.Contains(er2.Error(), "use of closed network connection"))
 }
 
 type Tester struct {
@@ -76,7 +95,7 @@ func (t *Tester) Mux() error {
 			}
 			mux := NewMuxServer(cli)
 			go func(mux *Mux) {
-				for cli := range mux.Accept {
+				for cli := range mux.Accept() {
 					go t.TCPServe(cli)
 				}
 			}(mux)
