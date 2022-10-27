@@ -26,6 +26,35 @@ func TestProtocolMux(t *testing.T) {
 	doa.Try(io.ReadFull(cli, buf[:132]))
 }
 
+func TestProtocolMuxClientClose(t *testing.T) {
+	remote := Tester{daze.NewTester(EchoServerListenOn)}
+	remote.Mux()
+	defer remote.Close()
+
+	mux := NewMuxClient(doa.Try(net.Dial("tcp", EchoServerListenOn)))
+	defer mux.Close()
+	cli := doa.Try(mux.Open())
+	defer cli.Close()
+
+	cli.Close()
+	doa.Doa(doa.Err(cli.Write([]byte{0x00, 0x00, 0x00, 0x80})) == io.ErrClosedPipe)
+}
+
+func TestProtocolMuxServerClose(t *testing.T) {
+	remote := Tester{daze.NewTester(EchoServerListenOn)}
+	remote.Mux()
+	defer remote.Close()
+
+	mux := NewMuxClient(doa.Try(net.Dial("tcp", EchoServerListenOn)))
+	defer mux.Close()
+	cli := doa.Try(mux.Open())
+	defer cli.Close()
+
+	buf := make([]byte, 2048)
+	doa.Try(cli.Write([]byte{0x01, 0x00, 0x00, 0x80}))
+	doa.Doa(doa.Err(io.ReadFull(cli, buf[:1])) == io.EOF)
+}
+
 type Tester struct {
 	*daze.Tester
 }
@@ -41,7 +70,7 @@ func (t *Tester) Mux() error {
 			cli, err := s.Accept()
 			if err != nil {
 				if !errors.Is(err, net.ErrClosed) {
-					log.Println(err)
+					log.Println("main:", err)
 				}
 				break
 			}

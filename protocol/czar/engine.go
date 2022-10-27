@@ -70,7 +70,7 @@ func (s *Server) Run() error {
 		return err
 	}
 	s.Closer = ln
-	log.Println("listen and serve on", s.Listen)
+	log.Println("main: listen and serve on", s.Listen)
 
 	go func() {
 		idx := uint32(math.MaxUint32)
@@ -78,7 +78,7 @@ func (s *Server) Run() error {
 			cli, err := ln.Accept()
 			if err != nil {
 				if !errors.Is(err, net.ErrClosed) {
-					log.Println(err)
+					log.Println("main:", err)
 				}
 				break
 			}
@@ -88,13 +88,13 @@ func (s *Server) Run() error {
 				for cli := range mux.Accept {
 					idx++
 					ctx := &daze.Context{Cid: idx}
-					log.Printf("%08x accept remote=%s", ctx.Cid, mux.Conn.RemoteAddr())
+					log.Printf("conn: %08x accept remote=%s", ctx.Cid, mux.Conn.RemoteAddr())
 					go func(cli io.ReadWriteCloser) {
 						defer cli.Close()
 						if err := s.Serve(ctx, cli); err != nil {
-							log.Printf("%08x  error %s", ctx.Cid, err)
+							log.Printf("conn: %08x  error %s", ctx.Cid, err)
 						}
-						log.Printf("%08x closed", ctx.Cid)
+						log.Printf("conn: %08x closed", ctx.Cid)
 					}(cli)
 				}
 			}(mux)
@@ -146,6 +146,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 func (c *Client) Run() {
 	for {
 		srv := doa.Try(daze.Reno("tcp", c.Server))
+		log.Println("czar: mux init")
 		mux := NewMuxClient(srv)
 		for {
 			select {
@@ -154,6 +155,7 @@ func (c *Client) Run() {
 			case <-mux.RecvDone:
 			case <-mux.SendDone:
 			}
+			log.Println("czar: mux done")
 			break
 		}
 	}

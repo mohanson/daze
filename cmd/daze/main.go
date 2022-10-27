@@ -68,11 +68,11 @@ func main() {
 			flExtend = flag.String("e", "", "extend data for different protocols")
 		)
 		flag.Parse()
-		log.Println("server cipher is", *flCipher)
-		log.Println("protocol is used", *flProtoc)
+		log.Println("main: server cipher is", *flCipher)
+		log.Println("main: protocol is used", *flProtoc)
 		if *flDnserv != "" {
 			net.DefaultResolver = daze.Resolver(*flDnserv)
-			log.Println("domain server is", *flDnserv)
+			log.Println("main: domain server is", *flDnserv)
 		}
 		switch *flProtoc {
 		case "ashe":
@@ -104,12 +104,12 @@ func main() {
 			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon, czar}")
 		)
 		flag.Parse()
-		log.Println("remote server is", *flServer)
-		log.Println("client cipher is", *flCipher)
-		log.Println("protocol is used", *flProtoc)
+		log.Println("main: remote server is", *flServer)
+		log.Println("main: client cipher is", *flCipher)
+		log.Println("main: protocol is used", *flProtoc)
 		if *flDnserv != "" {
 			net.DefaultResolver = daze.Resolver(*flDnserv)
-			log.Println("domain server is", *flDnserv)
+			log.Println("main: domain server is", *flDnserv)
 		}
 		client := func() daze.Dialer {
 			switch *flProtoc {
@@ -128,32 +128,32 @@ func main() {
 				return routerRight
 			}
 			if *flFilter == "remote" {
-				log.Println("load rule reserved IPv4/6 CIDRs")
+				log.Println("main: load rule reserved IPv4/6 CIDRs")
 				routerLocal := daze.NewRouterLocal()
-				log.Println("find", len(routerLocal.L))
+				log.Println("main: find", len(routerLocal.L))
 				routerRight := daze.NewRouterRight(daze.RoadRemote)
 				routerClump := daze.NewRouterChain(routerLocal, routerRight)
 				routerCache := daze.NewRouterCache(routerClump)
 				return routerCache
 			}
 			if *flFilter == "rule" {
-				log.Println("load rule", *flRulels)
+				log.Println("main: load rule", *flRulels)
 				routerRules := daze.NewRouterRules()
 				f1 := doa.Try(daze.OpenFile(*flRulels))
 				defer f1.Close()
 				doa.Nil(routerRules.FromReader(f1))
-				log.Println("find", len(routerRules.L)+len(routerRules.R)+len(routerRules.B))
+				log.Println("main: find", len(routerRules.L)+len(routerRules.R)+len(routerRules.B))
 
-				log.Println("load rule reserved IPv4/6 CIDRs")
+				log.Println("main: load rule reserved IPv4/6 CIDRs")
 				routerLocal := daze.NewRouterLocal()
-				log.Println("find", len(routerLocal.L))
+				log.Println("main: find", len(routerLocal.L))
 
-				log.Println("load rule", *flCIDRls)
+				log.Println("main: load rule", *flCIDRls)
 				f2 := doa.Try(daze.OpenFile(*flCIDRls))
 				defer f2.Close()
 				routerApnic := daze.NewRouterIPNet([]*net.IPNet{}, daze.RoadLocale)
 				routerApnic.FromReader(f2)
-				log.Println("find", len(routerApnic.L))
+				log.Println("main: find", len(routerApnic.L))
 
 				routerRight := daze.NewRouterRight(daze.RoadRemote)
 				routerClump := daze.NewRouterChain(routerRules, routerLocal, routerApnic, routerRight)

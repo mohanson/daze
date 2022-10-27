@@ -149,9 +149,9 @@ func (l *Locale) ServeProxy(ctx *Context, app io.ReadWriteCloser) error {
 			}
 
 			if r.Method == "CONNECT" {
-				log.Printf("%08x  proto format=tunnel", ctx.Cid)
+				log.Printf("conn: %08x  proto format=tunnel", ctx.Cid)
 			} else {
-				log.Printf("%08x  proto format=hproxy", ctx.Cid)
+				log.Printf("conn: %08x  proto format=hproxy", ctx.Cid)
 			}
 
 			srv, err := l.Dialer.Dial(ctx, "tcp", r.URL.Hostname()+":"+port)
@@ -240,7 +240,7 @@ func (l *Locale) ServeSocks4(ctx *Context, app io.ReadWriteCloser) error {
 		dstHost = net.IP(fDstIP).String()
 	}
 	dst = dstHost + ":" + strconv.Itoa(int(dstPort))
-	log.Printf("%08x  proto format=socks4", ctx.Cid)
+	log.Printf("conn: %08x  proto format=socks4", ctx.Cid)
 	switch fCode {
 	case 0x01:
 		srv, err = l.Dialer.Dial(ctx, "tcp", dst)
@@ -323,7 +323,7 @@ func (l *Locale) ServeSocks5(ctx *Context, app io.ReadWriteCloser) error {
 
 // ServeSocks5TCP serves socks5 TCP protocol.
 func (l *Locale) ServeSocks5TCP(ctx *Context, app io.ReadWriteCloser, dst string) error {
-	log.Printf("%08x  proto format=socks5", ctx.Cid)
+	log.Printf("conn: %08x  proto format=socks5", ctx.Cid)
 	srv, err := l.Dialer.Dial(ctx, "tcp", dst)
 	if err != nil {
 		app.Write([]byte{0x05, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
@@ -430,10 +430,10 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 			goto init
 		}
 	init:
-		log.Printf("%08x  proto format=socks5", ctx.Cid)
+		log.Printf("conn: %08x  proto format=socks5", ctx.Cid)
 		srv, err = l.Dialer.Dial(ctx, "udp", dst)
 		if err != nil {
-			log.Printf("%08x  error %s", ctx.Cid, err)
+			log.Printf("conn: %08x  error %s", ctx.Cid, err)
 			continue
 		}
 		cpl[dst] = srv
@@ -460,7 +460,7 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, app io.ReadWriteCloser) error {
 	send:
 		_, err = srv.Write(buf[appHeadSize:appSize])
 		if err != nil {
-			log.Printf("%08x  error %s", ctx.Cid, err)
+			log.Printf("conn: %08x  error %s", ctx.Cid, err)
 			continue
 		}
 	}
@@ -515,7 +515,7 @@ func (l *Locale) Run() error {
 		return err
 	}
 	l.Closer = s
-	log.Println("listen and serve on", l.Listen)
+	log.Println("main: listen and serve on", l.Listen)
 
 	go func() {
 		idx := uint32(math.MaxUint32)
@@ -523,19 +523,19 @@ func (l *Locale) Run() error {
 			cli, err := s.Accept()
 			if err != nil {
 				if !errors.Is(err, net.ErrClosed) {
-					log.Println(err)
+					log.Println("main:", err)
 				}
 				break
 			}
 			idx++
 			ctx := &Context{idx}
-			log.Printf("%08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
+			log.Printf("conn: %08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
 			go func(ctx *Context, cli net.Conn) {
 				defer cli.Close()
 				if err := l.Serve(ctx, cli); err != nil {
-					log.Printf("%08x  error %s", ctx.Cid, err)
+					log.Printf("conn: %08x  error %s", ctx.Cid, err)
 				}
-				log.Printf("%08x closed", ctx.Cid)
+				log.Printf("conn: %08x closed", ctx.Cid)
 			}(ctx, cli)
 		}
 	}()
@@ -616,7 +616,7 @@ func (r *RouterIPNet) road(ctx *Context, host string) Road {
 	}
 	l, err := net.DefaultResolver.LookupIPAddr(context.Background(), host)
 	if err != nil {
-		log.Printf("%08x  error %s", ctx.Cid, err)
+		log.Printf("conn: %08x  error %s", ctx.Cid, err)
 		return RoadPuzzle
 	}
 	if len(l) == 0 {
@@ -634,7 +634,7 @@ func (r *RouterIPNet) road(ctx *Context, host string) Road {
 // Road implements daze.Router.
 func (r *RouterIPNet) Road(ctx *Context, host string) Road {
 	road := r.road(ctx, host)
-	log.Printf("%08x  route router=ipnet road=%s", ctx.Cid, road)
+	log.Printf("conn: %08x  route router=ipnet road=%s", ctx.Cid, road)
 	return road
 }
 
@@ -668,7 +668,7 @@ type RouterRight struct {
 
 // Road implements daze.Router.
 func (r *RouterRight) Road(ctx *Context, host string) Road {
-	log.Printf("%08x  route router=right road=%s", ctx.Cid, r.R)
+	log.Printf("conn: %08x  route router=right road=%s", ctx.Cid, r.R)
 	return r.R
 }
 
@@ -742,7 +742,7 @@ func (r *RouterCache) Road(ctx *Context, host string) Road {
 	r.m.Lock()
 	defer r.m.Unlock()
 	road := r.road(ctx, host)
-	log.Printf("%08x  route router=cache road=%s", ctx.Cid, road)
+	log.Printf("conn: %08x  route router=cache road=%s", ctx.Cid, road)
 	return road
 }
 
@@ -775,7 +775,7 @@ func (r *RouterChain) road(ctx *Context, host string) Road {
 // Road implements daze.Router.
 func (r *RouterChain) Road(ctx *Context, host string) Road {
 	road := r.road(ctx, host)
-	log.Printf("%08x  route router=chain road=%s", ctx.Cid, road)
+	log.Printf("conn: %08x  route router=chain road=%s", ctx.Cid, road)
 	return road
 }
 
@@ -835,7 +835,7 @@ func (r *RouterRules) road(ctx *Context, host string) Road {
 // Road implements daze.Router.
 func (r *RouterRules) Road(ctx *Context, host string) Road {
 	road := r.road(ctx, host)
-	log.Printf("%08x  route router=rules road=%s", ctx.Cid, road)
+	log.Printf("conn: %08x  route router=rules road=%s", ctx.Cid, road)
 	return road
 }
 
@@ -884,7 +884,7 @@ func (s *Aimbot) Dial(ctx *Context, network string, address string) (io.ReadWrit
 		err error
 		rwc io.ReadWriteCloser
 	)
-	log.Printf("%08x   dial network=%s address=%s", ctx.Cid, network, address)
+	log.Printf("conn: %08x   dial network=%s address=%s", ctx.Cid, network, address)
 	dst, _, err = net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
@@ -900,7 +900,7 @@ func (s *Aimbot) Dial(ctx *Context, network string, address string) (io.ReadWrit
 		rwc, err = s.Remote.Dial(ctx, network, address)
 	}
 	if err == nil {
-		log.Printf("%08x  estab", ctx.Cid)
+		log.Printf("conn: %08x  estab", ctx.Cid)
 	}
 	return rwc, err
 }
@@ -995,7 +995,7 @@ func Reno(network string, address string) (net.Conn, error) {
 		if err == nil {
 			return r, err
 		}
-		log.Printf("0000reno  error %s", err)
+		log.Println("reno:", err)
 		time.Sleep(time.Second * time.Duration(math.Pow(2, float64(i))))
 		if i < 5 {
 			i++
@@ -1095,7 +1095,7 @@ func (t *Tester) TCP() error {
 			cli, err := s.Accept()
 			if err != nil {
 				if !errors.Is(err, net.ErrClosed) {
-					log.Println(err)
+					log.Println("main:", err)
 				}
 				break
 			}
