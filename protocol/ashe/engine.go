@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"math"
+	"math/rand"
 	"net"
 	"time"
 
@@ -245,7 +246,7 @@ func (c *Client) WithCipher(ctx *daze.Context, srv io.ReadWriteCloser) (io.ReadW
 		buf = make([]byte, 256)
 		err error
 	)
-	daze.Random.Read(buf[:128])
+	rand.Read(buf[:128])
 	_, err = srv.Write(buf[:128])
 	if err != nil {
 		return nil, err

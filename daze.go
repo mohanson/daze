@@ -930,11 +930,6 @@ var (
 	_ Router = (*RouterRules)(nil)
 )
 
-var (
-	// Random is a source of random numbers.
-	Random = rand.New(rand.NewSource(time.Now().Unix()))
-)
-
 // Dial connects to the address on the named network.
 func Dial(network string, address string) (net.Conn, error) {
 	d := net.Dialer{
@@ -1118,7 +1113,7 @@ func (t *Tester) TCPServe(cli io.ReadWriteCloser) {
 		case 0:
 			msg := binary.BigEndian.Uint16(buf[2:4])
 			doa.Doa(msg <= 2044)
-			Random.Read(buf[4 : 4+msg])
+			rand.Read(buf[4 : 4+msg])
 			buf[0] = 1
 			cli.Write(buf[:4+msg])
 		case 1:
@@ -1149,7 +1144,7 @@ func (t *Tester) UDPServe(cli *net.UDPConn) error {
 		case 0:
 			msg := binary.BigEndian.Uint16(buf[2:4])
 			doa.Doa(msg <= 2044)
-			Random.Read(buf[4 : 4+msg])
+			rand.Read(buf[4 : 4+msg])
 			buf[0] = 1
 			doa.Try(cli.WriteToUDP(buf[:4+msg], addr))
 		case 1:

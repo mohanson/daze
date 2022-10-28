@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"math"
+	"math/rand"
 	"net"
 	"net/http"
 	"sync/atomic"
@@ -170,7 +171,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	if err != nil {
 		return nil, err
 	}
-	daze.Random.Read(buf[:16])
+	rand.Read(buf[:16])
 	copy(buf[16:32], c.Cipher[:16])
 	sign := md5.Sum(buf[:32])
 	copy(buf[16:32], sign[:])
