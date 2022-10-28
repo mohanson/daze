@@ -48,6 +48,8 @@ func (s *Stream) Read(p []byte) (int, error) {
 		return len(b), nil
 	case <-s.rdn:
 		return 0, s.rer
+	case <-s.mux.done:
+		return 0, s.mux.rerr
 	}
 }
 
@@ -122,6 +124,7 @@ type Mux struct {
 	done   chan struct{}
 	idpool chan uint8
 	lock   sync.Mutex
+	rerr   error
 	stream []*Stream
 }
 
@@ -156,17 +159,7 @@ func (m *Mux) Spawn() {
 		buf := make([]byte, 2048)
 		_, err := io.ReadFull(m.conn, buf[:4])
 		if err != nil {
-			for _, stream := range m.stream {
-				if stream == nil {
-					continue
-				}
-				stream.ron.Do(func() {
-					stream.rer = err
-					close(stream.rdn)
-				})
-			}
-			close(m.accept)
-			close(m.done)
+			m.rerr = err
 			break
 		}
 		idx := buf[0]
@@ -205,6 +198,8 @@ func (m *Mux) Spawn() {
 			})
 		}
 	}
+	close(m.accept)
+	close(m.done)
 }
 
 // Write writes data to the connection.
