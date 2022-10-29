@@ -805,7 +805,7 @@ func NewRouterChain(router ...Router) *RouterChain {
 //
 // L(ocale) means using locale network
 // R(emote) means using remote network
-// B(anned) means block it
+// B(anned) means to block it
 type RouterRules struct {
 	L []string
 	R []string

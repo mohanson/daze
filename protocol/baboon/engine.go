@@ -18,7 +18,7 @@ import (
 	"github.com/mohanson/daze/protocol/ashe"
 )
 
-// Protocol baboon disguise the ashe protocol through the HTTP protocol.
+// Protocol baboon is the ashe protocol based on HTTP.
 
 // Conf is acting as package level configuration.
 var Conf = struct {
