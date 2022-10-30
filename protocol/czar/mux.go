@@ -167,11 +167,9 @@ func (m *Mux) Spawn() {
 		switch cmd {
 		case 0x00:
 			// Make sure the stream has been closed properly.
-			if m.stream[idx] != nil {
-				select {
-				case <-m.stream[idx].rdn:
-				case <-m.stream[idx].wdn:
-				}
+			select {
+			case <-m.stream[idx].rdn:
+			case <-m.stream[idx].wdn:
 			}
 			stream := NewStream(idx, m)
 			// The mux server does not need to using an id pool.
@@ -225,7 +223,20 @@ func NewMux(conn net.Conn) *Mux {
 
 // NewMuxServer returns a new MuxServer.
 func NewMuxServer(conn net.Conn) *Mux {
-	return NewMux(conn)
+	mux := NewMux(conn)
+	for i := 0; i < 256; i++ {
+		stream := NewStream(uint8(i), mux)
+		stream.ron.Do(func() {
+			stream.rer = io.ErrClosedPipe
+			close(stream.rdn)
+		})
+		stream.won.Do(func() {
+			stream.wer = io.ErrClosedPipe
+			close(stream.wdn)
+		})
+		mux.stream[i] = stream
+	}
+	return mux
 }
 
 // NewMuxClient returns a new MuxClient.
