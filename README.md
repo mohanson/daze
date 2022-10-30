@@ -122,6 +122,8 @@ Daze currently has 3 middle protocols.
 
 Default protocol. Ashe is a TCP-based cryptographic proxy protocol. The main purpose of this protocol is to bypass firewalls while providing a good user experience, so it only provides minimal security, which is one of the reasons for choosing the RC4 algorithm.
 
+Note that it is your responsibility to ensure that the server and client's date and time are consistent, the ashe protocol allows a deviation of two minutes.
+
 #### Baboon
 
 Protocol baboon is the ashe protocol based on HTTP. The daze server will pretend to be an HTTP service. If the user sends the correct password, the daze server will provide the proxy service, otherwise, it will behave as a normal HTTP service. To use the baboon protocol, you need to specify the protocol name and a fake site:

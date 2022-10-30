@@ -65,17 +65,17 @@ func (s *Server) Close() error {
 
 // Run it.
 func (s *Server) Run() error {
-	ln, err := net.Listen("tcp", s.Listen)
+	l, err := net.Listen("tcp", s.Listen)
 	if err != nil {
 		return err
 	}
-	s.Closer = ln
+	s.Closer = l
 	log.Println("main: listen and serve on", s.Listen)
 
 	go func() {
 		idx := uint32(math.MaxUint32)
 		for {
-			cli, err := ln.Accept()
+			cli, err := l.Accept()
 			if err != nil {
 				if !errors.Is(err, net.ErrClosed) {
 					log.Println("main:", err)

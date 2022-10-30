@@ -132,14 +132,14 @@ func (s *Server) Route(r *http.Request) int {
 
 // Run it.
 func (s *Server) Run() error {
-	ln, err := net.Listen("tcp", s.Listen)
+	l, err := net.Listen("tcp", s.Listen)
 	if err != nil {
 		return err
 	}
 	log.Println("main: listen and serve on", s.Listen)
 	srv := &http.Server{Handler: s}
 	s.Closer = srv
-	go srv.Serve(ln)
+	go srv.Serve(l)
 	return nil
 }
 
