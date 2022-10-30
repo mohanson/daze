@@ -135,7 +135,7 @@ $ daze client ... -p baboon
 
 #### Czar
 
-Protocol czar is the ashe protocol base on TCP multiplexing. It improves the speed of TCP link establishment by reducing the data transfer rate. In most cases, it has a better user experience than using the ashe protocol directly.
+Protocol czar is the ashe protocol base on TCP multiplexing. For the uninitiated, multiplexing is the practice of reusing a single TCP connection for multiple ashe protocols. This practice saves the time of the TCP three-way handshake, but on the other hand, there is a small impairment to the data transfer rate (about 0.19%). In most cases, it has a better user experience than using the ashe protocol directly.
 
 ```sh
 $ daze server ... -p czar
