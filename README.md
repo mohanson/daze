@@ -144,7 +144,11 @@ $ daze client ... -p czar
 
 ## Proxy Control
 
-Proxy control is a rule that determines whether network requests (TCP and UDP) go directly to the destination or are forwarded to the daze server.
+Proxy control is a rule that determines whether network requests (TCP and UDP) go directly to the destination or are forwarded to the daze server. Use the `-f` option in the daze client to adjust the proxy configuration, you can choose
+
+- Use local network for all requests.
+- Use remote server for all requests.
+- Use both local and remote server (default).
 
 ### File rule.ls
 
