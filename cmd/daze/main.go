@@ -16,6 +16,7 @@ import (
 	"github.com/mohanson/daze/protocol/ashe"
 	"github.com/mohanson/daze/protocol/baboon"
 	"github.com/mohanson/daze/protocol/czar"
+	"github.com/mohanson/daze/protocol/dahlia"
 )
 
 // Conf is acting as package level configuration.
@@ -94,6 +95,10 @@ func main() {
 			server := czar.NewServer(*flListen, *flCipher)
 			defer server.Close()
 			doa.Nil(server.Run())
+		case "dahlia":
+			server := dahlia.NewServer(*flListen, *flExtend, *flCipher)
+			defer server.Close()
+			doa.Nil(server.Run())
 		}
 		daze.Hang()
 	case "client":
@@ -143,6 +148,10 @@ func main() {
 			}))
 			defer locale.Close()
 			doa.Nil(locale.Run())
+		case "dahlia":
+			client := dahlia.NewClient(*flListen, *flServer, *flCipher)
+			defer client.Close()
+			doa.Nil(client.Run())
 		}
 		daze.Hang()
 	case "gen":
