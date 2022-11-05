@@ -108,12 +108,12 @@ type Dialer interface {
 // Direct is the default dialer for connecting to an address.
 type Direct struct{}
 
-// Dial implements Dialer.
+// Dial implements daze.Dialer.
 func (d *Direct) Dial(ctx *Context, network string, address string) (io.ReadWriteCloser, error) {
 	return Dial(network, address)
 }
 
-// Locale is the main process of  In most cases, it is usually deployed as a daemon on a local machine.
+// Locale is the main process of daze. In most cases, it is usually deployed as a daemon on a local machine.
 type Locale struct {
 	Listen string
 	Dialer Dialer
@@ -609,7 +609,7 @@ type RouterIPNet struct {
 	R Road
 }
 
-// Road implements Router.
+// Road implements daze.Router.
 func (r *RouterIPNet) road(ctx *Context, host string) Road {
 	if len(r.L) == 0 {
 		return RoadPuzzle
@@ -631,7 +631,7 @@ func (r *RouterIPNet) road(ctx *Context, host string) Road {
 	return RoadPuzzle
 }
 
-// Road implements Router.
+// Road implements daze.Router.
 func (r *RouterIPNet) Road(ctx *Context, host string) Road {
 	road := r.road(ctx, host)
 	log.Printf("conn: %08x  route router=ipnet road=%s", ctx.Cid, road)
@@ -666,7 +666,7 @@ type RouterRight struct {
 	R Road
 }
 
-// Road implements Router.
+// Road implements daze.Router.
 func (r *RouterRight) Road(ctx *Context, host string) Road {
 	log.Printf("conn: %08x  route router=right road=%s", ctx.Cid, r.R)
 	return r.R
@@ -727,7 +727,7 @@ type RouterCache struct {
 	m   sync.Mutex
 }
 
-// Road implements Router.
+// Road implements daze.Router.
 func (r *RouterCache) road(ctx *Context, host string) Road {
 	if a, b := r.Box.GetExists(host); b {
 		return a
@@ -737,7 +737,7 @@ func (r *RouterCache) road(ctx *Context, host string) Road {
 	return a
 }
 
-// Road implements Router.
+// Road implements daze.Router.
 func (r *RouterCache) Road(ctx *Context, host string) Road {
 	r.m.Lock()
 	defer r.m.Unlock()
@@ -760,7 +760,7 @@ type RouterChain struct {
 	L []Router
 }
 
-// Road implements Router.
+// Road implements daze.Router.
 func (r *RouterChain) road(ctx *Context, host string) Road {
 	var a Road
 	for _, e := range r.L {
@@ -772,7 +772,7 @@ func (r *RouterChain) road(ctx *Context, host string) Road {
 	return RoadPuzzle
 }
 
-// Road implements Router.
+// Road implements daze.Router.
 func (r *RouterChain) Road(ctx *Context, host string) Road {
 	road := r.road(ctx, host)
 	log.Printf("conn: %08x  route router=chain road=%s", ctx.Cid, road)
@@ -812,7 +812,7 @@ type RouterRules struct {
 	B []string
 }
 
-// Road implements Router.
+// Road implements daze.Router.
 func (r *RouterRules) road(ctx *Context, host string) Road {
 	for _, e := range r.L {
 		if doa.Try(filepath.Match(e, host)) {
@@ -832,7 +832,7 @@ func (r *RouterRules) road(ctx *Context, host string) Road {
 	return RoadPuzzle
 }
 
-// Road implements Router.
+// Road implements daze.Router.
 func (r *RouterRules) Road(ctx *Context, host string) Road {
 	road := r.road(ctx, host)
 	log.Printf("conn: %08x  route router=rules road=%s", ctx.Cid, road)
