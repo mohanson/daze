@@ -15,6 +15,7 @@ Daze is software to help you pass through the firewalls, in other words, proxy. 
             - [Ashe](#ashe)
             - [Baboon](#baboon)
             - [Czar](#czar)
+            - [Dahlia](#dahlia)
     - [Proxy Control](#proxy-control)
         - [File rule.ls](#file-rulels)
         - [File rule.cidr](#file-rulecidr)
@@ -116,7 +117,7 @@ Why can one port support so many protocols? Because it's magic!
 
 ### Middle Protocols
 
-Daze currently has 3 middle protocols.
+Daze currently has 4 middle protocols.
 
 #### Ashe
 
@@ -140,6 +141,16 @@ Protocol czar is the ashe protocol base on TCP multiplexing. For the uninitiated
 ```sh
 $ daze server ... -p czar
 $ daze client ... -p czar
+```
+
+#### Dahlia
+
+Dahlia is an encrypted port forwarding protocol. Unlike common port forwarding tools, it needs to configure a server and a client, and the communication between the server and the client is encrypted to bypass firewall detection.
+
+```sh
+# Port forwarding from 20002 to 20000:
+$ daze server -l :20001 -e 127.0.0.1:20000 -p dahlia
+$ daze client -l :20002 -s 127.0.0.1:20001 -p dahlia
 ```
 
 ## Proxy Control

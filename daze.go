@@ -905,6 +905,62 @@ func (s *Aimbot) Dial(ctx *Context, network string, address string) (io.ReadWrit
 	return rwc, err
 }
 
+// AimbotOption provides configuration for quick initialization of Aimbot.
+type AimbotOption struct {
+	Type string
+	Rule string
+	Cidr string
+}
+
+// NewAimbot returns a new Aimbot.
+func NewAimbot(client Dialer, option *AimbotOption) *Aimbot {
+	router := func() Router {
+		if option.Type == "locale" {
+			routerRight := NewRouterRight(RoadLocale)
+			return routerRight
+		}
+		if option.Type == "remote" {
+			log.Println("main: load rule reserved IPv4/6 CIDRs")
+			routerLocal := NewRouterLocal()
+			log.Println("main: find", len(routerLocal.L))
+			routerRight := NewRouterRight(RoadRemote)
+			routerClump := NewRouterChain(routerLocal, routerRight)
+			routerCache := NewRouterCache(routerClump)
+			return routerCache
+		}
+		if option.Type == "rule" {
+			log.Println("main: load rule", option.Rule)
+			routerRules := NewRouterRules()
+			f1 := doa.Try(OpenFile(option.Rule))
+			defer f1.Close()
+			doa.Nil(routerRules.FromReader(f1))
+			log.Println("main: find", len(routerRules.L)+len(routerRules.R)+len(routerRules.B))
+
+			log.Println("main: load rule reserved IPv4/6 CIDRs")
+			routerLocal := NewRouterLocal()
+			log.Println("main: find", len(routerLocal.L))
+
+			log.Println("main: load rule", option.Cidr)
+			f2 := doa.Try(OpenFile(option.Cidr))
+			defer f2.Close()
+			routerApnic := NewRouterIPNet([]*net.IPNet{}, RoadLocale)
+			routerApnic.FromReader(f2)
+			log.Println("main: find", len(routerApnic.L))
+
+			routerRight := NewRouterRight(RoadRemote)
+			routerClump := NewRouterChain(routerRules, routerLocal, routerApnic, routerRight)
+			routerCache := NewRouterCache(routerClump)
+			return routerCache
+		}
+		panic("unreachable")
+	}()
+	return &Aimbot{
+		Remote: client,
+		Locale: &Direct{},
+		Router: router,
+	}
+}
+
 // ============================================================================
 //               ___           ___           ___           ___
 //              /\  \         /\  \         /\  \         /\__\
