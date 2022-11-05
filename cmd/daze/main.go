@@ -115,65 +115,35 @@ func main() {
 			net.DefaultResolver = daze.Resolver(*flDnserv)
 			log.Println("main: domain server is", *flDnserv)
 		}
-		client := func() daze.Dialer {
-			switch *flProtoc {
-			case "ashe":
-				return ashe.NewClient(*flServer, *flCipher)
-			case "baboon":
-				return baboon.NewClient(*flServer, *flCipher)
-			case "czar":
-				return czar.NewClient(*flServer, *flCipher)
-			}
-			panic("unreachable")
-		}()
-		router := func() daze.Router {
-			if *flFilter == "locale" {
-				routerRight := daze.NewRouterRight(daze.RoadLocale)
-				return routerRight
-			}
-			if *flFilter == "remote" {
-				log.Println("main: load rule reserved IPv4/6 CIDRs")
-				routerLocal := daze.NewRouterLocal()
-				log.Println("main: find", len(routerLocal.L))
-				routerRight := daze.NewRouterRight(daze.RoadRemote)
-				routerClump := daze.NewRouterChain(routerLocal, routerRight)
-				routerCache := daze.NewRouterCache(routerClump)
-				return routerCache
-			}
-			if *flFilter == "rule" {
-				log.Println("main: load rule", *flRulels)
-				routerRules := daze.NewRouterRules()
-				f1 := doa.Try(daze.OpenFile(*flRulels))
-				defer f1.Close()
-				doa.Nil(routerRules.FromReader(f1))
-				log.Println("main: find", len(routerRules.L)+len(routerRules.R)+len(routerRules.B))
-
-				log.Println("main: load rule reserved IPv4/6 CIDRs")
-				routerLocal := daze.NewRouterLocal()
-				log.Println("main: find", len(routerLocal.L))
-
-				log.Println("main: load rule", *flCIDRls)
-				f2 := doa.Try(daze.OpenFile(*flCIDRls))
-				defer f2.Close()
-				routerApnic := daze.NewRouterIPNet([]*net.IPNet{}, daze.RoadLocale)
-				routerApnic.FromReader(f2)
-				log.Println("main: find", len(routerApnic.L))
-
-				routerRight := daze.NewRouterRight(daze.RoadRemote)
-				routerClump := daze.NewRouterChain(routerRules, routerLocal, routerApnic, routerRight)
-				routerCache := daze.NewRouterCache(routerClump)
-				return routerCache
-			}
-			panic("unreachable")
-		}()
-		aimbot := &daze.Aimbot{
-			Remote: client,
-			Locale: &daze.Direct{},
-			Router: router,
+		switch *flProtoc {
+		case "ashe":
+			client := ashe.NewClient(*flServer, *flCipher)
+			locale := daze.NewLocale(*flListen, daze.NewAimbot(client, &daze.AimbotOption{
+				Type: *flFilter,
+				Rule: *flRulels,
+				Cidr: *flCIDRls,
+			}))
+			defer locale.Close()
+			doa.Nil(locale.Run())
+		case "baboon":
+			client := baboon.NewClient(*flServer, *flCipher)
+			locale := daze.NewLocale(*flListen, daze.NewAimbot(client, &daze.AimbotOption{
+				Type: *flFilter,
+				Rule: *flRulels,
+				Cidr: *flCIDRls,
+			}))
+			defer locale.Close()
+			doa.Nil(locale.Run())
+		case "czar":
+			client := czar.NewClient(*flServer, *flCipher)
+			locale := daze.NewLocale(*flListen, daze.NewAimbot(client, &daze.AimbotOption{
+				Type: *flFilter,
+				Rule: *flRulels,
+				Cidr: *flCIDRls,
+			}))
+			defer locale.Close()
+			doa.Nil(locale.Run())
 		}
-		locale := daze.NewLocale(*flListen, aimbot)
-		defer locale.Close()
-		doa.Nil(locale.Run())
 		daze.Hang()
 	case "gen":
 		flag.Usage = func() {

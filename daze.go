@@ -108,12 +108,12 @@ type Dialer interface {
 // Direct is the default dialer for connecting to an address.
 type Direct struct{}
 
-// Dial implements daze.Dialer.
+// Dial implements Dialer.
 func (d *Direct) Dial(ctx *Context, network string, address string) (io.ReadWriteCloser, error) {
 	return Dial(network, address)
 }
 
-// Locale is the main process of daze. In most cases, it is usually deployed as a daemon on a local machine.
+// Locale is the main process of  In most cases, it is usually deployed as a daemon on a local machine.
 type Locale struct {
 	Listen string
 	Dialer Dialer
@@ -609,7 +609,7 @@ type RouterIPNet struct {
 	R Road
 }
 
-// Road implements daze.Router.
+// Road implements Router.
 func (r *RouterIPNet) road(ctx *Context, host string) Road {
 	if len(r.L) == 0 {
 		return RoadPuzzle
@@ -631,7 +631,7 @@ func (r *RouterIPNet) road(ctx *Context, host string) Road {
 	return RoadPuzzle
 }
 
-// Road implements daze.Router.
+// Road implements Router.
 func (r *RouterIPNet) Road(ctx *Context, host string) Road {
 	road := r.road(ctx, host)
 	log.Printf("conn: %08x  route router=ipnet road=%s", ctx.Cid, road)
@@ -666,7 +666,7 @@ type RouterRight struct {
 	R Road
 }
 
-// Road implements daze.Router.
+// Road implements Router.
 func (r *RouterRight) Road(ctx *Context, host string) Road {
 	log.Printf("conn: %08x  route router=right road=%s", ctx.Cid, r.R)
 	return r.R
@@ -727,7 +727,7 @@ type RouterCache struct {
 	m   sync.Mutex
 }
 
-// Road implements daze.Router.
+// Road implements Router.
 func (r *RouterCache) road(ctx *Context, host string) Road {
 	if a, b := r.Box.GetExists(host); b {
 		return a
@@ -737,7 +737,7 @@ func (r *RouterCache) road(ctx *Context, host string) Road {
 	return a
 }
 
-// Road implements daze.Router.
+// Road implements Router.
 func (r *RouterCache) Road(ctx *Context, host string) Road {
 	r.m.Lock()
 	defer r.m.Unlock()
@@ -760,7 +760,7 @@ type RouterChain struct {
 	L []Router
 }
 
-// Road implements daze.Router.
+// Road implements Router.
 func (r *RouterChain) road(ctx *Context, host string) Road {
 	var a Road
 	for _, e := range r.L {
@@ -772,7 +772,7 @@ func (r *RouterChain) road(ctx *Context, host string) Road {
 	return RoadPuzzle
 }
 
-// Road implements daze.Router.
+// Road implements Router.
 func (r *RouterChain) Road(ctx *Context, host string) Road {
 	road := r.road(ctx, host)
 	log.Printf("conn: %08x  route router=chain road=%s", ctx.Cid, road)
@@ -812,7 +812,7 @@ type RouterRules struct {
 	B []string
 }
 
-// Road implements daze.Router.
+// Road implements Router.
 func (r *RouterRules) road(ctx *Context, host string) Road {
 	for _, e := range r.L {
 		if doa.Try(filepath.Match(e, host)) {
@@ -832,7 +832,7 @@ func (r *RouterRules) road(ctx *Context, host string) Road {
 	return RoadPuzzle
 }
 
-// Road implements daze.Router.
+// Road implements Router.
 func (r *RouterRules) Road(ctx *Context, host string) Road {
 	road := r.road(ctx, host)
 	log.Printf("conn: %08x  route router=rules road=%s", ctx.Cid, road)
@@ -903,6 +903,62 @@ func (s *Aimbot) Dial(ctx *Context, network string, address string) (io.ReadWrit
 		log.Printf("conn: %08x  estab", ctx.Cid)
 	}
 	return rwc, err
+}
+
+// AimbotOption provides configuration for quick initialization of Aimbot.
+type AimbotOption struct {
+	Type string
+	Rule string
+	Cidr string
+}
+
+// NewAimbot returns a new Aimbot.
+func NewAimbot(client Dialer, option *AimbotOption) *Aimbot {
+	router := func() Router {
+		if option.Type == "locale" {
+			routerRight := NewRouterRight(RoadLocale)
+			return routerRight
+		}
+		if option.Type == "remote" {
+			log.Println("main: load rule reserved IPv4/6 CIDRs")
+			routerLocal := NewRouterLocal()
+			log.Println("main: find", len(routerLocal.L))
+			routerRight := NewRouterRight(RoadRemote)
+			routerClump := NewRouterChain(routerLocal, routerRight)
+			routerCache := NewRouterCache(routerClump)
+			return routerCache
+		}
+		if option.Type == "rule" {
+			log.Println("main: load rule", option.Rule)
+			routerRules := NewRouterRules()
+			f1 := doa.Try(OpenFile(option.Rule))
+			defer f1.Close()
+			doa.Nil(routerRules.FromReader(f1))
+			log.Println("main: find", len(routerRules.L)+len(routerRules.R)+len(routerRules.B))
+
+			log.Println("main: load rule reserved IPv4/6 CIDRs")
+			routerLocal := NewRouterLocal()
+			log.Println("main: find", len(routerLocal.L))
+
+			log.Println("main: load rule", option.Cidr)
+			f2 := doa.Try(OpenFile(option.Cidr))
+			defer f2.Close()
+			routerApnic := NewRouterIPNet([]*net.IPNet{}, RoadLocale)
+			routerApnic.FromReader(f2)
+			log.Println("main: find", len(routerApnic.L))
+
+			routerRight := NewRouterRight(RoadRemote)
+			routerClump := NewRouterChain(routerRules, routerLocal, routerApnic, routerRight)
+			routerCache := NewRouterCache(routerClump)
+			return routerCache
+		}
+		panic("unreachable")
+	}()
+	return &Aimbot{
+		Remote: client,
+		Locale: &Direct{},
+		Router: router,
+	}
 }
 
 // ============================================================================
