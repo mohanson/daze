@@ -163,7 +163,7 @@ Proxy control is a rule that determines whether network requests (TCP and UDP) g
 
 ### File rule.ls
 
-Daze uses a RULE file to customize your own rules(optional). RULE has the highest priority in routers so you should carefully maintain it. This is a RULE document located at "./rule.ls", use `daze client -r ./rule.ls` to apply it.
+Daze uses a "rule.ls" file to customize your own rules(optional). "rule.ls" has the highest priority in routers so you should carefully maintain it. The "rule.ls" is located on the "./rule.ls" by default, or you can use `daze client -r path/to/rule.ls` to apply it.
 
 ```
 L a.com
@@ -179,7 +179,7 @@ Glob is supported, such as `R *.google.com`.
 
 ### File rule.cidr
 
-Daze also uses a CIDR(Classless Inter-Domain Routing) file to route addresses. CIDR file has lower priority than RULE files, located at "./rule.cidr". When an IP address is in the CIDR file, daze will use the local network to establish the connection instead of using a proxy.
+Daze also uses a CIDR(Classless Inter-Domain Routing) file to route addresses. The CIDR file is located at "./rule.cidr", and has a lower priority than "rule.ls". When an IP address is in the CIDR file, daze will use the local network to establish the connection instead of a proxy.
 
 # Links
 
