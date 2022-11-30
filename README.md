@@ -180,7 +180,3 @@ Glob is supported, such as `R *.google.com`.
 ### File rule.cidr
 
 Daze also uses a CIDR(Classless Inter-Domain Routing) file to route addresses. The CIDR file is located at "./rule.cidr", and has a lower priority than "rule.ls". When an IP address is in the CIDR file, daze will use the local network to establish the connection instead of a proxy.
-
-# Links
-
-- [Iproyal Improved Security - Blazing Fast Sneaker Proxies](https://iproyal.cn?r=147480)
