@@ -15,7 +15,7 @@ const (
 	Password           = "password"
 )
 
-func TestProtocolNaixTCP(t *testing.T) {
+func TestProtocolDahliaTCP(t *testing.T) {
 	remote := daze.NewTester(EchoServerListenOn)
 	defer remote.Close()
 	remote.TCP()
