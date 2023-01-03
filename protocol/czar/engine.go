@@ -89,13 +89,13 @@ func (s *Server) Run() error {
 					idx++
 					ctx := &daze.Context{Cid: idx}
 					log.Printf("conn: %08x accept remote=%s", ctx.Cid, mux.conn.RemoteAddr())
-					go func(cli io.ReadWriteCloser) {
+					go func(ctx *daze.Context, cli io.ReadWriteCloser) {
 						defer cli.Close()
 						if err := s.Serve(ctx, cli); err != nil {
 							log.Printf("conn: %08x  error %s", ctx.Cid, err)
 						}
 						log.Printf("conn: %08x closed", ctx.Cid)
-					}(cli)
+					}(ctx, cli)
 				}
 			}(mux)
 		}

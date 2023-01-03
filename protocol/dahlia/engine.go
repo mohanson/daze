@@ -67,13 +67,13 @@ func (s *Server) Run() error {
 			idx++
 			ctx := &daze.Context{Cid: idx}
 			log.Printf("conn: %08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
-			go func(cli net.Conn) {
+			go func(ctx *daze.Context, cli net.Conn) {
 				defer cli.Close()
 				if err := s.Serve(ctx, cli); err != nil {
 					log.Printf("conn: %08x  error %s", ctx.Cid, err)
 				}
 				log.Printf("conn: %08x closed", ctx.Cid)
-			}(cli)
+			}(ctx, cli)
 		}
 	}()
 	return nil
@@ -142,13 +142,13 @@ func (c *Client) Run() error {
 			idx++
 			ctx := &daze.Context{Cid: idx}
 			log.Printf("conn: %08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
-			go func(cli net.Conn) {
+			go func(ctx *daze.Context, cli net.Conn) {
 				defer cli.Close()
 				if err := c.Serve(ctx, cli); err != nil {
 					log.Printf("conn: %08x  error %s", ctx.Cid, err)
 				}
 				log.Printf("conn: %08x closed", ctx.Cid)
-			}(cli)
+			}(ctx, cli)
 		}
 	}()
 	return nil
@@ -210,13 +210,13 @@ func (m *Middle) Run() error {
 			idx++
 			ctx := &daze.Context{Cid: idx}
 			log.Printf("conn: %08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
-			go func(cli net.Conn) {
+			go func(ctx *daze.Context, cli net.Conn) {
 				defer cli.Close()
 				if err := m.Serve(ctx, cli); err != nil {
 					log.Printf("conn: %08x  error %s", ctx.Cid, err)
 				}
 				log.Printf("conn: %08x closed", ctx.Cid)
-			}(cli)
+			}(ctx, cli)
 		}
 	}()
 	return nil
