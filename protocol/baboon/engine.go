@@ -184,7 +184,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		Server: c.Server,
 		Cipher: c.Cipher,
 	}
-	ret, err := cli.With(ctx, srv, network, address)
+	ret, err := cli.Estab(ctx, srv, network, address)
 	if err != nil {
 		srv.Close()
 	}

@@ -132,7 +132,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 			return nil, err
 		}
 		asheClient := &ashe.Client{Cipher: c.Cipher}
-		ret, err := asheClient.With(ctx, srv, network, address)
+		ret, err := asheClient.Estab(ctx, srv, network, address)
 		if err != nil {
 			srv.Close()
 		}

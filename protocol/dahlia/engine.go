@@ -33,7 +33,7 @@ func (s *Server) Close() error {
 // Serve incoming connections. Parameter cli will be closed automatically when the function exits.
 func (s *Server) Serve(ctx *daze.Context, cli net.Conn) error {
 	dec := ashe.Server{Cipher: s.Cipher}
-	spy, err := dec.ServeCipher(ctx, cli)
+	spy, err := dec.Hello(cli)
 	if err != nil {
 		return err
 	}
@@ -111,7 +111,7 @@ func (c *Client) Serve(ctx *daze.Context, cli net.Conn) error {
 		return err
 	}
 	enc := ashe.Client{Cipher: c.Cipher}
-	spy, err := enc.WithCipher(ctx, srv)
+	spy, err := enc.Hello(srv)
 	if err != nil {
 		srv.Close()
 		return err
