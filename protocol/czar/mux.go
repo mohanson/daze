@@ -139,7 +139,7 @@ func (m *Mux) Close() error {
 	return m.conn.Close()
 }
 
-// Stream is used to create a new stream as a net.Conn.
+// Open is used to create a new stream as a net.Conn.
 func (m *Mux) Open() (*Stream, error) {
 	idx := <-m.idpool
 	_, err := m.Write([]byte{idx, 0x00, 0x00, 0x00})
@@ -215,6 +215,7 @@ func NewMux(conn net.Conn) *Mux {
 		done:   make(chan struct{}),
 		idpool: nil,
 		lock:   sync.Mutex{},
+		rerr:   nil,
 		stream: make([]*Stream, 256),
 	}
 	go m.Spawn()
