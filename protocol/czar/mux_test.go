@@ -24,10 +24,10 @@ func TestProtocolMux(t *testing.T) {
 
 	buf := make([]byte, 2048)
 	doa.Try(cli.Write([]byte{0x00, 0x00, 0x00, 0x80}))
-	doa.Try(io.ReadFull(cli, buf[:132]))
+	doa.Doa(doa.Try(io.ReadFull(cli, buf[:132])) == 132)
 	doa.Try(cli.Write([]byte{0x00, 0x00, 0x00, 0x80}))
-	doa.Try(io.ReadFull(cli, buf[:66]))
-	doa.Try(io.ReadFull(cli, buf[:66]))
+	doa.Doa(doa.Try(io.ReadFull(cli, buf[:66])) == 66)
+	doa.Doa(doa.Try(io.ReadFull(cli, buf[:66])) == 66)
 }
 
 func TestProtocolMuxStreamClientClose(t *testing.T) {
