@@ -14,6 +14,7 @@ type Stream struct {
 	idp chan uint8
 	idx uint8
 	mux *Mux
+	rbf []byte
 	rch chan []byte
 	rer error
 	rdn chan struct{}
@@ -41,11 +42,16 @@ func (s *Stream) Close() error {
 
 // Read implements io.Reader.
 func (s *Stream) Read(p []byte) (int, error) {
+	if len(s.rbf) != 0 {
+		n := copy(p, s.rbf)
+		s.rbf = s.rbf[n:]
+		return n, nil
+	}
 	select {
-	case b := <-s.rch:
-		doa.Doa(len(p) >= len(b))
-		copy(p, b)
-		return len(b), nil
+	case s.rbf = <-s.rch:
+		n := copy(p, s.rbf)
+		s.rbf = s.rbf[n:]
+		return n, nil
 	case <-s.rdn:
 		return 0, s.rer
 	case <-s.mux.done:
@@ -60,6 +66,7 @@ func (s *Stream) write(p []byte) (int, error) {
 		return 0, s.wer
 	default:
 	}
+	doa.Doa(len(p) != 0)
 	doa.Doa(len(p) <= 2044)
 	buf := make([]byte, 4+len(p))
 	buf[0] = s.idx
@@ -107,6 +114,7 @@ func NewStream(idx uint8, mux *Mux) *Stream {
 		idp: nil,
 		idx: idx,
 		mux: mux,
+		rbf: make([]byte, 0),
 		rch: make(chan []byte, 32),
 		rer: nil,
 		rdn: make(chan struct{}),
@@ -139,7 +147,7 @@ func (m *Mux) Close() error {
 	return m.conn.Close()
 }
 
-// Stream is used to create a new stream as a net.Conn.
+// Open is used to create a new stream as a net.Conn.
 func (m *Mux) Open() (*Stream, error) {
 	idx := <-m.idpool
 	_, err := m.Write([]byte{idx, 0x00, 0x00, 0x00})
@@ -170,6 +178,8 @@ func (m *Mux) Spawn() {
 			select {
 			case <-m.stream[idx].rdn:
 			case <-m.stream[idx].wdn:
+			default:
+				panic("unreachable")
 			}
 			stream := NewStream(idx, m)
 			// The mux server does not need to using an id pool.
@@ -215,6 +225,7 @@ func NewMux(conn net.Conn) *Mux {
 		done:   make(chan struct{}),
 		idpool: nil,
 		lock:   sync.Mutex{},
+		rerr:   nil,
 		stream: make([]*Stream, 256),
 	}
 	go m.Spawn()
