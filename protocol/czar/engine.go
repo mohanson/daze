@@ -88,7 +88,7 @@ func (s *Server) Run() error {
 				for cli := range mux.Accept() {
 					idx++
 					ctx := &daze.Context{Cid: idx}
-					log.Printf("conn: %08x accept remote=%s", ctx.Cid, mux.socket.RemoteAddr())
+					log.Printf("conn: %08x accept remote=%s", ctx.Cid, mux.con.RemoteAddr())
 					go func(ctx *daze.Context, cli io.ReadWriteCloser) {
 						defer cli.Close()
 						if err := s.Serve(ctx, cli); err != nil {
