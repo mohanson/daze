@@ -25,7 +25,6 @@ type Stream struct {
 
 // Close implements io.Closer.
 func (s *Stream) Close() error {
-	var err error
 	s.ron.Do(func() {
 		s.rer = io.ErrClosedPipe
 		close(s.rdn)
@@ -35,10 +34,10 @@ func (s *Stream) Close() error {
 		close(s.wdn)
 	})
 	s.son.Do(func() {
-		_, err = s.mux.Write([]byte{s.idx, 0x02, 0x00, 0x00})
+		s.mux.Write([]byte{s.idx, 0x02, 0x00, 0x00})
 		s.idp <- s.idx
 	})
-	return err
+	return nil
 }
 
 // Read implements io.Reader.
