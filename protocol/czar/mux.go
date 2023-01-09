@@ -9,6 +9,7 @@ import (
 
 // A Stream managed by the multiplexer.
 type Stream struct {
+	con sync.Once
 	idp chan uint8
 	idx uint8
 	mux *Mux
@@ -20,7 +21,6 @@ type Stream struct {
 	wer error
 	wdn chan struct{}
 	won sync.Once
-	con sync.Once
 }
 
 // Close implements io.Closer.
@@ -101,6 +101,7 @@ func (s *Stream) Write(p []byte) (int, error) {
 // NewStream returns a new Stream.
 func NewStream(idx uint8, mux *Mux) *Stream {
 	return &Stream{
+		con: sync.Once{},
 		idp: nil,
 		idx: idx,
 		mux: mux,
