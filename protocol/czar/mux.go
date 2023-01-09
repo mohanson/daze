@@ -14,11 +14,11 @@ type Stream struct {
 	mux *Mux
 	rbf []byte
 	rch chan []byte
-	rer error
+	rer Err
 	rdn chan struct{}
 	ron sync.Once
 	son sync.Once
-	wer error
+	wer Err
 	wdn chan struct{}
 	won sync.Once
 }
@@ -26,11 +26,11 @@ type Stream struct {
 // Close implements io.Closer.
 func (s *Stream) Close() error {
 	s.ron.Do(func() {
-		s.rer = io.ErrClosedPipe
+		s.rer.Put(io.ErrClosedPipe)
 		close(s.rdn)
 	})
 	s.won.Do(func() {
-		s.wer = io.ErrClosedPipe
+		s.wer.Put(io.ErrClosedPipe)
 		close(s.wdn)
 	})
 	s.son.Do(func() {
@@ -59,7 +59,7 @@ func (s *Stream) Read(p []byte) (int, error) {
 		s.rbf = s.rbf[n:]
 		return n, nil
 	case <-s.rdn:
-		return 0, s.rer
+		return 0, s.rer.err
 	case <-s.mux.rdn:
 		return 0, s.mux.rer
 	}
@@ -84,10 +84,8 @@ func (s *Stream) Write(p []byte) (int, error) {
 		binary.BigEndian.PutUint16(b[2:4], uint16(l))
 		copy(b[4:], p[:l])
 		p = p[l:]
-		select {
-		case <-s.wdn:
-			return n, s.wer
-		default:
+		if err := s.wer.Get(); err != nil {
+			return n, err
 		}
 		_, err := s.mux.Write(b[:4+l])
 		if err != nil {
@@ -105,11 +103,11 @@ func NewStream(idx uint8, mux *Mux) *Stream {
 		mux: mux,
 		rbf: make([]byte, 0),
 		rch: make(chan []byte, 32),
-		rer: nil,
+		rer: Err{},
 		rdn: make(chan struct{}),
 		ron: sync.Once{},
 		son: sync.Once{},
-		wer: nil,
+		wer: Err{},
 		wdn: make(chan struct{}),
 		won: sync.Once{},
 	}
@@ -187,11 +185,11 @@ func (m *Mux) Spawn() {
 		case 0x02:
 			stream := m.stream[idx]
 			stream.ron.Do(func() {
-				stream.rer = io.EOF
+				stream.rer.Put(io.EOF)
 				close(stream.rdn)
 			})
 			stream.won.Do(func() {
-				stream.wer = io.ErrClosedPipe
+				stream.wer.Put(io.ErrClosedPipe)
 				close(stream.wdn)
 			})
 			stream.son.Do(func() {
