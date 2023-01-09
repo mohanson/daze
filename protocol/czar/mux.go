@@ -25,6 +25,7 @@ type Stream struct {
 
 // Close implements io.Closer.
 func (s *Stream) Close() error {
+	var err error
 	s.ron.Do(func() {
 		s.rer = io.ErrClosedPipe
 		close(s.rdn)
@@ -34,10 +35,10 @@ func (s *Stream) Close() error {
 		close(s.wdn)
 	})
 	s.son.Do(func() {
-		s.mux.Write([]byte{s.idx, 0x02, 0x00, 0x00})
+		_, err = s.mux.Write([]byte{s.idx, 0x02, 0x00, 0x00})
 		s.idp <- s.idx
 	})
-	return nil
+	return err
 }
 
 // Read implements io.Reader.
@@ -60,8 +61,8 @@ func (s *Stream) Read(p []byte) (int, error) {
 		return n, nil
 	case <-s.rdn:
 		return 0, s.rer
-	case <-s.mux.done:
-		return 0, s.mux.rerr
+	case <-s.mux.rdn:
+		return 0, s.mux.rer
 	}
 }
 
@@ -118,12 +119,12 @@ func NewStream(idx uint8, mux *Mux) *Stream {
 // Mux is used to wrap a reliable ordered connection and to multiplex it into multiple streams.
 type Mux struct {
 	accept chan *Stream
-	conn   net.Conn
-	done   chan struct{}
-	idpool chan uint8
-	lock   sync.Mutex
-	rerr   error
+	idp    chan uint8
+	rdn    chan struct{}
+	rer    error
+	socket net.Conn
 	stream []*Stream
+	wmu    sync.Mutex
 }
 
 // Accept is used to block until the next available stream is ready to be accepted.
@@ -134,19 +135,19 @@ func (m *Mux) Accept() chan *Stream {
 // Close closes the connection.
 // Any blocked Read or Write operations will be unblocked and return errors.
 func (m *Mux) Close() error {
-	return m.conn.Close()
+	return m.socket.Close()
 }
 
 // Open is used to create a new stream as a net.Conn.
 func (m *Mux) Open() (*Stream, error) {
-	idx := <-m.idpool
+	idx := <-m.idp
 	_, err := m.Write([]byte{idx, 0x00, 0x00, 0x00})
 	if err != nil {
-		m.idpool <- idx
+		m.idp <- idx
 		return nil, err
 	}
 	stream := NewStream(idx, m)
-	stream.idp = m.idpool
+	stream.idp = m.idp
 	m.stream[idx] = stream
 	return stream, nil
 }
@@ -155,9 +156,9 @@ func (m *Mux) Open() (*Stream, error) {
 func (m *Mux) Spawn() {
 	for {
 		buf := make([]byte, 2048)
-		_, err := io.ReadFull(m.conn, buf[:4])
+		_, err := io.ReadFull(m.socket, buf[:4])
 		if err != nil {
-			m.rerr = err
+			m.rer = err
 			break
 		}
 		idx := buf[0]
@@ -179,7 +180,7 @@ func (m *Mux) Spawn() {
 		case 0x01:
 			length := binary.BigEndian.Uint16(buf[2:4])
 			end := length + 4
-			_, err := io.ReadFull(m.conn, buf[4:end])
+			_, err := io.ReadFull(m.socket, buf[4:end])
 			if err != nil {
 				break
 			}
@@ -204,26 +205,26 @@ func (m *Mux) Spawn() {
 		}
 	}
 	close(m.accept)
-	close(m.done)
+	close(m.rdn)
 }
 
 // Write writes data to the connection.
 func (m *Mux) Write(b []byte) (int, error) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	return m.conn.Write(b)
+	m.wmu.Lock()
+	defer m.wmu.Unlock()
+	return m.socket.Write(b)
 }
 
 // NewMux returns a new Mux.
 func NewMux(conn net.Conn) *Mux {
 	m := &Mux{
 		accept: make(chan *Stream),
-		conn:   conn,
-		done:   make(chan struct{}),
-		idpool: nil,
-		lock:   sync.Mutex{},
-		rerr:   nil,
+		idp:    nil,
+		rdn:    make(chan struct{}),
+		rer:    nil,
+		socket: conn,
 		stream: make([]*Stream, 256),
+		wmu:    sync.Mutex{},
 	}
 	go m.Spawn()
 	return m
@@ -256,6 +257,6 @@ func NewMuxClient(conn net.Conn) *Mux {
 		idp <- uint8(i)
 	}
 	mux := NewMux(conn)
-	mux.idpool = idp
+	mux.idp = idp
 	return mux
 }
