@@ -25,14 +25,10 @@ type Stream struct {
 
 // Close implements io.Closer.
 func (s *Stream) Close() error {
-	s.ron.Do(func() {
-		s.rer.Put(io.ErrClosedPipe)
-		close(s.rdn)
-	})
-	s.won.Do(func() {
-		s.wer.Put(io.ErrClosedPipe)
-		close(s.wdn)
-	})
+	s.rer.Put(io.ErrClosedPipe)
+	s.wer.Put(io.ErrClosedPipe)
+	s.ron.Do(func() { close(s.rdn) })
+	s.won.Do(func() { close(s.wdn) })
 	s.son.Do(func() {
 		s.mux.Write([]byte{s.idx, 0x02, 0x00, 0x00})
 		s.idp <- s.idx
@@ -171,8 +167,8 @@ func (m *Mux) Spawn() {
 			m.usb[idx] = stm
 			m.ach <- stm
 		case 0x01:
-			length := binary.BigEndian.Uint16(buf[2:4])
-			end := length + 4
+			bsz := binary.BigEndian.Uint16(buf[2:4])
+			end := bsz + 4
 			_, err := io.ReadFull(m.con, buf[4:end])
 			if err != nil {
 				break
@@ -184,17 +180,11 @@ func (m *Mux) Spawn() {
 			}
 		case 0x02:
 			stm := m.usb[idx]
-			stm.ron.Do(func() {
-				stm.rer.Put(io.EOF)
-				close(stm.rdn)
-			})
-			stm.won.Do(func() {
-				stm.wer.Put(io.ErrClosedPipe)
-				close(stm.wdn)
-			})
-			stm.son.Do(func() {
-				stm.idp <- stm.idx
-			})
+			stm.rer.Put(io.EOF)
+			stm.wer.Put(io.ErrClosedPipe)
+			stm.ron.Do(func() { close(stm.rdn) })
+			stm.won.Do(func() { close(stm.wdn) })
+			stm.son.Do(func() { stm.idp <- stm.idx })
 		}
 	}
 	close(m.ach)
@@ -210,7 +200,7 @@ func (m *Mux) Write(b []byte) (int, error) {
 
 // NewMux returns a new Mux.
 func NewMux(conn net.Conn) *Mux {
-	m := &Mux{
+	mux := &Mux{
 		ach: make(chan *Stream),
 		con: conn,
 		idp: nil,
@@ -219,8 +209,8 @@ func NewMux(conn net.Conn) *Mux {
 		usb: make([]*Stream, 256),
 		wmu: sync.Mutex{},
 	}
-	go m.Spawn()
-	return m
+	go mux.Spawn()
+	return mux
 }
 
 // NewMuxServer returns a new MuxServer.
