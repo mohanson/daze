@@ -5,8 +5,6 @@ import (
 	"io"
 	"net"
 	"sync"
-
-	"github.com/godump/doa"
 )
 
 // A Stream managed by the multiplexer.
@@ -22,6 +20,7 @@ type Stream struct {
 	wer error
 	wdn chan struct{}
 	won sync.Once
+	con sync.Once
 }
 
 // Close implements io.Closer.
@@ -33,7 +32,8 @@ func (s *Stream) Close() error {
 	s.won.Do(func() {
 		s.wer = io.ErrClosedPipe
 		close(s.wdn)
-		// Errors can be safely ignored.
+	})
+	s.con.Do(func() {
 		s.mux.Write([]byte{s.idx, 0x02, 0x00, 0x00})
 		s.idp <- s.idx
 	})
@@ -52,6 +52,13 @@ func (s *Stream) Read(p []byte) (int, error) {
 		n := copy(p, s.rbf)
 		s.rbf = s.rbf[n:]
 		return n, nil
+	default:
+	}
+	select {
+	case s.rbf = <-s.rch:
+		n := copy(p, s.rbf)
+		s.rbf = s.rbf[n:]
+		return n, nil
 	case <-s.rdn:
 		return 0, s.rer
 	case <-s.mux.done:
@@ -59,53 +66,36 @@ func (s *Stream) Read(p []byte) (int, error) {
 	}
 }
 
-// A low level function, the length of the data to be written is always less than packet body size.
-func (s *Stream) write(p []byte) (int, error) {
-	select {
-	case <-s.wdn:
-		return 0, s.wer
-	default:
-	}
-	doa.Doa(len(p) != 0)
-	doa.Doa(len(p) <= 2044)
-	buf := make([]byte, 4+len(p))
-	buf[0] = s.idx
-	buf[1] = 0x01
-	binary.BigEndian.PutUint16(buf[2:4], uint16(len(p)))
-	copy(buf[4:], p)
-	_, err := s.mux.Write(buf)
-	if err != nil {
-		s.won.Do(func() {
-			s.wer = err
-			close(s.wdn)
-		})
-		// In the czar protocol, data is sent as packet, if a packet is not fully sent, it is considered unsent.
-		return 0, err
-	}
-	return len(p), err
-}
-
 // Write implements io.Writer.
 func (s *Stream) Write(p []byte) (int, error) {
-	f := 0
-	e := f + 2044
 	n := 0
-	for e < len(p) {
-		m, err := s.write(p[f:e])
-		n += m
-		if err != nil {
-			return n, err
+	l := 0
+	b := make([]byte, 2048)
+	b[0] = s.idx
+	b[1] = 0x01
+	for {
+		switch {
+		case len(p) >= 2044:
+			l = 2044
+		case len(p) >= 1:
+			l = len(p)
+		case len(p) >= 0:
+			return n, nil
 		}
-		f = e
-		e = f + 2044
+		binary.BigEndian.PutUint16(b[2:4], uint16(l))
+		copy(b[4:], p[:l])
+		p = p[l:]
+		select {
+		case <-s.wdn:
+			return n, s.wer
+		default:
+			_, err := s.mux.Write(b[:4+l])
+			if err != nil {
+				return n, err
+			}
+			n += l
+		}
 	}
-	m, err := s.write(p[f:])
-	if err != nil {
-		return n, err
-	}
-	n += m
-	doa.Doa(len(p) == n)
-	return n, err
 }
 
 // NewStream returns a new Stream.
@@ -125,7 +115,7 @@ func NewStream(idx uint8, mux *Mux) *Stream {
 	}
 }
 
-// Mux implemented the czar mux protocol.
+// Mux is used to wrap a reliable ordered connection and to multiplex it into multiple streams.
 type Mux struct {
 	accept chan *Stream
 	conn   net.Conn
@@ -204,6 +194,13 @@ func (m *Mux) Spawn() {
 				stream.rer = io.EOF
 				close(stream.rdn)
 			})
+			stream.won.Do(func() {
+				stream.wer = io.ErrClosedPipe
+				close(stream.wdn)
+			})
+			stream.con.Do(func() {
+				stream.idp <- stream.idx
+			})
 		}
 	}
 	close(m.accept)
@@ -244,6 +241,8 @@ func NewMuxServer(conn net.Conn) *Mux {
 		stream.won.Do(func() {
 			stream.wer = io.ErrClosedPipe
 			close(stream.wdn)
+		})
+		stream.con.Do(func() {
 		})
 		mux.stream[i] = stream
 	}
