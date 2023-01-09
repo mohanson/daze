@@ -9,7 +9,6 @@ import (
 
 // A Stream managed by the multiplexer.
 type Stream struct {
-	con sync.Once
 	idp chan uint8
 	idx uint8
 	mux *Mux
@@ -18,6 +17,7 @@ type Stream struct {
 	rer error
 	rdn chan struct{}
 	ron sync.Once
+	son sync.Once
 	wer error
 	wdn chan struct{}
 	won sync.Once
@@ -33,7 +33,7 @@ func (s *Stream) Close() error {
 		s.wer = io.ErrClosedPipe
 		close(s.wdn)
 	})
-	s.con.Do(func() {
+	s.son.Do(func() {
 		s.mux.Write([]byte{s.idx, 0x02, 0x00, 0x00})
 		s.idp <- s.idx
 	})
@@ -101,7 +101,6 @@ func (s *Stream) Write(p []byte) (int, error) {
 // NewStream returns a new Stream.
 func NewStream(idx uint8, mux *Mux) *Stream {
 	return &Stream{
-		con: sync.Once{},
 		idp: nil,
 		idx: idx,
 		mux: mux,
@@ -110,6 +109,7 @@ func NewStream(idx uint8, mux *Mux) *Stream {
 		rer: nil,
 		rdn: make(chan struct{}),
 		ron: sync.Once{},
+		son: sync.Once{},
 		wer: nil,
 		wdn: make(chan struct{}),
 		won: sync.Once{},
@@ -199,7 +199,7 @@ func (m *Mux) Spawn() {
 				stream.wer = io.ErrClosedPipe
 				close(stream.wdn)
 			})
-			stream.con.Do(func() {
+			stream.son.Do(func() {
 				stream.idp <- stream.idx
 			})
 		}
@@ -243,7 +243,7 @@ func NewMuxServer(conn net.Conn) *Mux {
 			stream.wer = io.ErrClosedPipe
 			close(stream.wdn)
 		})
-		stream.con.Do(func() {
+		stream.son.Do(func() {
 		})
 		mux.stream[i] = stream
 	}
