@@ -234,16 +234,8 @@ func NewMuxServer(conn net.Conn) *Mux {
 	mux := NewMux(conn)
 	for i := 0; i < 256; i++ {
 		stream := NewStream(uint8(i), mux)
-		stream.ron.Do(func() {
-			stream.rer = io.ErrClosedPipe
-			close(stream.rdn)
-		})
-		stream.won.Do(func() {
-			stream.wer = io.ErrClosedPipe
-			close(stream.wdn)
-		})
-		stream.son.Do(func() {
-		})
+		stream.son.Do(func() {})
+		stream.Close()
 		mux.stream[i] = stream
 	}
 	return mux
