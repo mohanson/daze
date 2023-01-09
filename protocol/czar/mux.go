@@ -88,12 +88,12 @@ func (s *Stream) Write(p []byte) (int, error) {
 		case <-s.wdn:
 			return n, s.wer
 		default:
-			_, err := s.mux.Write(b[:4+l])
-			if err != nil {
-				return n, err
-			}
-			n += l
 		}
+		_, err := s.mux.Write(b[:4+l])
+		if err != nil {
+			return n, err
+		}
+		n += l
 	}
 }
 
