@@ -47,12 +47,11 @@ func (s *Stream) Read(p []byte) (int, error) {
 		s.rbf = s.rbf[n:]
 		return n, nil
 	}
-	select {
-	case s.rbf = <-s.rch:
+	if len(s.rch) != 0 {
+		s.rbf = <-s.rch
 		n := copy(p, s.rbf)
 		s.rbf = s.rbf[n:]
 		return n, nil
-	default:
 	}
 	select {
 	case s.rbf = <-s.rch:
