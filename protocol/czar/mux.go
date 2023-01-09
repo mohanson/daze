@@ -165,12 +165,8 @@ func (m *Mux) Spawn() {
 		switch cmd {
 		case 0x00:
 			// Make sure the stream has been closed properly.
-			select {
-			case <-m.stream[idx].rdn:
-			case <-m.stream[idx].wdn:
-			default:
-				panic("unreachable")
-			}
+			<-m.stream[idx].rdn
+			<-m.stream[idx].wdn
 			stream := NewStream(idx, m)
 			// The mux server does not need to using an id pool.
 			stream.idp = make(chan uint8, 1)
