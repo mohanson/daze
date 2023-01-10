@@ -9,31 +9,27 @@ import (
 
 // A Stream managed by the multiplexer.
 type Stream struct {
-	con sync.Once
 	idp chan uint8
 	idx uint8
 	mux *Mux
 	rbf []byte
 	rch chan []byte
-	rer error
+	rer Err
 	rdn chan struct{}
 	ron sync.Once
-	wer error
+	son sync.Once
+	wer Err
 	wdn chan struct{}
 	won sync.Once
 }
 
 // Close implements io.Closer.
 func (s *Stream) Close() error {
-	s.ron.Do(func() {
-		s.rer = io.ErrClosedPipe
-		close(s.rdn)
-	})
-	s.won.Do(func() {
-		s.wer = io.ErrClosedPipe
-		close(s.wdn)
-	})
-	s.con.Do(func() {
+	s.rer.Put(io.ErrClosedPipe)
+	s.wer.Put(io.ErrClosedPipe)
+	s.ron.Do(func() { close(s.rdn) })
+	s.won.Do(func() { close(s.wdn) })
+	s.son.Do(func() {
 		s.mux.Write([]byte{s.idx, 0x02, 0x00, 0x00})
 		s.idp <- s.idx
 	})
@@ -47,12 +43,11 @@ func (s *Stream) Read(p []byte) (int, error) {
 		s.rbf = s.rbf[n:]
 		return n, nil
 	}
-	select {
-	case s.rbf = <-s.rch:
+	if len(s.rch) != 0 {
+		s.rbf = <-s.rch
 		n := copy(p, s.rbf)
 		s.rbf = s.rbf[n:]
 		return n, nil
-	default:
 	}
 	select {
 	case s.rbf = <-s.rch:
@@ -60,9 +55,9 @@ func (s *Stream) Read(p []byte) (int, error) {
 		s.rbf = s.rbf[n:]
 		return n, nil
 	case <-s.rdn:
-		return 0, s.rer
-	case <-s.mux.done:
-		return 0, s.mux.rerr
+		return 0, s.rer.err
+	case <-s.mux.rdn:
+		return 0, s.mux.rer
 	}
 }
 
@@ -85,32 +80,30 @@ func (s *Stream) Write(p []byte) (int, error) {
 		binary.BigEndian.PutUint16(b[2:4], uint16(l))
 		copy(b[4:], p[:l])
 		p = p[l:]
-		select {
-		case <-s.wdn:
-			return n, s.wer
-		default:
-			_, err := s.mux.Write(b[:4+l])
-			if err != nil {
-				return n, err
-			}
-			n += l
+		if err := s.wer.Get(); err != nil {
+			return n, err
 		}
+		_, err := s.mux.Write(b[:4+l])
+		if err != nil {
+			return n, err
+		}
+		n += l
 	}
 }
 
 // NewStream returns a new Stream.
 func NewStream(idx uint8, mux *Mux) *Stream {
 	return &Stream{
-		con: sync.Once{},
 		idp: nil,
 		idx: idx,
 		mux: mux,
 		rbf: make([]byte, 0),
 		rch: make(chan []byte, 32),
-		rer: nil,
+		rer: Err{},
 		rdn: make(chan struct{}),
 		ron: sync.Once{},
-		wer: nil,
+		son: sync.Once{},
+		wer: Err{},
 		wdn: make(chan struct{}),
 		won: sync.Once{},
 	}
@@ -118,47 +111,47 @@ func NewStream(idx uint8, mux *Mux) *Stream {
 
 // Mux is used to wrap a reliable ordered connection and to multiplex it into multiple streams.
 type Mux struct {
-	accept chan *Stream
-	conn   net.Conn
-	done   chan struct{}
-	idpool chan uint8
-	lock   sync.Mutex
-	rerr   error
-	stream []*Stream
+	ach chan *Stream
+	con net.Conn
+	idp chan uint8
+	rdn chan struct{}
+	rer error
+	usb []*Stream
+	wmu sync.Mutex
 }
 
 // Accept is used to block until the next available stream is ready to be accepted.
 func (m *Mux) Accept() chan *Stream {
-	return m.accept
+	return m.ach
 }
 
 // Close closes the connection.
 // Any blocked Read or Write operations will be unblocked and return errors.
 func (m *Mux) Close() error {
-	return m.conn.Close()
+	return m.con.Close()
 }
 
 // Open is used to create a new stream as a net.Conn.
 func (m *Mux) Open() (*Stream, error) {
-	idx := <-m.idpool
+	idx := <-m.idp
 	_, err := m.Write([]byte{idx, 0x00, 0x00, 0x00})
 	if err != nil {
-		m.idpool <- idx
+		m.idp <- idx
 		return nil, err
 	}
-	stream := NewStream(idx, m)
-	stream.idp = m.idpool
-	m.stream[idx] = stream
-	return stream, nil
+	stm := NewStream(idx, m)
+	stm.idp = m.idp
+	m.usb[idx] = stm
+	return stm, nil
 }
 
 // Spawn continues to receive data until a fatal error is encountered.
 func (m *Mux) Spawn() {
 	for {
 		buf := make([]byte, 2048)
-		_, err := io.ReadFull(m.conn, buf[:4])
+		_, err := io.ReadFull(m.con, buf[:4])
 		if err != nil {
-			m.rerr = err
+			m.rer = err
 			break
 		}
 		idx := buf[0]
@@ -166,86 +159,68 @@ func (m *Mux) Spawn() {
 		switch cmd {
 		case 0x00:
 			// Make sure the stream has been closed properly.
-			select {
-			case <-m.stream[idx].rdn:
-			case <-m.stream[idx].wdn:
-			default:
-				panic("unreachable")
-			}
-			stream := NewStream(idx, m)
+			<-m.usb[idx].rdn
+			<-m.usb[idx].wdn
+			stm := NewStream(idx, m)
 			// The mux server does not need to using an id pool.
-			stream.idp = make(chan uint8, 1)
-			m.stream[idx] = stream
-			m.accept <- stream
+			stm.idp = make(chan uint8, 1)
+			m.usb[idx] = stm
+			m.ach <- stm
 		case 0x01:
-			length := binary.BigEndian.Uint16(buf[2:4])
-			end := length + 4
-			_, err := io.ReadFull(m.conn, buf[4:end])
+			bsz := binary.BigEndian.Uint16(buf[2:4])
+			end := bsz + 4
+			_, err := io.ReadFull(m.con, buf[4:end])
 			if err != nil {
 				break
 			}
-			stream := m.stream[idx]
+			stm := m.usb[idx]
 			select {
-			case stream.rch <- buf[4:end]:
-			case <-stream.rdn:
+			case stm.rch <- buf[4:end]:
+			case <-stm.rdn:
 			}
 		case 0x02:
-			stream := m.stream[idx]
-			stream.ron.Do(func() {
-				stream.rer = io.EOF
-				close(stream.rdn)
-			})
-			stream.won.Do(func() {
-				stream.wer = io.ErrClosedPipe
-				close(stream.wdn)
-			})
-			stream.con.Do(func() {
-				stream.idp <- stream.idx
-			})
+			stm := m.usb[idx]
+			stm.rer.Put(io.EOF)
+			stm.wer.Put(io.ErrClosedPipe)
+			stm.ron.Do(func() { close(stm.rdn) })
+			stm.won.Do(func() { close(stm.wdn) })
+			stm.son.Do(func() { stm.idp <- stm.idx })
 		}
 	}
-	close(m.accept)
-	close(m.done)
+	close(m.ach)
+	close(m.rdn)
 }
 
 // Write writes data to the connection.
 func (m *Mux) Write(b []byte) (int, error) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
-	return m.conn.Write(b)
+	m.wmu.Lock()
+	defer m.wmu.Unlock()
+	return m.con.Write(b)
 }
 
 // NewMux returns a new Mux.
 func NewMux(conn net.Conn) *Mux {
-	m := &Mux{
-		accept: make(chan *Stream),
-		conn:   conn,
-		done:   make(chan struct{}),
-		idpool: nil,
-		lock:   sync.Mutex{},
-		rerr:   nil,
-		stream: make([]*Stream, 256),
+	mux := &Mux{
+		ach: make(chan *Stream),
+		con: conn,
+		idp: nil,
+		rdn: make(chan struct{}),
+		rer: nil,
+		usb: make([]*Stream, 256),
+		wmu: sync.Mutex{},
 	}
-	go m.Spawn()
-	return m
+	go mux.Spawn()
+	return mux
 }
 
 // NewMuxServer returns a new MuxServer.
 func NewMuxServer(conn net.Conn) *Mux {
 	mux := NewMux(conn)
 	for i := 0; i < 256; i++ {
-		stream := NewStream(uint8(i), mux)
-		stream.ron.Do(func() {
-			stream.rer = io.ErrClosedPipe
-			close(stream.rdn)
-		})
-		stream.won.Do(func() {
-			stream.wer = io.ErrClosedPipe
-			close(stream.wdn)
-		})
-		stream.con.Do(func() {
-		})
-		mux.stream[i] = stream
+		stm := NewStream(uint8(i), mux)
+		stm.son.Do(func() {})
+		stm.Close()
+		mux.usb[i] = stm
 	}
 	return mux
 }
@@ -257,6 +232,6 @@ func NewMuxClient(conn net.Conn) *Mux {
 		idp <- uint8(i)
 	}
 	mux := NewMux(conn)
-	mux.idpool = idp
+	mux.idp = idp
 	return mux
 }

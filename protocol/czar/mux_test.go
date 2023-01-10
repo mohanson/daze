@@ -67,7 +67,7 @@ func TestProtocolMuxClientClose(t *testing.T) {
 	cli := doa.Try(mux.Open())
 	defer cli.Close()
 
-	mux.conn.Close()
+	mux.con.Close()
 	buf := make([]byte, 2048)
 	er0 := doa.Err(mux.Open())
 	doa.Doa(strings.Contains(er0.Error(), "use of closed network connection"))
