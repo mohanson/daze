@@ -27,7 +27,7 @@ var Conf = struct {
 }{
 	PathRule: "/rule.ls",
 	PathCIDR: "/rule.cidr",
-	Version:  "1.18.0",
+	Version:  "1.18.1",
 }
 
 const helpMsg = `Usage: daze <command> [<args>]
@@ -51,7 +51,7 @@ If no region is specified, an empty cidr list is generated.
 func main() {
 	if len(os.Args) <= 1 {
 		fmt.Println(helpMsg)
-		os.Exit(0)
+		return
 	}
 	// Initialize random source.
 	rand.Seed(time.Now().UnixNano())
@@ -179,8 +179,5 @@ func main() {
 		}
 	case "ver":
 		fmt.Println("daze", Conf.Version)
-	default:
-		fmt.Println(helpMsg)
-		os.Exit(0)
 	}
 }
