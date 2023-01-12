@@ -1,8 +1,8 @@
 # RULE file aims to be a minimal configuration file format that's easy to read
-# due to obvious semantics. There are two parts per line on the RULE file:
-# mode and glob. mode is on the left of the space sign and glob is on the
-# right. mode is a character that describes whether the host should be accessed
-# through a proxy, and the glob is a glob-style string.
+# due to obvious semantics. Each line in the file represents a rule, and each
+# rule consists of mode and glob. Mode is a character that describes whether
+# the host should be accessed through a proxy, and the glob is a glob-style
+# string.
 #
 # Glob patterns:
 #   h?llo matches hello, hallo and hxllo
@@ -19,3 +19,10 @@
 # L(ocale) means using locale network
 # R(emote) means using remote network
 # B(anned) means block it
+
+R   google.cn
+R *.google.cn
+R   google.com
+R *.google.com
+R   googleapis.com
+R *.googleapis.com
