@@ -40,14 +40,14 @@ Build results will be saved in the directory `bin`. You can just keep this direc
 Daze is dead simple to use:
 
 ```sh
-# server port
-# you need a machine that can access the Internet, and enter the following command:
+# Server side
+# You need a machine that can access the Internet, and enter the following command:
 $ daze server -l 0.0.0.0:1081 -k $PASSWORD
 
-# client port
-# use the following command to link your server(replace $SERVER with your server IP):
+# Client size
+# Use the following command to link your server(replace $SERVER with your server IP):
 $ daze client -s $SERVER:1081 -k $PASSWORD
-# now, you are free to visit the Internet
+# Now, you are free to visit the Internet
 $ curl -x socks5://127.0.0.1:1080 google.com
 ```
 
@@ -57,7 +57,7 @@ For users who have already finished tutorials, here is an advanced guide.
 
 ## Platforms
 
-daze is implemented in pure Go language, so it can run on almost any operating system. The following are only the browsers/operating system commonly used by me:
+Daze is implemented in pure Go language, so it can run on almost any operating system. The following are only the browsers/operating system commonly used by me:
 
 ### Android
 
