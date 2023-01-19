@@ -192,7 +192,7 @@ func (m *Mux) Spawn() {
 	close(m.rdn)
 }
 
-// Write writes data to the connection.
+// Write writes data to the connection. The code implements a simple priority write using two locks.
 func (m *Mux) Write(priority int, b []byte) (int, error) {
 	if priority >= 1 {
 		m.wm1.Lock()
