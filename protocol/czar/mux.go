@@ -30,7 +30,7 @@ func (s *Stream) Close() error {
 	s.ron.Do(func() { close(s.rdn) })
 	s.won.Do(func() { close(s.wdn) })
 	s.son.Do(func() {
-		s.mux.Write([]byte{s.idx, 0x02, 0x00, 0x00})
+		s.mux.Write(0, []byte{s.idx, 0x02, 0x00, 0x00})
 		s.idp <- s.idx
 	})
 	return nil
@@ -83,7 +83,7 @@ func (s *Stream) Write(p []byte) (int, error) {
 		if err := s.wer.Get(); err != nil {
 			return n, err
 		}
-		_, err := s.mux.Write(b[:4+l])
+		_, err := s.mux.Write(1, b[:4+l])
 		if err != nil {
 			return n, err
 		}
@@ -117,7 +117,8 @@ type Mux struct {
 	rdn chan struct{}
 	rer error
 	usb []*Stream
-	wmu sync.Mutex
+	wm0 sync.Mutex
+	wm1 sync.Mutex
 }
 
 // Accept is used to block until the next available stream is ready to be accepted.
@@ -134,7 +135,7 @@ func (m *Mux) Close() error {
 // Open is used to create a new stream as a net.Conn.
 func (m *Mux) Open() (*Stream, error) {
 	idx := <-m.idp
-	_, err := m.Write([]byte{idx, 0x00, 0x00, 0x00})
+	_, err := m.Write(0, []byte{idx, 0x00, 0x00, 0x00})
 	if err != nil {
 		m.idp <- idx
 		return nil, err
@@ -191,11 +192,18 @@ func (m *Mux) Spawn() {
 	close(m.rdn)
 }
 
-// Write writes data to the connection.
-func (m *Mux) Write(b []byte) (int, error) {
-	m.wmu.Lock()
-	defer m.wmu.Unlock()
-	return m.con.Write(b)
+// Write writes data to the connection. The code implements a simple priority write using two locks.
+func (m *Mux) Write(priority int, b []byte) (int, error) {
+	if priority >= 1 {
+		m.wm1.Lock()
+	}
+	m.wm0.Lock()
+	n, err := m.con.Write(b)
+	m.wm0.Unlock()
+	if priority >= 1 {
+		m.wm1.Unlock()
+	}
+	return n, err
 }
 
 // NewMux returns a new Mux.
@@ -207,7 +215,8 @@ func NewMux(conn net.Conn) *Mux {
 		rdn: make(chan struct{}),
 		rer: nil,
 		usb: make([]*Stream, 256),
-		wmu: sync.Mutex{},
+		wm0: sync.Mutex{},
+		wm1: sync.Mutex{},
 	}
 	go mux.Spawn()
 	return mux
