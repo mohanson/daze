@@ -154,9 +154,9 @@ func (c *Client) Run() {
 				continue
 			case <-mux.rdn:
 			}
-			log.Println("czar: mux done")
 			break
 		}
+		log.Println("czar: mux done")
 	}
 }
 
