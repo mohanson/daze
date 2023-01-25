@@ -609,6 +609,21 @@ type RouterIPNet struct {
 	B []*net.IPNet
 }
 
+// FromReader loads a CIDR file from reader.
+func (r *RouterIPNet) FromReader(f io.Reader) error {
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		_, cidr, err := net.ParseCIDR(line)
+		doa.Nil(err)
+		r.L = append(r.L, cidr)
+	}
+	return scanner.Err()
+}
+
 // Road implements daze.Router.
 func (r *RouterIPNet) Road(ctx *Context, host string) Road {
 	l, err := net.DefaultResolver.LookupIPAddr(context.Background(), host)
@@ -641,62 +656,6 @@ func NewRouterIPNet() *RouterIPNet {
 		L: []*net.IPNet{},
 		R: []*net.IPNet{},
 		B: []*net.IPNet{},
-	}
-}
-
-// FromReader loads a CIDR file from reader.
-func (r *RouterIPNet) FromReader(f io.Reader) error {
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		_, cidr, err := net.ParseCIDR(line)
-		doa.Nil(err)
-		r.L = append(r.L, cidr)
-	}
-	return scanner.Err()
-}
-
-// FromReserved loads reserved ip addresses.
-//
-// Introduction:
-// See https://en.wikipedia.org/wiki/Reserved_IP_addresses
-func (r *RouterIPNet) FromReserved() {
-	for _, e := range [][2]string{
-		// IPv4
-		{"00000000", "FF000000"},
-		{"0A000000", "FF000000"},
-		{"7F000000", "FF000000"},
-		{"A9FE0000", "FFFF0000"},
-		{"AC100000", "FFF00000"},
-		{"C0000000", "FFFFFFF8"},
-		{"C00000AA", "FFFFFFFE"},
-		{"C0000200", "FFFFFF00"},
-		{"C0A80000", "FFFF0000"},
-		{"C6120000", "FFFE0000"},
-		{"C6336400", "FFFFFF00"},
-		{"CB007100", "FFFFFF00"},
-		{"F0000000", "F0000000"},
-		{"FFFFFFFF", "FFFFFFFF"},
-		// IPv6
-		{"00000000000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
-		{"00000000000000000000000000000001", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
-		{"01000000000000000000000000000000", "FFFFFFFFFFFFFFFF0000000000000000"},
-		{"0064FF9B000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFF00000000"},
-		{"20010000000000000000000000000000", "FFFFFFFF000000000000000000000000"},
-		{"20010010000000000000000000000000", "FFFFFFF0000000000000000000000000"},
-		{"20010020000000000000000000000000", "FFFFFFF0000000000000000000000000"},
-		{"20010DB8000000000000000000000000", "FFFFFFFF000000000000000000000000"},
-		{"20020000000000000000000000000000", "FFFF0000000000000000000000000000"},
-		{"FC000000000000000000000000000000", "FE000000000000000000000000000000"},
-		{"FE800000000000000000000000000000", "FFC00000000000000000000000000000"},
-		{"FF000000000000000000000000000000", "FF000000000000000000000000000000"},
-	} {
-		i := doa.Try(hex.DecodeString(e[0]))
-		m := doa.Try(hex.DecodeString(e[1]))
-		r.L = append(r.L, &net.IPNet{IP: i, Mask: m})
 	}
 }
 
@@ -894,7 +853,7 @@ func NewAimbot(client Dialer, option *AimbotOption) *Aimbot {
 		if option.Type == "remote" {
 			routerLocal := NewRouterIPNet()
 			log.Println("main: load rule reserved IPv4/6 CIDRs")
-			routerLocal.FromReserved()
+			routerLocal.L = LoadReservedIP()
 			routerRight := NewRouterRight(RoadRemote)
 			routerChain := NewRouterChain(routerLocal, routerRight)
 			routerCache := NewRouterCache(routerChain)
@@ -909,7 +868,7 @@ func NewAimbot(client Dialer, option *AimbotOption) *Aimbot {
 
 			routerLocal := NewRouterIPNet()
 			log.Println("main: load rule reserved IPv4/6 CIDRs")
-			routerLocal.FromReserved()
+			routerLocal.L = LoadReservedIP()
 
 			log.Println("main: load rule", option.Cidr)
 			f2 := doa.Try(OpenFile(option.Cidr))
@@ -1079,6 +1038,49 @@ func LoadApnic() map[string][]*net.IPNet {
 			doa.Nil(err)
 			r[seps[1]] = append(r[seps[1]], cidr)
 		}
+	}
+	return r
+}
+
+// LoadReservedIP loads reserved ip addresses.
+//
+// Introduction:
+// See https://en.wikipedia.org/wiki/Reserved_IP_addresses
+func LoadReservedIP() []*net.IPNet {
+	r := []*net.IPNet{}
+	for _, e := range [][2]string{
+		// IPv4
+		{"00000000", "FF000000"},
+		{"0A000000", "FF000000"},
+		{"7F000000", "FF000000"},
+		{"A9FE0000", "FFFF0000"},
+		{"AC100000", "FFF00000"},
+		{"C0000000", "FFFFFFF8"},
+		{"C00000AA", "FFFFFFFE"},
+		{"C0000200", "FFFFFF00"},
+		{"C0A80000", "FFFF0000"},
+		{"C6120000", "FFFE0000"},
+		{"C6336400", "FFFFFF00"},
+		{"CB007100", "FFFFFF00"},
+		{"F0000000", "F0000000"},
+		{"FFFFFFFF", "FFFFFFFF"},
+		// IPv6
+		{"00000000000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
+		{"00000000000000000000000000000001", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
+		{"01000000000000000000000000000000", "FFFFFFFFFFFFFFFF0000000000000000"},
+		{"0064FF9B000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFF00000000"},
+		{"20010000000000000000000000000000", "FFFFFFFF000000000000000000000000"},
+		{"20010010000000000000000000000000", "FFFFFFF0000000000000000000000000"},
+		{"20010020000000000000000000000000", "FFFFFFF0000000000000000000000000"},
+		{"20010DB8000000000000000000000000", "FFFFFFFF000000000000000000000000"},
+		{"20020000000000000000000000000000", "FFFF0000000000000000000000000000"},
+		{"FC000000000000000000000000000000", "FE000000000000000000000000000000"},
+		{"FE800000000000000000000000000000", "FFC00000000000000000000000000000"},
+		{"FF000000000000000000000000000000", "FF000000000000000000000000000000"},
+	} {
+		i := doa.Try(hex.DecodeString(e[0]))
+		m := doa.Try(hex.DecodeString(e[1]))
+		r = append(r, &net.IPNet{IP: i, Mask: m})
 	}
 	return r
 }
