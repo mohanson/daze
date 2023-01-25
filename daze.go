@@ -680,16 +680,36 @@ func NewRouterRight(road Road) *RouterRight {
 type RouterCache struct {
 	Lru *lru.Lru[string, Road]
 	Raw Router
+	Syn sync.Mutex
+}
+
+// LruGet looks up a key's value from the cache.
+func (r *RouterCache) LruGet(host string) Road {
+	r.Syn.Lock()
+	defer r.Syn.Unlock()
+	a, b := r.Lru.GetExists(host)
+	if b {
+		return a
+	}
+	return RoadPuzzle
+}
+
+// LruSet.
+func (r *RouterCache) LruSet(host string, road Road) {
+	r.Syn.Lock()
+	defer r.Syn.Unlock()
+	r.Lru.Set(host, road)
 }
 
 // Road implements daze.Router.
 func (r *RouterCache) Road(ctx *Context, host string) Road {
-	if a, b := r.Lru.GetExists(host); b {
+	a := r.LruGet(host)
+	if a != RoadPuzzle {
 		return a
 	}
-	a := r.Raw.Road(ctx, host)
-	r.Lru.Set(host, a)
-	return a
+	b := r.Raw.Road(ctx, host)
+	r.LruSet(host, b)
+	return b
 }
 
 // NewRouterCache returns a new Cache object.
