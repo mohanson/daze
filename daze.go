@@ -602,47 +602,20 @@ type Router interface {
 	Road(ctx *Context, host string) Road
 }
 
-// RouterIPNet is a router by IPNets. It judges whether an IP or domain name is within its range, if so, it returns R,
-// otherwise it returns RoadPuzzle.
+// RouterIPNet is a router by IPNets. It judges whether an IP or domain name is within its range.
 type RouterIPNet struct {
 	L []*net.IPNet
-	R Road
+	R []*net.IPNet
+	B []*net.IPNet
 }
 
-// Road implements daze.Router.
-func (r *RouterIPNet) road(ctx *Context, host string) Road {
-	if len(r.L) == 0 {
-		return RoadPuzzle
-	}
-	l, err := net.DefaultResolver.LookupIPAddr(context.Background(), host)
-	if err != nil {
-		log.Printf("conn: %08x  error %s", ctx.Cid, err)
-		return RoadPuzzle
-	}
-	if len(l) == 0 {
-		return RoadPuzzle
-	}
-	a := l[0]
-	for _, e := range r.L {
-		if e.Contains(a.IP) {
-			return r.R
-		}
-	}
-	return RoadPuzzle
-}
-
-// Road implements daze.Router.
-func (r *RouterIPNet) Road(ctx *Context, host string) Road {
-	road := r.road(ctx, host)
-	log.Printf("conn: %08x  route router=ipnet road=%s", ctx.Cid, road)
-	return road
-}
-
-// FromReader loads a CIDR file from reader.
-func (r *RouterIPNet) FromReader(f io.Reader) error {
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := scanner.Text()
+// FromFile loads a CIDR file.
+func (r *RouterIPNet) FromFile(name string) {
+	f := doa.Try(OpenFile(name))
+	defer f.Close()
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		line := s.Text()
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
@@ -650,14 +623,41 @@ func (r *RouterIPNet) FromReader(f io.Reader) error {
 		doa.Nil(err)
 		r.L = append(r.L, cidr)
 	}
-	return scanner.Err()
+	doa.Nil(s.Err())
+}
+
+// Road implements daze.Router.
+func (r *RouterIPNet) Road(ctx *Context, host string) Road {
+	l, err := net.DefaultResolver.LookupIPAddr(context.Background(), host)
+	if err != nil {
+		log.Printf("conn: %08x  error %s", ctx.Cid, err)
+		return RoadPuzzle
+	}
+	a := l[0]
+	for _, e := range r.L {
+		if e.Contains(a.IP) {
+			return RoadLocale
+		}
+	}
+	for _, e := range r.R {
+		if e.Contains(a.IP) {
+			return RoadRemote
+		}
+	}
+	for _, e := range r.B {
+		if e.Contains(a.IP) {
+			return RoadFucked
+		}
+	}
+	return RoadPuzzle
 }
 
 // NewRouterIPNet returns a new RouterIPNet object.
-func NewRouterIPNet(ipnets []*net.IPNet, road Road) *RouterIPNet {
+func NewRouterIPNet() *RouterIPNet {
 	return &RouterIPNet{
-		L: ipnets,
-		R: road,
+		L: LoadReservedIP(),
+		R: []*net.IPNet{},
+		B: []*net.IPNet{},
 	}
 }
 
@@ -668,7 +668,6 @@ type RouterRight struct {
 
 // Road implements daze.Router.
 func (r *RouterRight) Road(ctx *Context, host string) Road {
-	log.Printf("conn: %08x  route router=right road=%s", ctx.Cid, r.R)
 	return r.R
 }
 
@@ -677,81 +676,47 @@ func NewRouterRight(road Road) *RouterRight {
 	return &RouterRight{R: road}
 }
 
-// NewRouterLocal returns reserved ip addresses.
-//
-// Introduction:
-// See https://en.wikipedia.org/wiki/Reserved_IP_addresses
-func NewRouterLocal() *RouterIPNet {
-	r := []*net.IPNet{}
-	for _, e := range [][2]string{
-		// IPv4
-		{"00000000", "FF000000"},
-		{"0A000000", "FF000000"},
-		{"7F000000", "FF000000"},
-		{"A9FE0000", "FFFF0000"},
-		{"AC100000", "FFF00000"},
-		{"C0000000", "FFFFFFF8"},
-		{"C00000AA", "FFFFFFFE"},
-		{"C0000200", "FFFFFF00"},
-		{"C0A80000", "FFFF0000"},
-		{"C6120000", "FFFE0000"},
-		{"C6336400", "FFFFFF00"},
-		{"CB007100", "FFFFFF00"},
-		{"F0000000", "F0000000"},
-		{"FFFFFFFF", "FFFFFFFF"},
-		// IPv6
-		{"00000000000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
-		{"00000000000000000000000000000001", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
-		{"01000000000000000000000000000000", "FFFFFFFFFFFFFFFF0000000000000000"},
-		{"0064FF9B000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFF00000000"},
-		{"20010000000000000000000000000000", "FFFFFFFF000000000000000000000000"},
-		{"20010010000000000000000000000000", "FFFFFFF0000000000000000000000000"},
-		{"20010020000000000000000000000000", "FFFFFFF0000000000000000000000000"},
-		{"20010DB8000000000000000000000000", "FFFFFFFF000000000000000000000000"},
-		{"20020000000000000000000000000000", "FFFF0000000000000000000000000000"},
-		{"FC000000000000000000000000000000", "FE000000000000000000000000000000"},
-		{"FE800000000000000000000000000000", "FFC00000000000000000000000000000"},
-		{"FF000000000000000000000000000000", "FF000000000000000000000000000000"},
-	} {
-		i := doa.Try(hex.DecodeString(e[0]))
-		m := doa.Try(hex.DecodeString(e[1]))
-		r = append(r, &net.IPNet{IP: i, Mask: m})
-	}
-	return NewRouterIPNet(r, RoadLocale)
-}
-
 // RouterCache cache routing results for next use.
 type RouterCache struct {
-	Pit Router
-	Box *lru.Lru[string, Road]
-	m   sync.Mutex
+	Lru *lru.Lru[string, Road]
+	Raw Router
+	Syn sync.Mutex
 }
 
-// Road implements daze.Router.
-func (r *RouterCache) road(ctx *Context, host string) Road {
-	if a, b := r.Box.GetExists(host); b {
+// LruGet looks up a key's value from the cache.
+func (r *RouterCache) LruGet(host string) Road {
+	r.Syn.Lock()
+	defer r.Syn.Unlock()
+	a, b := r.Lru.GetExists(host)
+	if b {
 		return a
 	}
-	a := r.Pit.Road(ctx, host)
-	r.Box.Set(host, a)
-	return a
+	return RoadPuzzle
+}
+
+// LruSet.
+func (r *RouterCache) LruSet(host string, road Road) {
+	r.Syn.Lock()
+	defer r.Syn.Unlock()
+	r.Lru.Set(host, road)
 }
 
 // Road implements daze.Router.
 func (r *RouterCache) Road(ctx *Context, host string) Road {
-	r.m.Lock()
-	defer r.m.Unlock()
-	road := r.road(ctx, host)
-	log.Printf("conn: %08x  route router=cache road=%s", ctx.Cid, road)
-	return road
+	a := r.LruGet(host)
+	if a != RoadPuzzle {
+		return a
+	}
+	b := r.Raw.Road(ctx, host)
+	r.LruSet(host, b)
+	return b
 }
 
 // NewRouterCache returns a new Cache object.
 func NewRouterCache(r Router) *RouterCache {
 	return &RouterCache{
-		Pit: r,
-		Box: lru.New[string, Road](Conf.RouterLruSize),
-		m:   sync.Mutex{},
+		Lru: lru.New[string, Road](Conf.RouterLruSize),
+		Raw: r,
 	}
 }
 
@@ -761,22 +726,14 @@ type RouterChain struct {
 }
 
 // Road implements daze.Router.
-func (r *RouterChain) road(ctx *Context, host string) Road {
-	var a Road
+func (r *RouterChain) Road(ctx *Context, host string) Road {
 	for _, e := range r.L {
-		a = e.Road(ctx, host)
+		a := e.Road(ctx, host)
 		if a != RoadPuzzle {
 			return a
 		}
 	}
 	return RoadPuzzle
-}
-
-// Road implements daze.Router.
-func (r *RouterChain) Road(ctx *Context, host string) Road {
-	road := r.road(ctx, host)
-	log.Printf("conn: %08x  route router=chain road=%s", ctx.Cid, road)
-	return road
 }
 
 // NewRouterChain returns a new RouterChain.
@@ -813,7 +770,7 @@ type RouterRules struct {
 }
 
 // Road implements daze.Router.
-func (r *RouterRules) road(ctx *Context, host string) Road {
+func (r *RouterRules) Road(ctx *Context, host string) Road {
 	for _, e := range r.L {
 		if doa.Try(filepath.Match(e, host)) {
 			return RoadLocale
@@ -832,18 +789,13 @@ func (r *RouterRules) road(ctx *Context, host string) Road {
 	return RoadPuzzle
 }
 
-// Road implements daze.Router.
-func (r *RouterRules) Road(ctx *Context, host string) Road {
-	road := r.road(ctx, host)
-	log.Printf("conn: %08x  route router=rules road=%s", ctx.Cid, road)
-	return road
-}
-
-// FromReader loads a RULE file from reader.
-func (r *RouterRules) FromReader(f io.Reader) error {
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := scanner.Text()
+// FromFile loads a RULE file.
+func (r *RouterRules) FromFile(name string) {
+	f := doa.Try(OpenFile(name))
+	defer f.Close()
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		line := s.Text()
 		seps := strings.Fields(line)
 		if len(seps) < 2 {
 			continue
@@ -858,7 +810,7 @@ func (r *RouterRules) FromReader(f io.Reader) error {
 			r.B = append(r.B, seps[1:]...)
 		}
 	}
-	return scanner.Err()
+	doa.Nil(s.Err())
 }
 
 // NewRouterRules returns a new RoaderRules.
@@ -883,19 +835,22 @@ func (s *Aimbot) Dial(ctx *Context, network string, address string) (io.ReadWrit
 		dst string
 		err error
 		rwc io.ReadWriteCloser
+		tag Road
 	)
 	log.Printf("conn: %08x   dial network=%s address=%s", ctx.Cid, network, address)
 	dst, _, err = net.SplitHostPort(address)
 	if err != nil {
 		return nil, err
 	}
-	switch s.Router.Road(ctx, dst) {
+	tag = s.Router.Road(ctx, dst)
+	log.Printf("conn: %08x  route road=%s", ctx.Cid, tag)
+	switch tag {
 	case RoadLocale:
 		rwc, err = s.Locale.Dial(ctx, network, address)
 	case RoadRemote:
 		rwc, err = s.Remote.Dial(ctx, network, address)
 	case RoadFucked:
-		err = fmt.Errorf("daze: %s has been blocked", dst)
+		err = fmt.Errorf("conn: %s has been blocked", dst)
 	case RoadPuzzle:
 		rwc, err = s.Remote.Dial(ctx, network, address)
 	}
@@ -920,9 +875,7 @@ func NewAimbot(client Dialer, option *AimbotOption) *Aimbot {
 			return routerRight
 		}
 		if option.Type == "remote" {
-			log.Println("main: load rule reserved IPv4/6 CIDRs")
-			routerLocal := NewRouterLocal()
-			log.Println("main: find", len(routerLocal.L))
+			routerLocal := NewRouterIPNet()
 			routerRight := NewRouterRight(RoadRemote)
 			routerChain := NewRouterChain(routerLocal, routerRight)
 			routerCache := NewRouterCache(routerChain)
@@ -931,24 +884,14 @@ func NewAimbot(client Dialer, option *AimbotOption) *Aimbot {
 		if option.Type == "rule" {
 			log.Println("main: load rule", option.Rule)
 			routerRules := NewRouterRules()
-			f1 := doa.Try(OpenFile(option.Rule))
-			defer f1.Close()
-			doa.Nil(routerRules.FromReader(f1))
-			log.Println("main: find", len(routerRules.L)+len(routerRules.R)+len(routerRules.B))
-
-			log.Println("main: load rule reserved IPv4/6 CIDRs")
-			routerLocal := NewRouterLocal()
-			log.Println("main: find", len(routerLocal.L))
+			routerRules.FromFile(option.Rule)
 
 			log.Println("main: load rule", option.Cidr)
-			f2 := doa.Try(OpenFile(option.Cidr))
-			defer f2.Close()
-			routerApnic := NewRouterIPNet([]*net.IPNet{}, RoadLocale)
-			routerApnic.FromReader(f2)
-			log.Println("main: find", len(routerApnic.L))
+			routerLocal := NewRouterIPNet()
+			routerLocal.FromFile(option.Cidr)
 
 			routerRight := NewRouterRight(RoadRemote)
-			routerChain := NewRouterChain(routerRules, routerLocal, routerApnic, routerRight)
+			routerChain := NewRouterChain(routerRules, routerLocal, routerRight)
 			routerCache := NewRouterCache(routerChain)
 			return routerCache
 		}
@@ -1110,6 +1053,49 @@ func LoadApnic() map[string][]*net.IPNet {
 			doa.Nil(err)
 			r[seps[1]] = append(r[seps[1]], cidr)
 		}
+	}
+	return r
+}
+
+// LoadReservedIP loads reserved ip addresses.
+//
+// Introduction:
+// See https://en.wikipedia.org/wiki/Reserved_IP_addresses
+func LoadReservedIP() []*net.IPNet {
+	r := []*net.IPNet{}
+	for _, e := range [][2]string{
+		// IPv4
+		{"00000000", "FF000000"},
+		{"0A000000", "FF000000"},
+		{"7F000000", "FF000000"},
+		{"A9FE0000", "FFFF0000"},
+		{"AC100000", "FFF00000"},
+		{"C0000000", "FFFFFFF8"},
+		{"C00000AA", "FFFFFFFE"},
+		{"C0000200", "FFFFFF00"},
+		{"C0A80000", "FFFF0000"},
+		{"C6120000", "FFFE0000"},
+		{"C6336400", "FFFFFF00"},
+		{"CB007100", "FFFFFF00"},
+		{"F0000000", "F0000000"},
+		{"FFFFFFFF", "FFFFFFFF"},
+		// IPv6
+		{"00000000000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
+		{"00000000000000000000000000000001", "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"},
+		{"01000000000000000000000000000000", "FFFFFFFFFFFFFFFF0000000000000000"},
+		{"0064FF9B000000000000000000000000", "FFFFFFFFFFFFFFFFFFFFFFFF00000000"},
+		{"20010000000000000000000000000000", "FFFFFFFF000000000000000000000000"},
+		{"20010010000000000000000000000000", "FFFFFFF0000000000000000000000000"},
+		{"20010020000000000000000000000000", "FFFFFFF0000000000000000000000000"},
+		{"20010DB8000000000000000000000000", "FFFFFFFF000000000000000000000000"},
+		{"20020000000000000000000000000000", "FFFF0000000000000000000000000000"},
+		{"FC000000000000000000000000000000", "FE000000000000000000000000000000"},
+		{"FE800000000000000000000000000000", "FFC00000000000000000000000000000"},
+		{"FF000000000000000000000000000000", "FF000000000000000000000000000000"},
+	} {
+		i := doa.Try(hex.DecodeString(e[0]))
+		m := doa.Try(hex.DecodeString(e[1]))
+		r = append(r, &net.IPNet{IP: i, Mask: m})
 	}
 	return r
 }
