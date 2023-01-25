@@ -779,7 +779,7 @@ func (r *RouterChain) Road(ctx *Context, host string) Road {
 	return road
 }
 
-// NewRouterChain returns a new RouterClump.
+// NewRouterChain returns a new RouterChain.
 func NewRouterChain(router ...Router) *RouterChain {
 	return &RouterChain{
 		L: router,
@@ -924,8 +924,8 @@ func NewAimbot(client Dialer, option *AimbotOption) *Aimbot {
 			routerLocal := NewRouterLocal()
 			log.Println("main: find", len(routerLocal.L))
 			routerRight := NewRouterRight(RoadRemote)
-			routerClump := NewRouterChain(routerLocal, routerRight)
-			routerCache := NewRouterCache(routerClump)
+			routerChain := NewRouterChain(routerLocal, routerRight)
+			routerCache := NewRouterCache(routerChain)
 			return routerCache
 		}
 		if option.Type == "rule" {
@@ -948,8 +948,8 @@ func NewAimbot(client Dialer, option *AimbotOption) *Aimbot {
 			log.Println("main: find", len(routerApnic.L))
 
 			routerRight := NewRouterRight(RoadRemote)
-			routerClump := NewRouterChain(routerRules, routerLocal, routerApnic, routerRight)
-			routerCache := NewRouterCache(routerClump)
+			routerChain := NewRouterChain(routerRules, routerLocal, routerApnic, routerRight)
+			routerCache := NewRouterCache(routerChain)
 			return routerCache
 		}
 		panic("unreachable")
