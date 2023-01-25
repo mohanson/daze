@@ -678,25 +678,25 @@ func NewRouterRight(road Road) *RouterRight {
 
 // RouterCache cache routing results for next use.
 type RouterCache struct {
-	Pit Router
-	Box *lru.Lru[string, Road]
+	Lru *lru.Lru[string, Road]
+	Raw Router
 }
 
 // Road implements daze.Router.
 func (r *RouterCache) Road(ctx *Context, host string) Road {
-	if a, b := r.Box.GetExists(host); b {
+	if a, b := r.Lru.GetExists(host); b {
 		return a
 	}
-	a := r.Pit.Road(ctx, host)
-	r.Box.Set(host, a)
+	a := r.Raw.Road(ctx, host)
+	r.Lru.Set(host, a)
 	return a
 }
 
 // NewRouterCache returns a new Cache object.
 func NewRouterCache(r Router) *RouterCache {
 	return &RouterCache{
-		Pit: r,
-		Box: lru.New[string, Road](Conf.RouterLruSize),
+		Lru: lru.New[string, Road](Conf.RouterLruSize),
+		Raw: r,
 	}
 }
 
