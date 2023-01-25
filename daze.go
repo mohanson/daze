@@ -906,7 +906,6 @@ func NewAimbot(client Dialer, option *AimbotOption) *Aimbot {
 			f1 := doa.Try(OpenFile(option.Rule))
 			defer f1.Close()
 			doa.Nil(routerRules.FromReader(f1))
-			log.Println("main: find", len(routerRules.L)+len(routerRules.R)+len(routerRules.B))
 
 			routerLocal := NewRouterIPNet()
 			log.Println("main: load rule reserved IPv4/6 CIDRs")
