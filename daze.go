@@ -609,11 +609,13 @@ type RouterIPNet struct {
 	B []*net.IPNet
 }
 
-// FromReader loads a CIDR file from reader.
-func (r *RouterIPNet) FromReader(f io.Reader) error {
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := scanner.Text()
+// FromFile loads a CIDR file.
+func (r *RouterIPNet) FromFile(name string) {
+	f := doa.Try(OpenFile(name))
+	defer f.Close()
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		line := s.Text()
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
@@ -621,7 +623,7 @@ func (r *RouterIPNet) FromReader(f io.Reader) error {
 		doa.Nil(err)
 		r.L = append(r.L, cidr)
 	}
-	return scanner.Err()
+	doa.Nil(s.Err())
 }
 
 // Road implements daze.Router.
@@ -653,7 +655,7 @@ func (r *RouterIPNet) Road(ctx *Context, host string) Road {
 // NewRouterIPNet returns a new RouterIPNet object.
 func NewRouterIPNet() *RouterIPNet {
 	return &RouterIPNet{
-		L: []*net.IPNet{},
+		L: LoadReservedIP(),
 		R: []*net.IPNet{},
 		B: []*net.IPNet{},
 	}
@@ -767,11 +769,13 @@ func (r *RouterRules) Road(ctx *Context, host string) Road {
 	return RoadPuzzle
 }
 
-// FromReader loads a RULE file from reader.
-func (r *RouterRules) FromReader(f io.Reader) error {
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		line := scanner.Text()
+// FromFile loads a RULE file.
+func (r *RouterRules) FromFile(name string) {
+	f := doa.Try(OpenFile(name))
+	defer f.Close()
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		line := s.Text()
 		seps := strings.Fields(line)
 		if len(seps) < 2 {
 			continue
@@ -786,7 +790,7 @@ func (r *RouterRules) FromReader(f io.Reader) error {
 			r.B = append(r.B, seps[1:]...)
 		}
 	}
-	return scanner.Err()
+	doa.Nil(s.Err())
 }
 
 // NewRouterRules returns a new RoaderRules.
@@ -852,8 +856,6 @@ func NewAimbot(client Dialer, option *AimbotOption) *Aimbot {
 		}
 		if option.Type == "remote" {
 			routerLocal := NewRouterIPNet()
-			log.Println("main: load rule reserved IPv4/6 CIDRs")
-			routerLocal.L = LoadReservedIP()
 			routerRight := NewRouterRight(RoadRemote)
 			routerChain := NewRouterChain(routerLocal, routerRight)
 			routerCache := NewRouterCache(routerChain)
@@ -862,18 +864,11 @@ func NewAimbot(client Dialer, option *AimbotOption) *Aimbot {
 		if option.Type == "rule" {
 			log.Println("main: load rule", option.Rule)
 			routerRules := NewRouterRules()
-			f1 := doa.Try(OpenFile(option.Rule))
-			defer f1.Close()
-			doa.Nil(routerRules.FromReader(f1))
-
-			routerLocal := NewRouterIPNet()
-			log.Println("main: load rule reserved IPv4/6 CIDRs")
-			routerLocal.L = LoadReservedIP()
+			routerRules.FromFile(option.Rule)
 
 			log.Println("main: load rule", option.Cidr)
-			f2 := doa.Try(OpenFile(option.Cidr))
-			defer f2.Close()
-			routerLocal.FromReader(f2)
+			routerLocal := NewRouterIPNet()
+			routerLocal.FromFile(option.Cidr)
 
 			routerRight := NewRouterRight(RoadRemote)
 			routerChain := NewRouterChain(routerRules, routerLocal, routerRight)
