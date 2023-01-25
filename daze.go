@@ -724,7 +724,6 @@ func NewRouterLocal() *RouterIPNet {
 type RouterCache struct {
 	Pit Router
 	Box *lru.Lru[string, Road]
-	m   sync.Mutex
 }
 
 // Road implements daze.Router.
@@ -739,8 +738,6 @@ func (r *RouterCache) road(ctx *Context, host string) Road {
 
 // Road implements daze.Router.
 func (r *RouterCache) Road(ctx *Context, host string) Road {
-	r.m.Lock()
-	defer r.m.Unlock()
 	road := r.road(ctx, host)
 	log.Printf("conn: %08x  route router=cache road=%s", ctx.Cid, road)
 	return road
@@ -751,7 +748,6 @@ func NewRouterCache(r Router) *RouterCache {
 	return &RouterCache{
 		Pit: r,
 		Box: lru.New[string, Road](Conf.RouterLruSize),
-		m:   sync.Mutex{},
 	}
 }
 
