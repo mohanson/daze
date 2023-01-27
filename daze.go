@@ -49,7 +49,10 @@ var Conf = struct {
 	RouterLruSize int
 }{
 	DialerTimeout: time.Second * 8,
-	RouterLruSize: 128,
+	// A single cache entry represents a single host or DNS name lookup. Make the cache as large as the maximum number
+	// of clients that access your web site concurrently. Note that setting the cache size too high is a waste of
+	// memory and degrades performance.
+	RouterLruSize: 64,
 }
 
 // Resolver returns a new Resolver used by the package-level Lookup functions and by Dialers without a specified
