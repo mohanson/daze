@@ -680,7 +680,7 @@ func NewRouterRight(road Road) *RouterRight {
 type RouterCache struct {
 	Lru *lru.Lru[string, Road]
 	Raw Router
-	Syn sync.Mutex
+	Syn *sync.Mutex
 }
 
 // LruGet looks up a key's value from the cache.
@@ -717,6 +717,7 @@ func NewRouterCache(r Router) *RouterCache {
 	return &RouterCache{
 		Lru: lru.New[string, Road](Conf.RouterLruSize),
 		Raw: r,
+		Syn: &sync.Mutex{},
 	}
 }
 
