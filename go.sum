@@ -1,4 +1,4 @@
 github.com/godump/doa v0.1.3 h1:zedWs+kag2epLpCr3TyGFiZr6LbGnmIDSxwH979nYV4=
 github.com/godump/doa v0.1.3/go.mod h1:a3ECk/aqWBm9dR74TgcPYRZ6ZKkz/R0qIjhGSKxmWhM=
-github.com/godump/lru v0.1.3 h1:YynDITf3QLDW5sHb95bScqVzhGPvSOrGuhpHEzoNqcY=
-github.com/godump/lru v0.1.3/go.mod h1:CjN3QStHQJHVTTyNVIjg5cCBWkO+9EXQrnWAAcmxkv0=
+github.com/godump/lru v0.1.4 h1:rR5JcuXzODY/emAV2VSVvid+LakNM8fO6xoNe+p96SM=
+github.com/godump/lru v0.1.4/go.mod h1:O9LAh2sC9pSGcn1Uzpmo4phKg3Fi4eL5YgKiv8lYas4=
