@@ -45,7 +45,7 @@ const helpGen = `Usage: daze gen <region>
 Supported region:
   CN         China
 
-If no region is specified, an empty cidr list is generated.
+Executing this command will update rule.cidr by remote data source.
 `
 
 func main() {
@@ -174,8 +174,7 @@ func main() {
 		f := doa.Try(os.OpenFile(filepath.Join(resExec, Conf.PathCIDR), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644))
 		defer f.Close()
 		for _, e := range cidr {
-			f.WriteString(e.String())
-			f.WriteString("\n")
+			fmt.Fprintln(f, "L", e.String())
 		}
 	case "ver":
 		fmt.Println("daze", Conf.Version)

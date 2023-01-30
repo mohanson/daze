@@ -619,12 +619,21 @@ func (r *RouterIPNet) FromFile(name string) {
 	s := bufio.NewScanner(f)
 	for s.Scan() {
 		line := s.Text()
-		if line == "" || strings.HasPrefix(line, "#") {
+		seps := strings.Fields(line)
+		if len(seps) < 2 {
 			continue
 		}
-		_, cidr, err := net.ParseCIDR(line)
+		_, cidr, err := net.ParseCIDR(seps[1])
 		doa.Nil(err)
-		r.L = append(r.L, cidr)
+		switch seps[0] {
+		case "#":
+		case "L":
+			r.L = append(r.L, cidr)
+		case "R":
+			r.R = append(r.R, cidr)
+		case "B":
+			r.B = append(r.B, cidr)
+		}
 	}
 	doa.Nil(s.Err())
 }
