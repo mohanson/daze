@@ -878,10 +878,12 @@ func NewAimbot(client Dialer, option *AimbotOption) *Aimbot {
 			log.Println("main: load rule", option.Rule)
 			routerRules := NewRouterRules()
 			routerRules.FromFile(option.Rule)
+			log.Println("main: size is", len(routerRules.L)+len(routerRules.R)+len(routerRules.B))
 
 			log.Println("main: load rule", option.Cidr)
 			routerLocal := NewRouterIPNet()
 			routerLocal.FromFile(option.Cidr)
+			log.Println("main: size is", len(routerLocal.L)+len(routerLocal.R)+len(routerLocal.B))
 
 			routerRight := NewRouterRight(RoadRemote)
 			routerChain := NewRouterChain(routerRules, routerLocal, routerRight)

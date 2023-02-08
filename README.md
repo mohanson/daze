@@ -19,7 +19,6 @@ Daze is software to help you pass through the firewalls, in other words, proxy. 
     - [Proxy Control](#proxy-control)
         - [File rule.ls](#file-rulels)
         - [File rule.cidr](#file-rulecidr)
-- [Links](#links)
 
 # Tutorials
 
@@ -179,4 +178,4 @@ Glob is supported, such as `R *.google.com`.
 
 ### File rule.cidr
 
-Daze also uses a CIDR(Classless Inter-Domain Routing) file to route addresses. The CIDR file is located at "./rule.cidr", and has a lower priority than "rule.ls". When an IP address is in the CIDR file, daze will use the local network to establish the connection instead of a proxy.
+Daze also uses a CIDR(Classless Inter-Domain Routing) file to route addresses. The CIDR file is located at "./rule.cidr", and has a lower priority than "rule.ls".
