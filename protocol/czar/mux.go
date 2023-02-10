@@ -218,7 +218,6 @@ func NewMux(conn net.Conn) *Mux {
 		wm0: sync.Mutex{},
 		wm1: sync.Mutex{},
 	}
-	go mux.Spawn()
 	return mux
 }
 
@@ -231,6 +230,7 @@ func NewMuxServer(conn net.Conn) *Mux {
 		stm.Close()
 		mux.usb[i] = stm
 	}
+	go mux.Spawn()
 	return mux
 }
 
@@ -242,5 +242,6 @@ func NewMuxClient(conn net.Conn) *Mux {
 	}
 	mux := NewMux(conn)
 	mux.idp = idp
+	go mux.Spawn()
 	return mux
 }
