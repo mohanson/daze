@@ -43,7 +43,7 @@ Daze is dead simple to use:
 # You need a machine that can access the Internet, and enter the following command:
 $ daze server -l 0.0.0.0:1081 -k $PASSWORD
 
-# Client size
+# Client side
 # Use the following command to link your server(replace $SERVER with your server IP):
 $ daze client -s $SERVER:1081 -k $PASSWORD
 # Now, you are free to visit the Internet
