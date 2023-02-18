@@ -179,3 +179,5 @@ Glob is supported, such as `R *.google.com`.
 ### File rule.cidr
 
 Daze also uses a CIDR(Classless Inter-Domain Routing) file to route addresses. The CIDR file is located at "./rule.cidr", and has a lower priority than "rule.ls".
+
+By default, daze has configured rule.cidr for China's mainland.
