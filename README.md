@@ -1,4 +1,6 @@
-# Daze
+<div align="center">
+  <img src="./res/daze.png">
+</div>
 
 Daze is software to help you pass through the firewalls, in other words, proxy. Daze uses a simple but efficient protocol, making sure you never get detected or blocked.
 
