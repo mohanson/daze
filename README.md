@@ -1,26 +1,6 @@
-<div align="center">
-  <img src="./res/daze.png">
-</div>
+<div align="center" style="background-color: #FFFFFF"><img src="./res/daze.png"></div>
 
 Daze is software to help you pass through the firewalls, in other words, proxy. Daze uses a simple but efficient protocol, making sure you never get detected or blocked.
-
-- [Tutorials](#tutorials)
-- [Guides](#guides)
-    - [Platforms](#platforms)
-        - [Android](#android)
-        - [Chrome](#chrome)
-        - [Firefox](#firefox)
-    - [Network Model And Concepts](#network-model-and-concepts)
-    - [Protocols](#protocols)
-        - [Client Protocols](#client-protocols)
-        - [Middle Protocols](#middle-protocols)
-            - [Ashe](#ashe)
-            - [Baboon](#baboon)
-            - [Czar](#czar)
-            - [Dahlia](#dahlia)
-    - [Proxy Control](#proxy-control)
-        - [File rule.ls](#file-rulels)
-        - [File rule.cidr](#file-rulecidr)
 
 # Tutorials
 
