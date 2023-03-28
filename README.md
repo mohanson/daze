@@ -1,10 +1,10 @@
 <div align="center" style="background-color: #FFFFFF"><img src="./res/daze.png"></div>
 
-Daze is software to help you pass through the firewalls, in other words, proxy. Daze uses a simple but efficient protocol, making sure you never get detected or blocked.
+Daze is a software that helps you pass through firewalls, in other words, a proxy. It uses a simple yet efficient protocol, ensuring that you never get detected or blocked.
 
 # Getting Started
 
-Daze is designed as a single-file application. First of all, compile or [download](https://github.com/mohanson/daze/releases) daze:
+Daze is designed as a single-file application. First, compile or [download](https://github.com/mohanson/daze/releases) daze:
 
 ```sh
 $ git clone https://github.com/mohanson/daze
@@ -16,7 +16,7 @@ $ ./cmd/develop.sh
 $ ./cmd/develop.ps1
 ```
 
-Build results will be saved in the directory `bin`. You can just keep this directory, and all other files are not required.
+The build results will be saved in the bin directory. You can keep this directory, and all other files are not required.
 
 Daze is dead simple to use:
 
@@ -34,11 +34,11 @@ $ curl -x socks5://127.0.0.1:1080 google.com
 
 # Using Daze for Different Platforms
 
-Daze is implemented in pure Go language, so it can run on almost any operating system. The following are only the browsers/operating system commonly used by me:
+Daze is implemented in pure Go language, so it can run on almost any operating system. The following are some of the browsers/operating systems commonly used by me:
 
 ## Android
 
-0. Cross compile daze for android: `GOOS=android GOARCH=arm64 go build -o daze github.com/mohanson/daze/cmd/daze`
+0. Cross-compile daze for Android: `GOOS=android GOARCH=arm64 go build -o daze github.com/mohanson/daze/cmd/daze`
 0. Push the compiled file to the phone. You can use [adb](https://developer.android.com/studio/command-line/adb) or create an HTTP server and download daze with `wget` in [termux](https://play.google.com/store/apps/details?id=com.termux&hl=en).
 0. Run `daze client -l 127.0.0.1:1080 ...` in the termux.
 0. Set the proxy for phone: WLAN -> Settings -> Proxy -> Fill in `127.0.0.1:1080`
@@ -49,11 +49,11 @@ Chrome does not support setting proxies, so a third-party plugin must be used. [
 
 ## Firefox
 
-Firefox can configure a proxy in `Connection Settings` -> `Manual proxy configuration` -> `SOCKSv5 Host=127.0.0.1` and `Port=1080`. If you see an option `Use remote DNS` on the page, check it boldly.
+Firefox can configure a proxy in `Connection Settings` -> `Manual proxy configuration` -> `SOCKSv5 Host=127.0.0.1` and `Port=1080`. If you see an option `Use remote DNS` on the page, check it.
 
 # Network Model And Concepts
 
-Daze's network model consists of 5 characters:
+Daze's network model consists of 7 components:
 
 ```text
 +-------------+        +-------------+        +----------+        +-------------+        +-----------+
@@ -63,19 +63,19 @@ Daze's network model consists of 5 characters:
                               +------------- Middle Protocol ------------+-- Client Protocol --+
 ```
 
-- Destination: Internet service provider. For example, google.com.
-- Daze Server: a daze instance run by the command `daze server`.
-- Firewall: a firewall is a network security system that monitors and controls the incoming and outgoing network traffic based on predetermined security rules.
-- Daze client: a daze instance run by the command `daze client`.
-- User: a browser or other application trying to access the dest.
-- Middle Protocol: communication protocol between the daze server and daze client. Data is encrypted and obfuscated to bypass firewalls.
-- Client Protocol: communication protocol between the daze client and user.
+- Destination: The destination is an internet service provider, for example, google.com.
+- Daze Server: A Daze server is an instance that runs using the command `daze server`.
+- Firewall: A firewall is a network security system that monitors and controls incoming and outgoing network traffic based on pre-determined security rules.
+- Daze Client: A Daze client is an instance that runs using the command `daze client`.
+- User: A user is a browser or any other application attempting to access the destination.
+- Middle Protocol: The middle protocol is the communication protocol between the Daze server and Daze client. Data is encrypted and obfuscated to bypass firewalls.
+- Client Protocol: The client protocol is the communication protocol between the Daze client and the user.
 
 # Protocols
 
 ## Client Protocols
 
-Daze client implements 5 different proxy protocols in one port, they are HTTP Proxy, HTTPS Tunnel, SOCKS4, SOCKS4a, and SOCKS5.
+The Daze client implements five different proxy protocols in one port. These protocols are HTTP Proxy, HTTPS Tunnel, SOCKS4, SOCKS4a, and SOCKS5.
 
 ```sh
 # HTTP Proxy
@@ -98,13 +98,13 @@ Daze currently has 4 middle protocols.
 
 ### Ashe
 
-Default protocol. Ashe is a TCP-based cryptographic proxy protocol. The main purpose of this protocol is to bypass firewalls while providing a good user experience, so it only provides minimal security, which is one of the reasons for choosing the RC4 algorithm.
+The default protocol used by Daze is called Ashe. Ashe is a TCP-based cryptographic proxy protocol designed to bypass firewalls while providing a good user experience. However, Ashe only provides minimal security, which is why it uses the RC4 algorithm.
 
-Note that it is your responsibility to ensure that the server and client's date and time are consistent, the ashe protocol allows a deviation of two minutes.
+Please note that it is the user's responsibility to ensure that the date and time on both the server and client are consistent. The Ashe protocol allows for a deviation of up to two minutes.
 
 ### Baboon
 
-Protocol baboon is the ashe protocol based on HTTP. The daze server will pretend to be an HTTP service. If the user sends the correct password, the daze server will provide the proxy service, otherwise, it will behave as a normal HTTP service. To use the baboon protocol, you need to specify the protocol name and a fake site:
+Protocol baboon is a variant of the ashe protocol that operates over HTTP. In this protocol, the daze server masquerades as an HTTP service and requires the user to provide the correct password in order to gain access to the proxy service. If the password is not provided, the daze server will behave as a normal HTTP service. To use the baboon protocol, you must specify the protocol name and a fake site:
 
 ```sh
 $ daze server ... -p baboon -e https://github.com
@@ -113,7 +113,7 @@ $ daze client ... -p baboon
 
 ### Czar
 
-Protocol czar is the ashe protocol base on TCP multiplexing. For the uninitiated, multiplexing is the practice of reusing a single TCP connection for multiple ashe protocols. This practice saves the time of the TCP three-way handshake, but on the other hand, there is a small impairment to the data transfer rate (about 0.19%). In most cases, it has a better user experience than using the ashe protocol directly.
+Protocol czar is an implementation of the Ashe protocol based on TCP multiplexing. Multiplexing involves reusing a single TCP connection for multiple Ashe protocols, which saves time on the TCP three-way handshake. However, this may result in a slight decrease in data transfer rate (approximately 0.19%). In most cases, using Protocol czar provides a better user experience compared to using the Ashe protocol directly.
 
 ```sh
 $ daze server ... -p czar
@@ -122,7 +122,7 @@ $ daze client ... -p czar
 
 ### Dahlia
 
-Dahlia is an encrypted port forwarding protocol. Unlike common port forwarding tools, it needs to configure a server and a client, and the communication between the server and the client is encrypted to bypass firewall detection.
+Dahlia is a protocol used for encrypted port forwarding. Unlike many common port forwarding tools, it requires both a server and a client to be configured. Communication between the server and client is encrypted in order to bypass detection by firewalls.
 
 ```sh
 # Port forwarding from 20002 to 20000:
