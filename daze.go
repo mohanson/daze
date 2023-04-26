@@ -61,7 +61,7 @@ var Conf = struct {
 // Examples:
 //
 //	Resolver("8.8.8.8:53")
-//	Resolver("114.114.114.114:53")
+//	Resolver("1.1.1.1:53")
 func Resolver(addr string) *net.Resolver {
 	return &net.Resolver{
 		PreferGo: true,
@@ -1050,6 +1050,18 @@ func LoadApnic() map[string][]*net.IPNet {
 		}
 	}
 	return r
+}
+
+// LoadOpenResolver returns best and free public DNS servers (valid april 2023).
+func LoadOpenResolver() []string {
+	return []string{
+		"8.8.8.8:53",        // Google
+		"8.8.4.4:53",        // Google
+		"1.1.1.1:53",        // Cloudflare DNS
+		"1.0.0.1:53",        // Cloudflare DNS
+		"208.67.222.222:53", // OpenDNS
+		"208.67.220.220:53", // OpenDNS
+	}
 }
 
 // LoadReservedIP loads reserved ip addresses.

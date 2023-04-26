@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -58,7 +59,15 @@ func main() {
 	// If daze runs in Android through termux, then we set a default dns for it. See:
 	// https://stackoverflow.com/questions/38959067/dns-lookup-issue-when-running-my-go-app-in-termux
 	if os.Getenv("ANDROID_ROOT") != "" {
-		net.DefaultResolver = daze.Resolver("8.8.8.8:53")
+		for _, e := range daze.LoadOpenResolver() {
+			d := daze.Resolver(e)
+			_, f := d.LookupHost(context.Background(), "google.com")
+			if f == nil {
+				log.Println("main: domain server is", e)
+				net.DefaultResolver = d
+				break
+			}
+		}
 	}
 	resExec := filepath.Dir(doa.Try(os.Executable()))
 	subCommand := os.Args[1]
