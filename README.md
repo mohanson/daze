@@ -111,6 +111,8 @@ $ daze server ... -p baboon -e https://github.com
 $ daze client ... -p baboon
 ```
 
+It is recommended to deploy a local website locally, such as http://127.0.0.1:81, and then deploy the daze server on 0.0.0.0:80.
+
 ### Czar
 
 Protocol czar is an implementation of the Ashe protocol based on TCP multiplexing. Multiplexing involves reusing a single TCP connection for multiple Ashe protocols, which saves time on the TCP three-way handshake. However, this may result in a slight decrease in data transfer rate (approximately 0.19%). In most cases, using Protocol czar provides a better user experience compared to using the Ashe protocol directly.
@@ -118,16 +120,6 @@ Protocol czar is an implementation of the Ashe protocol based on TCP multiplexin
 ```sh
 $ daze server ... -p czar
 $ daze client ... -p czar
-```
-
-### Dahlia
-
-Dahlia is a protocol used for encrypted port forwarding. Unlike many common port forwarding tools, it requires both a server and a client to be configured. Communication between the server and client is encrypted in order to bypass detection by firewalls.
-
-```sh
-# Port forwarding from 20002 to 20000:
-$ daze server -l :20001 -e 127.0.0.1:20000 -p dahlia
-$ daze client -l :20002 -s 127.0.0.1:20001 -p dahlia
 ```
 
 # Proxy Control
