@@ -103,6 +103,7 @@ func (c *UDPConn) Write(p []byte) (int, error) {
 // destination addresses, and return one or more reply messages, as appropriate for the request type.
 type Server struct {
 	Listen string
+	// Cipher is a pre-shared key.
 	Cipher []byte
 	Closer io.Closer
 }
@@ -120,6 +121,7 @@ func (s *Server) Hello(con io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	if err != nil {
 		return nil, err
 	}
+	// To build a key from pre-shared key. Use xor as our key derivation function.
 	for i := 0; i < 32; i++ {
 		buf[i] ^= s.Cipher[i]
 	}
@@ -241,6 +243,7 @@ func NewServer(listen string, cipher string) *Server {
 // Client implemented the ashe protocol.
 type Client struct {
 	Server string
+	// Cipher is a pre-shared key.
 	Cipher []byte
 }
 
@@ -256,6 +259,7 @@ func (c *Client) Hello(con io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	if err != nil {
 		return nil, err
 	}
+	// To build a key from pre-shared key. Use xor as our key derivation function.
 	for i := 0; i < 32; i++ {
 		buf[i] ^= c.Cipher[i]
 	}
