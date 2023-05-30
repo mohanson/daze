@@ -110,17 +110,19 @@ type Server struct {
 // Hello creates an encrypted channel.
 func (s *Server) Hello(con io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	var (
-		buf     = make([]byte, 256)
+		buf     = make([]byte, 32)
 		cli     io.ReadWriteCloser
 		err     error
 		gap     int64
 		gapSign int64
 	)
-	_, err = io.ReadFull(con, buf[:128])
+	_, err = io.ReadFull(con, buf[:])
 	if err != nil {
 		return nil, err
 	}
-	copy(buf[128:256], s.Cipher[:])
+	for i := 0; i < 32; i++ {
+		buf[i] ^= s.Cipher[i]
+	}
 	cli = daze.Gravity(con, buf[:])
 	_, err = io.ReadFull(cli, buf[:8])
 	if err != nil {
@@ -245,16 +247,18 @@ type Client struct {
 // Hello creates an encrypted channel.
 func (c *Client) Hello(con io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	var (
-		buf = make([]byte, 256)
+		buf = make([]byte, 32)
 		err error
 		srv io.ReadWriteCloser
 	)
-	rand.Read(buf[:128])
-	_, err = con.Write(buf[:128])
+	rand.Read(buf[:])
+	_, err = con.Write(buf[:])
 	if err != nil {
 		return nil, err
 	}
-	copy(buf[128:256], c.Cipher[:])
+	for i := 0; i < 32; i++ {
+		buf[i] ^= c.Cipher[i]
+	}
 	srv = daze.Gravity(con, buf[:])
 	binary.BigEndian.PutUint64(buf[:8], uint64(time.Now().Unix()))
 	_, err = srv.Write(buf[:8])
