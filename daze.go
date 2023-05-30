@@ -5,8 +5,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/cipher"
-	"crypto/md5"
 	"crypto/rc4"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -992,14 +992,10 @@ func Reno(network string, address string) (net.Conn, error) {
 	}
 }
 
-// Salt converts the stupid password passed in by the user to 128-sized byte array.
+// Salt converts the stupid password passed in by the user to 32-sized byte array.
 func Salt(s string) []byte {
-	r := make([]byte, 128)
-	h := md5.Sum([]byte(s))
-	for i := 0; i < 8; i++ {
-		copy(r[0x10*i:0x10*i+0x10], h[:])
-	}
-	return r
+	h := sha256.Sum256([]byte(s))
+	return h[:]
 }
 
 // ============================================================================
