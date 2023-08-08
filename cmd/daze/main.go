@@ -5,12 +5,10 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"math/rand"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/godump/doa"
 	"github.com/mohanson/daze"
@@ -54,8 +52,6 @@ func main() {
 		fmt.Println(helpMsg)
 		return
 	}
-	// Initialize random source.
-	rand.Seed(time.Now().UnixNano())
 	// If daze runs in Android through termux, then we set a default dns for it. See:
 	// https://stackoverflow.com/questions/38959067/dns-lookup-issue-when-running-my-go-app-in-termux
 	if os.Getenv("ANDROID_ROOT") != "" {

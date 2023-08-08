@@ -2,12 +2,12 @@ package baboon
 
 import (
 	"crypto/md5"
+	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
 	"math"
-	"math/rand"
 	"net"
 	"net/http"
 	"sync/atomic"

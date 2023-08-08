@@ -1,13 +1,13 @@
 package ashe
 
 import (
+	"crypto/rand"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"log"
 	"math"
-	"math/rand"
 	"net"
 	"time"
 
