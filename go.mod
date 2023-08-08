@@ -1,6 +1,6 @@
 module github.com/mohanson/daze
 
-go 1.19
+go 1.20
 
 require (
 	github.com/godump/doa v0.1.3
