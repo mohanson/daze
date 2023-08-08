@@ -122,6 +122,16 @@ $ daze server ... -p czar
 $ daze client ... -p czar
 ```
 
+### Dahlia
+
+Dahlia is a protocol used for encrypted port forwarding. Unlike many common port forwarding tools, it requires both a server and a client to be configured. Communication between the server and client is encrypted in order to bypass detection by firewalls.
+
+```sh
+# Port forwarding from 20002 to 20000:
+$ daze server -l :20001 -e 127.0.0.1:20000 -p dahlia
+$ daze client -l :20002 -s 127.0.0.1:20001 -p dahlia
+```
+
 # Proxy Control
 
 Proxy control is a rule that determines whether network requests (TCP and UDP) go directly to the destination or are forwarded to the daze server. Use the `-f` option in the daze client to adjust the proxy configuration.
