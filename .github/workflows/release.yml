@@ -1,0 +1,23 @@
+name: release
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+      - name: Make
+        run: ./cmd/release.sh
+      - name: Push
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            bin/release/daze_android_arm64.zip
+            bin/release/daze_linux_amd64.zip
+            bin/release/daze_windows_amd64.zip
