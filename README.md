@@ -111,8 +111,6 @@ $ daze server ... -p baboon -e https://github.com
 $ daze client ... -p baboon
 ```
 
-It is recommended to deploy a local website locally, such as http://127.0.0.1:81, and then deploy the daze server on 0.0.0.0:80.
-
 ### Czar
 
 Protocol czar is an implementation of the Ashe protocol based on TCP multiplexing. Multiplexing involves reusing a single TCP connection for multiple Ashe protocols, which saves time on the TCP three-way handshake. However, this may result in a slight decrease in data transfer rate (approximately 0.19%). In most cases, using Protocol czar provides a better user experience compared to using the Ashe protocol directly.

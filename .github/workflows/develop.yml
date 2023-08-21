@@ -1,7 +1,8 @@
 name: develop
 
 on:
-  push
+  pull_request:
+  push:
 
 jobs:
   develop:
