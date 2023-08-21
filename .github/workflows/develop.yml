@@ -1,9 +1,10 @@
 name: develop
 
-on: [push]
+on:
+  push
 
 jobs:
-  build:
+  develop:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
