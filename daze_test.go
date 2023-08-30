@@ -2,6 +2,7 @@ package daze
 
 import (
 	"bytes"
+	"context"
 	"os/exec"
 	"testing"
 
@@ -57,6 +58,22 @@ func TestLocaleSocks5(t *testing.T) {
 	cmd := exec.Command("curl", "-x", "socks5://"+DazeServerListenOn, CurlDest)
 	out := doa.Try(cmd.Output())
 	if !bytes.Contains(out, []byte("zhihu")) {
+		t.FailNow()
+	}
+}
+
+func TestResolverDns(t *testing.T) {
+	dns := ResolverDns("1.1.1.1:53")
+	_, err := dns.LookupHost(context.Background(), "google.com")
+	if err != nil {
+		t.FailNow()
+	}
+}
+
+func TestResolverDot(t *testing.T) {
+	dot := ResolverDot("1.1.1.1:853")
+	_, err := dot.LookupHost(context.Background(), "google.com")
+	if err != nil {
 		t.FailNow()
 	}
 }
