@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"crypto/rc4"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -55,14 +56,8 @@ var Conf = struct {
 	RouterLruSize: 64,
 }
 
-// Resolver returns a new Resolver used by the package-level Lookup functions and by Dialers without a specified
-// Resolver.
-//
-// Examples:
-//
-//	Resolver("8.8.8.8:53")
-//	Resolver("1.1.1.1:53")
-func Resolver(addr string) *net.Resolver {
+// Resolver returns a DNS resolver.
+func ResolverDns(addr string) *net.Resolver {
 	return &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
@@ -70,6 +65,30 @@ func Resolver(addr string) *net.Resolver {
 				Timeout: Conf.DialerTimeout,
 			}
 			return d.DialContext(ctx, "udp", addr)
+		},
+	}
+}
+
+// ResolverDot returns a DNS over TLS resolver.
+func ResolverDot(addr string) *net.Resolver {
+	host, _, _ := net.SplitHostPort(addr)
+	conf := &tls.Config{
+		ServerName:         host,
+		ClientSessionCache: tls.NewLRUClientSessionCache(32),
+	}
+	return &net.Resolver{
+		PreferGo: true,
+		Dial: func(context context.Context, network, address string) (net.Conn, error) {
+			d := net.Dialer{
+				Timeout: Conf.DialerTimeout,
+			}
+			c, err := d.DialContext(context, "tcp", addr)
+			if err != nil {
+				return nil, err
+			}
+			_ = c.(*net.TCPConn).SetKeepAlive(true)
+			_ = c.(*net.TCPConn).SetKeepAlivePeriod(10 * time.Minute)
+			return tls.Client(c, conf), nil
 		},
 	}
 }
@@ -1046,20 +1065,6 @@ func LoadApnic() map[string][]*net.IPNet {
 		}
 	}
 	return r
-}
-
-// LoadOpenResolver returns best and free public DNS servers (valid april 2023).
-func LoadOpenResolver() []string {
-	return []string{
-		"8.8.8.8:53",        // Google
-		"8.8.4.4:53",        // Google
-		"4.2.2.1:53",        // Microsoft
-		"4.2.2.2:53",        // Microsoft
-		"1.1.1.1:53",        // Cloudflare DNS
-		"1.0.0.1:53",        // Cloudflare DNS
-		"208.67.222.222:53", // OpenDNS
-		"208.67.220.220:53", // OpenDNS
-	}
 }
 
 // LoadReservedIP loads reserved ip addresses.

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -55,15 +54,7 @@ func main() {
 	// If daze runs in Android through termux, then we set a default dns for it. See:
 	// https://stackoverflow.com/questions/38959067/dns-lookup-issue-when-running-my-go-app-in-termux
 	if os.Getenv("ANDROID_ROOT") != "" {
-		for _, e := range daze.LoadOpenResolver() {
-			d := daze.Resolver(e)
-			_, f := d.LookupHost(context.Background(), "google.com")
-			if f == nil {
-				log.Println("main: domain server is", e)
-				net.DefaultResolver = d
-				break
-			}
-		}
+		net.DefaultResolver = daze.ResolverDns("1.1.1.1:53")
 	}
 	resExec := filepath.Dir(doa.Try(os.Executable()))
 	subCommand := os.Args[1]
@@ -73,7 +64,7 @@ func main() {
 		var (
 			flListen = flag.String("l", "0.0.0.0:1081", "listen address")
 			flCipher = flag.String("k", "daze", "password, should be same with the one specified by client")
-			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
+			flDnserv = flag.String("dns", "", "specifies the DNS/DoT host:port, such as 1.1.1.1:53")
 			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon, czar, dahlia}")
 			flExtend = flag.String("e", "", "extend data for different protocols")
 		)
@@ -81,7 +72,12 @@ func main() {
 		log.Println("main: server cipher is", *flCipher)
 		log.Println("main: protocol is used", *flProtoc)
 		if *flDnserv != "" {
-			net.DefaultResolver = daze.Resolver(*flDnserv)
+			switch {
+			case strings.HasSuffix(*flDnserv, ":53"):
+				net.DefaultResolver = daze.ResolverDns(*flDnserv)
+			case strings.HasSuffix(*flDnserv, ":853"):
+				net.DefaultResolver = daze.ResolverDot(*flDnserv)
+			}
 			log.Println("main: domain server is", *flDnserv)
 		}
 		switch *flProtoc {
@@ -114,7 +110,7 @@ func main() {
 			flFilter = flag.String("f", "rule", "filter {rule, remote, locale}")
 			flRulels = flag.String("r", filepath.Join(resExec, Conf.PathRule), "rule path")
 			flCIDRls = flag.String("c", filepath.Join(resExec, Conf.PathCIDR), "cidr path")
-			flDnserv = flag.String("dns", "", "such as 8.8.8.8:53")
+			flDnserv = flag.String("dns", "", "specifies the DNS/DoT host:port, such as 1.1.1.1:53")
 			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon, czar, dahlia}")
 		)
 		flag.Parse()
@@ -122,7 +118,12 @@ func main() {
 		log.Println("main: client cipher is", *flCipher)
 		log.Println("main: protocol is used", *flProtoc)
 		if *flDnserv != "" {
-			net.DefaultResolver = daze.Resolver(*flDnserv)
+			switch {
+			case strings.HasSuffix(*flDnserv, ":53"):
+				net.DefaultResolver = daze.ResolverDns(*flDnserv)
+			case strings.HasSuffix(*flDnserv, ":853"):
+				net.DefaultResolver = daze.ResolverDot(*flDnserv)
+			}
 			log.Println("main: domain server is", *flDnserv)
 		}
 		switch *flProtoc {
