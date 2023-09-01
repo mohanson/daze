@@ -9,8 +9,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/godump/doa"
 	"github.com/mohanson/daze"
+	"github.com/mohanson/daze/lib/doa"
 	"github.com/mohanson/daze/protocol/ashe"
 )
 

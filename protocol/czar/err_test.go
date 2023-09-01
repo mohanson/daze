@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/godump/doa"
+	"github.com/mohanson/daze/lib/doa"
 )
 
 func TestErr(t *testing.T) {

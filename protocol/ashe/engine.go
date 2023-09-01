@@ -11,8 +11,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/godump/doa"
 	"github.com/mohanson/daze"
+	"github.com/mohanson/daze/lib/doa"
 )
 
 // This document describes a TCP-based cryptographic proxy protocol. The main purpose of this protocol is to bypass
