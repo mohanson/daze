@@ -184,5 +184,7 @@ func main() {
 		}
 	case "ver":
 		fmt.Println("daze", Conf.Version)
+	default:
+		fmt.Println(helpMsg)
 	}
 }
