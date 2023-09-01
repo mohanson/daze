@@ -158,4 +158,4 @@ Glob is supported, such as `R *.google.com`.
 
 Daze also uses a CIDR(Classless Inter-Domain Routing) file to route addresses. The CIDR file is located at "./rule.cidr", and has a lower priority than "rule.ls".
 
-By default, daze has configured rule.cidr for China's mainland.
+By default, daze has configured rule.cidr for China's mainland. You can update it manually via `daze gen cn`, this will pull the latest data from [http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest](http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest).
