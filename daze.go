@@ -26,8 +26,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/godump/doa"
-	"github.com/godump/lru"
+	"github.com/mohanson/daze/lib/doa"
+	"github.com/mohanson/daze/lib/lru"
 )
 
 // ============================================================================
