@@ -69,7 +69,8 @@ func ResolverDns(addr string) *net.Resolver {
 	}
 }
 
-// ResolverDot returns a DNS over TLS resolver.
+// ResolverDot returns a DNS over TLS resolver. For further information, see
+// https://datatracker.ietf.org/doc/html/rfc7858.
 func ResolverDot(addr string) *net.Resolver {
 	host, _, _ := net.SplitHostPort(addr)
 	conf := &tls.Config{
