@@ -19,6 +19,7 @@ import (
 	"math/bits"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -56,7 +57,7 @@ var Conf = struct {
 	RouterLruSize: 64,
 }
 
-// Resolver returns a DNS resolver.
+// ResolverDns returns a DNS resolver.
 func ResolverDns(addr string) *net.Resolver {
 	return &net.Resolver{
 		PreferGo: true,
@@ -69,8 +70,7 @@ func ResolverDns(addr string) *net.Resolver {
 	}
 }
 
-// ResolverDot returns a DNS over TLS resolver. For further information, see
-// https://datatracker.ietf.org/doc/html/rfc7858.
+// ResolverDot returns a DoT resolver. For further information, see https://datatracker.ietf.org/doc/html/rfc7858.
 func ResolverDot(addr string) *net.Resolver {
 	host, _, _ := net.SplitHostPort(addr)
 	conf := &tls.Config{
@@ -90,6 +90,54 @@ func ResolverDot(addr string) *net.Resolver {
 			_ = c.(*net.TCPConn).SetKeepAlive(true)
 			_ = c.(*net.TCPConn).SetKeepAlivePeriod(10 * time.Minute)
 			return tls.Client(c, conf), nil
+		},
+	}
+}
+
+// Cdoh structure can be used for DoH protocol processing.
+type Cdoh struct {
+	Server string
+	Buffer *bytes.Buffer
+}
+
+func (c Cdoh) Read(b []byte) (n int, err error)   { return c.Buffer.Read(b) }
+func (c Cdoh) Close() error                       { return nil }
+func (c Cdoh) LocalAddr() net.Addr                { return nil }
+func (c Cdoh) RemoteAddr() net.Addr               { return nil }
+func (c Cdoh) SetDeadline(t time.Time) error      { return nil }
+func (c Cdoh) SetReadDeadline(t time.Time) error  { return nil }
+func (c Cdoh) SetWriteDeadline(t time.Time) error { return nil }
+func (c Cdoh) Write(b []byte) (n int, err error) {
+	size := int(binary.BigEndian.Uint16(b[:2]))
+	doa.Doa(size == len(b)-2)
+	resp, err := http.Post(c.Server, "application/dns-message", bytes.NewReader(b[2:]))
+	if err != nil {
+		log.Println("main:", err)
+		return len(b), nil
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return len(b), nil
+	}
+	data := make([]byte, 2+len(body))
+	binary.BigEndian.PutUint16(data[:2], uint16(len(body)))
+	copy(data[2:], body)
+	c.Buffer.Write(data)
+	return len(b), nil
+}
+
+// ResolverDoh returns a DoH resolver. For further information, see https://datatracker.ietf.org/doc/html/rfc8484.
+func ResolverDoh(addr string) *net.Resolver {
+	urls := doa.Try(url.Parse(addr))
+	urls.Host = doa.Try(net.LookupHost(urls.Hostname()))[0]
+	return &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			conn := &Cdoh{
+				Server: urls.String(),
+				Buffer: bytes.NewBuffer([]byte{}),
+			}
+			return conn, nil
 		},
 	}
 }

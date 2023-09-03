@@ -77,3 +77,11 @@ func TestResolverDot(t *testing.T) {
 		t.FailNow()
 	}
 }
+
+func TestResolverDoh(t *testing.T) {
+	doh := ResolverDoh("https://1.1.1.1/dns-query")
+	_, err := doh.LookupHost(context.Background(), "google.com")
+	if err != nil {
+		t.FailNow()
+	}
+}

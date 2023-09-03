@@ -64,7 +64,7 @@ func main() {
 		var (
 			flListen = flag.String("l", "0.0.0.0:1081", "listen address")
 			flCipher = flag.String("k", "daze", "password, should be same with the one specified by client")
-			flDnserv = flag.String("dns", "", "specifies the DNS/DoT host:port, such as 1.1.1.1:53")
+			flDnserv = flag.String("dns", "", "specifies the DNS, DoT or DoH server")
 			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon, czar, dahlia}")
 			flExtend = flag.String("e", "", "extend data for different protocols")
 		)
@@ -77,6 +77,8 @@ func main() {
 				net.DefaultResolver = daze.ResolverDns(*flDnserv)
 			case strings.HasSuffix(*flDnserv, ":853"):
 				net.DefaultResolver = daze.ResolverDot(*flDnserv)
+			case strings.HasPrefix(*flDnserv, "https://"):
+				net.DefaultResolver = daze.ResolverDoh(*flDnserv)
 			}
 			log.Println("main: domain server is", *flDnserv)
 		}
@@ -110,7 +112,7 @@ func main() {
 			flFilter = flag.String("f", "rule", "filter {rule, remote, locale}")
 			flRulels = flag.String("r", filepath.Join(resExec, Conf.PathRule), "rule path")
 			flCIDRls = flag.String("c", filepath.Join(resExec, Conf.PathCIDR), "cidr path")
-			flDnserv = flag.String("dns", "", "specifies the DNS/DoT host:port, such as 1.1.1.1:53")
+			flDnserv = flag.String("dns", "", "specifies the DNS, DoT or DoH server")
 			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon, czar, dahlia}")
 		)
 		flag.Parse()
@@ -123,6 +125,8 @@ func main() {
 				net.DefaultResolver = daze.ResolverDns(*flDnserv)
 			case strings.HasSuffix(*flDnserv, ":853"):
 				net.DefaultResolver = daze.ResolverDot(*flDnserv)
+			case strings.HasPrefix(*flDnserv, "https://"):
+				net.DefaultResolver = daze.ResolverDoh(*flDnserv)
 			}
 			log.Println("main: domain server is", *flDnserv)
 		}

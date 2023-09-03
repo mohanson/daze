@@ -159,3 +159,13 @@ Glob is supported, such as `R *.google.com`.
 Daze also uses a CIDR(Classless Inter-Domain Routing) file to route addresses. The CIDR file is located at "./rule.cidr", and has a lower priority than "rule.ls".
 
 By default, daze has configured rule.cidr for China's mainland. You can update it manually via `daze gen cn`, this will pull the latest data from [http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest](http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest).
+
+# DNS resolver
+
+The DNS server and DNS protocol used by Daze can be specified through command line parameters.
+
+- `DNS: daze ... -dns 1.1.1.1:53`
+- `DoT: daze ... -dns 1.1.1.1:853`
+- `DoH: daze ... -dns https://1.1.1.1/dns-query`
+
+This [article](https://www.cloudflare.com/learning/dns/dns-over-tls/) briefly describes the difference between them. I know many people don't like to read articles, so I just suggest that add `-dns 1.1.1.1:853` in daze.
