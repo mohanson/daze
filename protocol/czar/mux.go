@@ -169,6 +169,11 @@ func (m *Mux) Spawn() {
 			m.ach <- stm
 		case 0x01:
 			bsz := binary.BigEndian.Uint16(buf[2:4])
+			if bsz > 2044 {
+				// Packet format error, connection closed.
+				m.con.Close()
+				break
+			}
 			end := bsz + 4
 			_, err := io.ReadFull(m.con, buf[4:end])
 			if err != nil {
