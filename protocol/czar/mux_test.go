@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"slices"
 	"strings"
 	"testing"
 
@@ -75,6 +76,29 @@ func TestProtocolMuxClientClose(t *testing.T) {
 	doa.Doa(strings.Contains(er1.Error(), "use of closed network connection"))
 	er2 := doa.Err(cli.Write([]byte{0x00, 0x00, 0x00, 0x80}))
 	doa.Doa(strings.Contains(er2.Error(), "use of closed network connection"))
+}
+
+func TestProtocolMuxServerRecvEvilPacket(t *testing.T) {
+	remote := Tester{daze.NewTester(EchoServerListenOn)}
+	remote.Mux()
+	defer remote.Close()
+
+	buf := make([]byte, 2048)
+
+	cl0 := doa.Try(net.Dial("tcp", EchoServerListenOn))
+	defer cl0.Close()
+	cl0.Write([]byte{0x00, 0x01, 0xff, 0xf0})
+	_, er0 := io.ReadFull(cl0, buf[:1])
+	doa.Doa(er0 == io.EOF)
+
+	cl1 := doa.Try(net.Dial("tcp", EchoServerListenOn))
+	defer cl1.Close()
+	cl1.Write([]byte{0x00, 0x00, 0x00, 0x00})
+	cl1.Write([]byte{0x00, 0x00, 0x00, 0x00})
+	cl1.Write([]byte{0x00, 0x01, 0x00, 0x04, 0x00, 0x00, 0x00, 0x04})
+	_, er1 := io.ReadFull(cl1, buf[:12])
+	doa.Nil(er1)
+	doa.Doa(slices.Equal(buf[:8], []byte{0x00, 0x01, 0x00, 0x08, 0x01, 0x00, 0x00, 0x04}))
 }
 
 type Tester struct {
