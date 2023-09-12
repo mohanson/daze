@@ -160,8 +160,10 @@ func (m *Mux) Spawn() {
 		switch cmd {
 		case 0x00:
 			// Make sure the stream has been closed properly.
-			<-m.usb[idx].rdn
-			<-m.usb[idx].wdn
+			old := m.usb[idx]
+			old.ron.Do(func() { close(old.rdn) })
+			old.won.Do(func() { close(old.wdn) })
+			old.son.Do(func() { old.idp <- old.idx })
 			stm := NewStream(idx, m)
 			// The mux server does not need to using an id pool.
 			stm.idp = make(chan uint8, 1)
