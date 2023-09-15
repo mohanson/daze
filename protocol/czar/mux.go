@@ -157,8 +157,8 @@ func (m *Mux) Spawn() {
 		}
 		idx := buf[0]
 		cmd := buf[1]
-		switch cmd {
-		case 0x00:
+		switch {
+		case cmd == 0x00:
 			// Make sure the stream has been closed properly.
 			old := m.usb[idx]
 			old.ron.Do(func() { close(old.rdn) })
@@ -169,7 +169,7 @@ func (m *Mux) Spawn() {
 			stm.idp = make(chan uint8, 1)
 			m.usb[idx] = stm
 			m.ach <- stm
-		case 0x01:
+		case cmd == 0x01:
 			bsz := binary.BigEndian.Uint16(buf[2:4])
 			if bsz > 2044 {
 				// Packet format error, connection closed.
@@ -186,13 +186,16 @@ func (m *Mux) Spawn() {
 			case stm.rch <- buf[4:end]:
 			case <-stm.rdn:
 			}
-		case 0x02:
+		case cmd == 0x02:
 			stm := m.usb[idx]
 			stm.rer.Put(io.EOF)
 			stm.wer.Put(io.ErrClosedPipe)
 			stm.ron.Do(func() { close(stm.rdn) })
 			stm.won.Do(func() { close(stm.wdn) })
 			stm.son.Do(func() { stm.idp <- stm.idx })
+		case cmd >= 0x03:
+			// Packet format error, connection closed.
+			m.con.Close()
 		}
 	}
 	close(m.ach)
