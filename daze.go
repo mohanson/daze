@@ -112,11 +112,12 @@ func (c Cdoh) Write(b []byte) (n int, err error) {
 	doa.Doa(size == len(b)-2)
 	resp, err := http.Post(c.Server, "application/dns-message", bytes.NewReader(b[2:]))
 	if err != nil {
-		log.Println("main:", err)
+		log.Println("cdoh:", err)
 		return len(b), nil
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		log.Println("cdoh:", err)
 		return len(b), nil
 	}
 	data := make([]byte, 2+len(body))
