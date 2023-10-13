@@ -381,7 +381,7 @@ func (l *Locale) ServeSocks5(ctx *Context, app io.ReadWriteCloser) error {
 		return err
 	}
 	dstPort = binary.BigEndian.Uint16(fDstPort)
-	dst = dstHost + ":" + strconv.Itoa(int(dstPort))
+	dst = net.JoinHostPort(dstHost, strconv.Itoa(int(dstPort)))
 	switch fCmd {
 	case 0x01:
 		return l.ServeSocks5TCP(ctx, app, dst)
