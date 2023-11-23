@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
+	"net/http/pprof"
 	"os"
 	"path/filepath"
 	"strings"
@@ -64,6 +66,7 @@ func main() {
 		var (
 			flDnserv = flag.String("dns", "", "specifies the DNS, DoT or DoH server")
 			flExtend = flag.String("e", "", "extend data for different protocols")
+			flGpprof = flag.String("g", "", "listen address of net/http/pprof")
 			flCipher = flag.String("k", "daze", "password, should be same with the one specified by client")
 			flListen = flag.String("l", "0.0.0.0:1081", "listen address")
 			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon, czar, dahlia}")
@@ -103,12 +106,18 @@ func main() {
 			defer server.Close()
 			doa.Nil(server.Run())
 		}
+		if *flGpprof != "" {
+			_ = pprof.Handler
+			log.Println("main: listen net/http/pprof on", *flGpprof)
+			go func() { doa.Nil(http.ListenAndServe(*flGpprof, nil)) }()
+		}
 		daze.Hang()
 	case "client":
 		var (
 			flCIDRls = flag.String("c", filepath.Join(resExec, Conf.PathCIDR), "cidr path")
 			flDnserv = flag.String("dns", "", "specifies the DNS, DoT or DoH server")
 			flFilter = flag.String("f", "rule", "filter {rule, remote, locale}")
+			flGpprof = flag.String("g", "", "listen address of net/http/pprof")
 			flCipher = flag.String("k", "daze", "password, should be same with the one specified by server")
 			flListen = flag.String("l", "127.0.0.1:1080", "listen address")
 			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon, czar, dahlia}")
@@ -162,6 +171,11 @@ func main() {
 			client := dahlia.NewClient(*flListen, *flServer, *flCipher)
 			defer client.Close()
 			doa.Nil(client.Run())
+		}
+		if *flGpprof != "" {
+			_ = pprof.Handler
+			log.Println("main: listen net/http/pprof on", *flGpprof)
+			go func() { doa.Nil(http.ListenAndServe(*flGpprof, nil)) }()
 		}
 		daze.Hang()
 	case "gen":
