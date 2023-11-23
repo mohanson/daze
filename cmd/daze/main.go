@@ -107,11 +107,9 @@ func main() {
 			doa.Nil(server.Run())
 		}
 		if *flGpprof != "" {
-			go func() {
-				_ = pprof.Handler
-				log.Println("main: listen net/http/pprof on", *flGpprof)
-				doa.Nil(http.ListenAndServe(*flGpprof, nil))
-			}()
+			_ = pprof.Handler
+			log.Println("main: listen net/http/pprof on", *flGpprof)
+			go func() { doa.Nil(http.ListenAndServe(*flGpprof, nil)) }()
 		}
 		daze.Hang()
 	case "client":
@@ -175,11 +173,9 @@ func main() {
 			doa.Nil(client.Run())
 		}
 		if *flGpprof != "" {
-			go func() {
-				_ = pprof.Handler
-				log.Println("main: listen net/http/pprof on", *flGpprof)
-				doa.Nil(http.ListenAndServe(*flGpprof, nil))
-			}()
+			_ = pprof.Handler
+			log.Println("main: listen net/http/pprof on", *flGpprof)
+			go func() { doa.Nil(http.ListenAndServe(*flGpprof, nil)) }()
 		}
 		daze.Hang()
 	case "gen":
