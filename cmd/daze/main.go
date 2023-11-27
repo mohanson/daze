@@ -27,7 +27,7 @@ var Conf = struct {
 }{
 	PathRule: "/rule.ls",
 	PathCIDR: "/rule.cidr",
-	Version:  "v1.19.8",
+	Version:  "v1.19.9",
 }
 
 const helpMsg = `Usage: daze <command> [<args>]
@@ -66,7 +66,7 @@ func main() {
 		var (
 			flDnserv = flag.String("dns", "", "specifies the DNS, DoT or DoH server")
 			flExtend = flag.String("e", "", "extend data for different protocols")
-			flGpprof = flag.String("g", "", "listen address of net/http/pprof")
+			flGpprof = flag.String("g", "", "specify an address to enable net/http/pprof")
 			flCipher = flag.String("k", "daze", "password, should be same with the one specified by client")
 			flListen = flag.String("l", "0.0.0.0:1081", "listen address")
 			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon, czar, dahlia}")
@@ -117,7 +117,7 @@ func main() {
 			flCIDRls = flag.String("c", filepath.Join(resExec, Conf.PathCIDR), "cidr path")
 			flDnserv = flag.String("dns", "", "specifies the DNS, DoT or DoH server")
 			flFilter = flag.String("f", "rule", "filter {rule, remote, locale}")
-			flGpprof = flag.String("g", "", "listen address of net/http/pprof")
+			flGpprof = flag.String("g", "", "specify an address to enable net/http/pprof")
 			flCipher = flag.String("k", "daze", "password, should be same with the one specified by server")
 			flListen = flag.String("l", "127.0.0.1:1080", "listen address")
 			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon, czar, dahlia}")
