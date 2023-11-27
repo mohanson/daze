@@ -1084,6 +1084,7 @@ func Salt(s string) []byte {
 // LoadApnic loads remote resource. APNIC is the Regional Internet Registry administering IP addresses for the Asia
 // Pacific.
 func LoadApnic() map[string][]*net.IPNet {
+	log.Println("main: load apnic data from http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")
 	f := doa.Try(OpenFile("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest"))
 	defer f.Close()
 	r := map[string][]*net.IPNet{}
@@ -1114,6 +1115,7 @@ func LoadApnic() map[string][]*net.IPNet {
 			r[seps[1]] = append(r[seps[1]], cidr)
 		}
 	}
+	log.Println("main: load apnic done")
 	return r
 }
 
