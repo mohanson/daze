@@ -11,7 +11,7 @@ import (
 const (
 	EchoServerListenOn = "127.0.0.1:28080"
 	DazeServerListenOn = "127.0.0.1:28081"
-	DazeClientListenOn = "127.0.0.1:21082"
+	DazeClientListenOn = "127.0.0.1:28082"
 	Password           = "password"
 )
 

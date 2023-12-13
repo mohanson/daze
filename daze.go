@@ -75,7 +75,7 @@ func ResolverDot(addr string) *net.Resolver {
 	host, _, _ := net.SplitHostPort(addr)
 	conf := &tls.Config{
 		ServerName:         host,
-		ClientSessionCache: tls.NewLRUClientSessionCache(32),
+		ClientSessionCache: tls.NewLRUClientSessionCache(0),
 	}
 	return &net.Resolver{
 		PreferGo: true,
@@ -87,8 +87,6 @@ func ResolverDot(addr string) *net.Resolver {
 			if err != nil {
 				return nil, err
 			}
-			_ = c.(*net.TCPConn).SetKeepAlive(true)
-			_ = c.(*net.TCPConn).SetKeepAlivePeriod(10 * time.Minute)
 			return tls.Client(c, conf), nil
 		},
 	}
