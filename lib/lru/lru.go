@@ -1,4 +1,3 @@
-// Package lru implements an LRU cache.
 package lru
 
 import (
@@ -14,37 +13,39 @@ type Elem[K comparable, V any] struct {
 
 // List represents a doubly linked list.
 type List[K comparable, V any] struct {
-	Root Elem[K, V]
+	Root *Elem[K, V]
 	Size int
 }
 
 // Init initializes or clears list l.
 func (l *List[K, V]) Init() *List[K, V] {
-	l.Root.Next = &l.Root
-	l.Root.Prev = &l.Root
+	root := Elem[K, V]{}
+	root.Prev = &root
+	root.Next = &root
+	l.Root = &root
 	l.Size = 0
 	return l
 }
 
 // Insert inserts e after at, increments l.len, and returns e.
-func (l *List[K, V]) Insert(e, at *Elem[K, V]) *Elem[K, V] {
-	e.Prev = at
-	e.Next = at.Next
+func (l *List[K, V]) Insert(e *Elem[K, V]) *Elem[K, V] {
+	e.Prev = l.Root
+	e.Next = l.Root.Next
 	e.Prev.Next = e
 	e.Next.Prev = e
 	l.Size++
 	return e
 }
 
-// Move moves e to next to at.
-func (l *List[K, V]) Move(e, at *Elem[K, V]) {
-	if e == at || e == at.Next {
+// Update e to next to root.
+func (l *List[K, V]) Update(e *Elem[K, V]) {
+	if l.Root.Next == e {
 		return
 	}
 	e.Prev.Next = e.Next
 	e.Next.Prev = e.Prev
-	e.Prev = at
-	e.Next = at.Next
+	e.Prev = l.Root
+	e.Next = l.Root.Next
 	e.Prev.Next = e
 	e.Next.Prev = e
 }
@@ -53,8 +54,8 @@ func (l *List[K, V]) Move(e, at *Elem[K, V]) {
 func (l *List[K, V]) Remove(e *Elem[K, V]) {
 	e.Prev.Next = e.Next
 	e.Next.Prev = e.Prev
-	e.Prev = nil // avoid memory leaks
-	e.Next = nil // avoid memory leaks
+	e.Prev = nil // Avoid memory leaks
+	e.Next = nil // Avoid memory leaks
 	l.Size--
 }
 
@@ -73,16 +74,16 @@ func (l *Lru[K, V]) Set(k K, v V) {
 	l.M.Lock()
 	defer l.M.Unlock()
 	if e, ok := l.C[k]; ok {
-		l.List.Move(e, &l.List.Root)
+		l.List.Update(e)
 		e.K = k
 		e.V = v
 		return
 	}
-	l.C[k] = l.List.Insert(&Elem[K, V]{K: k, V: v}, &l.List.Root)
-	if l.List.Size > l.Size {
+	if l.List.Size == l.Size {
 		delete(l.C, l.List.Root.Prev.K)
 		l.List.Remove(l.List.Root.Prev)
 	}
+	l.C[k] = l.List.Insert(&Elem[K, V]{K: k, V: v})
 }
 
 // Get looks up a key's value from the cache.
@@ -92,7 +93,7 @@ func (l *Lru[K, V]) GetExists(k K) (v V, ok bool) {
 	var e *Elem[K, V]
 	e, ok = l.C[k]
 	if ok {
-		l.List.Move(e, &l.List.Root)
+		l.List.Update(e)
 		v = e.V
 	}
 	return
