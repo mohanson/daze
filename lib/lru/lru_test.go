@@ -75,7 +75,7 @@ func TestLruSize(t *testing.T) {
 	if c.List.Size != c.Len() || c.Len() != 4 {
 		t.FailNow()
 	}
-	for i := 0; i < 65536; i++ {
+	for range 65536 {
 		rand.Read(b)
 		c.Set(hex.EncodeToString(b), int(binary.LittleEndian.Uint32(b)))
 		if c.List.Size != c.Len() || c.Len() != 4 {

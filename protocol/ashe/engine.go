@@ -122,7 +122,7 @@ func (s *Server) Hello(con io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 		return nil, err
 	}
 	// To build a key from pre-shared key. Use xor as our key derivation function.
-	for i := 0; i < 32; i++ {
+	for i := range 32 {
 		buf[i] ^= s.Cipher[i]
 	}
 	cli = daze.Gravity(con, buf[:])
@@ -260,7 +260,7 @@ func (c *Client) Hello(con io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 		return nil, err
 	}
 	// To build a key from pre-shared key. Use xor as our key derivation function.
-	for i := 0; i < 32; i++ {
+	for i := range 32 {
 		buf[i] ^= c.Cipher[i]
 	}
 	srv = daze.Gravity(con, buf[:])

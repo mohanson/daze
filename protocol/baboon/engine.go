@@ -122,7 +122,7 @@ func (s *Server) Route(r *http.Request) int {
 	hash.Write(authData[:16])
 	hash.Write(s.Cipher[:16])
 	sign := hash.Sum(nil)
-	for i := 0; i < 16; i++ {
+	for i := range 16 {
 		if authData[16+i] != sign[i] {
 			return 0
 		}

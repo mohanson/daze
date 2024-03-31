@@ -234,7 +234,7 @@ func NewMux(conn net.Conn) *Mux {
 // NewMuxServer returns a new MuxServer.
 func NewMuxServer(conn net.Conn) *Mux {
 	mux := NewMux(conn)
-	for i := 0; i < 256; i++ {
+	for i := range 256 {
 		stm := NewStream(uint8(i), mux)
 		stm.son.Do(func() {})
 		stm.Close()
@@ -247,7 +247,7 @@ func NewMuxServer(conn net.Conn) *Mux {
 // NewMuxClient returns a new MuxClient.
 func NewMuxClient(conn net.Conn) *Mux {
 	idp := make(chan uint8, 256)
-	for i := 0; i < 256; i++ {
+	for i := range 256 {
 		idp <- uint8(i)
 	}
 	mux := NewMux(conn)
