@@ -1,9 +1,7 @@
 package lru
 
 import (
-	"crypto/rand"
-	"encoding/binary"
-	"encoding/hex"
+	"math/rand/v2"
 	"testing"
 )
 
@@ -50,34 +48,28 @@ func TestLruDel(t *testing.T) {
 }
 
 func TestLruSize(t *testing.T) {
-	b := make([]byte, 4)
-	c := New[string, int](4)
+	c := New[uint64, uint64](4)
 	if c.List.Size != c.Len() || c.Len() != 0 {
 		t.FailNow()
 	}
-	rand.Read(b)
-	c.Set(hex.EncodeToString(b), int(binary.LittleEndian.Uint32(b)))
+	c.Set(rand.Uint64(), rand.Uint64())
 	if c.List.Size != c.Len() || c.Len() != 1 {
 		t.FailNow()
 	}
-	rand.Read(b)
-	c.Set(hex.EncodeToString(b), int(binary.LittleEndian.Uint32(b)))
+	c.Set(rand.Uint64(), rand.Uint64())
 	if c.List.Size != c.Len() || c.Len() != 2 {
 		t.FailNow()
 	}
-	rand.Read(b)
-	c.Set(hex.EncodeToString(b), int(binary.LittleEndian.Uint32(b)))
+	c.Set(rand.Uint64(), rand.Uint64())
 	if c.List.Size != c.Len() || c.Len() != 3 {
 		t.FailNow()
 	}
-	rand.Read(b)
-	c.Set(hex.EncodeToString(b), int(binary.LittleEndian.Uint32(b)))
+	c.Set(rand.Uint64(), rand.Uint64())
 	if c.List.Size != c.Len() || c.Len() != 4 {
 		t.FailNow()
 	}
 	for range 65536 {
-		rand.Read(b)
-		c.Set(hex.EncodeToString(b), int(binary.LittleEndian.Uint32(b)))
+		c.Set(rand.Uint64(), rand.Uint64())
 		if c.List.Size != c.Len() || c.Len() != 4 {
 			t.FailNow()
 		}

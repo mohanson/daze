@@ -1,7 +1,6 @@
 package ashe
 
 import (
-	"crypto/rand"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -254,7 +253,7 @@ func (c *Client) Hello(con io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 		err error
 		srv io.ReadWriteCloser
 	)
-	rand.Read(buf[:])
+	io.ReadFull(&daze.RandomReader{}, buf[:])
 	_, err = con.Write(buf[:])
 	if err != nil {
 		return nil, err

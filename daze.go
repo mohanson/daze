@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/cipher"
-	"crypto/rand"
 	"crypto/rc4"
 	"crypto/sha256"
 	"crypto/tls"
@@ -17,6 +16,7 @@ import (
 	"log"
 	"math"
 	"math/bits"
+	"math/rand/v2"
 	"net"
 	"net/http"
 	"net/url"
@@ -1043,6 +1043,18 @@ func OpenFile(name string) (io.ReadCloser, error) {
 	return os.Open(name)
 }
 
+// RandomReader is a simple random number generator. Note that it is not cryptographically secure, but for daze, the
+// randomness it provides is enough.
+type RandomReader struct{}
+
+// Read implements io.Reader.
+func (r *RandomReader) Read(p []byte) (int, error) {
+	for i := 0; i < len(p); i++ {
+		p[i] = byte(rand.Uint64())
+	}
+	return len(p), nil
+}
+
 // Reno is a slow start reconnection algorithm.
 func Reno(network string, address string) (net.Conn, error) {
 	i := 0
@@ -1215,7 +1227,7 @@ func (t *Tester) TCPServe(cli io.ReadWriteCloser) {
 		case 0:
 			msg := binary.BigEndian.Uint16(buf[2:4])
 			doa.Doa(msg <= 2044)
-			rand.Read(buf[4 : 4+msg])
+			io.ReadFull(&RandomReader{}, buf[4:4+msg])
 			buf[0] = 1
 			cli.Write(buf[:4+msg])
 		case 1:
@@ -1246,7 +1258,7 @@ func (t *Tester) UDPServe(cli *net.UDPConn) error {
 		case 0:
 			msg := binary.BigEndian.Uint16(buf[2:4])
 			doa.Doa(msg <= 2044)
-			rand.Read(buf[4 : 4+msg])
+			io.ReadFull(&RandomReader{}, buf[4:4+msg])
 			buf[0] = 1
 			doa.Try(cli.WriteToUDP(buf[:4+msg], addr))
 		case 1:
