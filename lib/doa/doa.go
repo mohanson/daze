@@ -1,3 +1,5 @@
+// Package doa is the abbreviation of the "Dead or alive". It provides some easy ways to make you panic down the
+// program.
 package doa
 
 // Doa lets you test if a condition in your code returns true, if not, the program will panic.
