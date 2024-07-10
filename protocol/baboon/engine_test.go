@@ -111,7 +111,7 @@ func TestProtocolBaboonMasker(t *testing.T) {
 	if len(body) == 0 {
 		t.FailNow()
 	}
-	if !bytes.Contains(body, []byte("zhihu")) {
+	if !bytes.Contains(body, []byte("github")) {
 		t.FailNow()
 	}
 }

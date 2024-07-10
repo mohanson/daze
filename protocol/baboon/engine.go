@@ -27,7 +27,7 @@ var Conf = struct {
 	// that you are using a proxy server.
 	Masker string
 }{
-	Masker: "https://www.zhihu.com",
+	Masker: "https://github.com/",
 }
 
 // Server implemented the baboon protocol.
