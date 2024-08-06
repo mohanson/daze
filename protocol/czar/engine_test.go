@@ -24,7 +24,6 @@ func TestProtocolCzarTCP(t *testing.T) {
 	dazeServer.Run()
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
-	defer dazeClient.Close()
 	ctx := &daze.Context{}
 	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
 	defer cli.Close()
@@ -44,7 +43,6 @@ func TestProtocolCzarTCPClientClose(t *testing.T) {
 	dazeServer.Run()
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
-	defer dazeClient.Close()
 	ctx := &daze.Context{}
 	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
 	defer cli.Close()
@@ -67,7 +65,6 @@ func TestProtocolCzarTCPServerClose(t *testing.T) {
 	dazeServer.Run()
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
-	defer dazeClient.Close()
 	ctx := &daze.Context{}
 	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
 	defer cli.Close()
@@ -88,7 +85,6 @@ func TestProtocolCzarUDP(t *testing.T) {
 	dazeServer.Run()
 
 	dazeClient := NewClient(DazeServerListenOn, Password)
-	defer dazeClient.Close()
 	ctx := &daze.Context{}
 	cli := doa.Try(dazeClient.Dial(ctx, "udp", EchoServerListenOn))
 	defer cli.Close()

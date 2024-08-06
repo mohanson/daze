@@ -119,10 +119,6 @@ type Client struct {
 	Server string
 }
 
-func (c *Client) Close() error {
-	return nil
-}
-
 // Dial connects to the address on the named network.
 func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.ReadWriteCloser, error) {
 	select {
