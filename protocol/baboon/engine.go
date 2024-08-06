@@ -32,9 +32,9 @@ var Conf = struct {
 
 // Server implemented the baboon protocol.
 type Server struct {
-	Listen string
 	Cipher []byte
 	Closer io.Closer
+	Listen string
 	Masker string
 	NextID uint32
 }
@@ -74,13 +74,10 @@ func (s *Server) ServeDaze(w http.ResponseWriter, r *http.Request) {
 		Writer: cc,
 		Closer: cc,
 	}
-	srv := ashe.Server{
-		Listen: s.Listen,
-		Cipher: s.Cipher,
-	}
+	spy := &ashe.Server{Cipher: s.Cipher}
 	ctx := &daze.Context{Cid: atomic.AddUint32(&s.NextID, 1)}
 	log.Printf("conn: %08x accept remote=%s", ctx.Cid, cc.RemoteAddr())
-	if err := srv.Serve(ctx, cli); err != nil {
+	if err := spy.Serve(ctx, cli); err != nil {
 		log.Printf("conn: %08x  error %s", ctx.Cid, err)
 	}
 	log.Printf("conn: %08x closed", ctx.Cid)
@@ -145,8 +142,8 @@ func (s *Server) Run() error {
 // NewServer returns a new Server.
 func NewServer(listen string, cipher string) *Server {
 	return &Server{
-		Listen: listen,
 		Cipher: daze.Salt(cipher),
+		Listen: listen,
 		Masker: Conf.Masker,
 		NextID: uint32(math.MaxUint32),
 	}
@@ -154,17 +151,17 @@ func NewServer(listen string, cipher string) *Server {
 
 // Client implemented the baboon protocol.
 type Client struct {
-	Server string
 	Cipher []byte
+	Server string
 }
 
 // Dial connects to the address on the named network.
 func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.ReadWriteCloser, error) {
 	var (
-		srv io.ReadWriteCloser
 		buf = make([]byte, 256)
-		req *http.Request
 		err error
+		req *http.Request
+		srv io.ReadWriteCloser
 	)
 	srv, err = daze.Dial("tcp", c.Server)
 	if err != nil {
@@ -179,21 +176,18 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	req.Write(srv)
 	// Discard responded header
 	io.ReadFull(srv, buf[:147])
-	cli := &ashe.Client{
-		Server: c.Server,
-		Cipher: c.Cipher,
-	}
-	ret, err := cli.Estab(ctx, srv, network, address)
+	spy := &ashe.Client{Cipher: c.Cipher}
+	con, err := spy.Estab(ctx, srv, network, address)
 	if err != nil {
 		srv.Close()
 	}
-	return ret, err
+	return con, err
 }
 
 // NewClient returns a new Client.
 func NewClient(server string, cipher string) *Client {
 	return &Client{
-		Server: server,
 		Cipher: daze.Salt(cipher),
+		Server: server,
 	}
 }

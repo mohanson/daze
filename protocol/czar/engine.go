@@ -44,15 +44,15 @@ import (
 
 // Server implemented the czar protocol.
 type Server struct {
-	Listen string
 	Cipher []byte
 	Closer io.Closer
+	Listen string
 }
 
 // Serve incoming connections. Parameter cli will be closed automatically when the function exits.
 func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
-	asheServer := &ashe.Server{Cipher: s.Cipher}
-	return asheServer.Serve(ctx, cli)
+	spy := &ashe.Server{Cipher: s.Cipher}
+	return spy.Serve(ctx, cli)
 }
 
 // Close listener.
@@ -83,21 +83,21 @@ func (s *Server) Run() error {
 				break
 			}
 			mux := NewMuxServer(cli)
-			go func(mux *Mux) {
+			go func() {
 				defer mux.Close()
 				for cli := range mux.Accept() {
 					idx++
 					ctx := &daze.Context{Cid: idx}
 					log.Printf("conn: %08x accept remote=%s", ctx.Cid, mux.con.RemoteAddr())
-					go func(ctx *daze.Context, cli io.ReadWriteCloser) {
+					go func() {
 						defer cli.Close()
 						if err := s.Serve(ctx, cli); err != nil {
 							log.Printf("conn: %08x  error %s", ctx.Cid, err)
 						}
 						log.Printf("conn: %08x closed", ctx.Cid)
-					}(ctx, cli)
+					}()
 				}
-			}(mux)
+			}()
 		}
 	}()
 
@@ -107,16 +107,16 @@ func (s *Server) Run() error {
 // NewServer returns a new Server.
 func NewServer(listen string, cipher string) *Server {
 	return &Server{
-		Listen: listen,
 		Cipher: daze.Salt(cipher),
+		Listen: listen,
 	}
 }
 
 // Client implemented the czar protocol.
 type Client struct {
 	Cipher []byte
-	Server string
 	Mux    chan *Mux
+	Server string
 }
 
 func (c *Client) Close() error {
@@ -131,12 +131,12 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		if err != nil {
 			return nil, err
 		}
-		asheClient := &ashe.Client{Cipher: c.Cipher}
-		ret, err := asheClient.Estab(ctx, srv, network, address)
+		spy := &ashe.Client{Cipher: c.Cipher}
+		con, err := spy.Estab(ctx, srv, network, address)
 		if err != nil {
 			srv.Close()
 		}
-		return ret, err
+		return con, err
 	case <-time.After(daze.Conf.DialerTimeout):
 		return nil, fmt.Errorf("dial tcp: %s: i/o timeout", address)
 	}
@@ -164,8 +164,8 @@ func (c *Client) Run() {
 func NewClient(server, cipher string) *Client {
 	client := &Client{
 		Cipher: daze.Salt(cipher),
-		Server: server,
 		Mux:    make(chan *Mux),
+		Server: server,
 	}
 	go client.Run()
 	return client

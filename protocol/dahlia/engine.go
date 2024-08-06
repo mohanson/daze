@@ -31,9 +31,9 @@ func (s *Server) Close() error {
 }
 
 // Serve incoming connections. Parameter cli will be closed automatically when the function exits.
-func (s *Server) Serve(ctx *daze.Context, cli net.Conn) error {
-	dec := ashe.Server{Cipher: s.Cipher}
-	spy, err := dec.Hello(cli)
+func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
+	spy := &ashe.Server{Cipher: s.Cipher}
+	con, err := spy.Hello(cli)
 	if err != nil {
 		return err
 	}
@@ -41,7 +41,7 @@ func (s *Server) Serve(ctx *daze.Context, cli net.Conn) error {
 	if err != nil {
 		return err
 	}
-	daze.Link(spy, srv)
+	daze.Link(con, srv)
 	return nil
 }
 
@@ -67,13 +67,13 @@ func (s *Server) Run() error {
 			idx++
 			ctx := &daze.Context{Cid: idx}
 			log.Printf("conn: %08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
-			go func(ctx *daze.Context, cli net.Conn) {
+			go func() {
 				defer cli.Close()
 				if err := s.Serve(ctx, cli); err != nil {
 					log.Printf("conn: %08x  error %s", ctx.Cid, err)
 				}
 				log.Printf("conn: %08x closed", ctx.Cid)
-			}(ctx, cli)
+			}()
 		}
 	}()
 	return nil
@@ -105,18 +105,18 @@ func (c *Client) Close() error {
 }
 
 // Serve incoming connections. Parameter cli will be closed automatically when the function exits.
-func (c *Client) Serve(ctx *daze.Context, cli net.Conn) error {
+func (c *Client) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 	srv, err := daze.Dial("tcp", c.Server)
 	if err != nil {
 		return err
 	}
-	enc := ashe.Client{Cipher: c.Cipher}
-	spy, err := enc.Hello(srv)
+	spy := &ashe.Client{Cipher: c.Cipher}
+	con, err := spy.Hello(srv)
 	if err != nil {
 		srv.Close()
 		return err
 	}
-	daze.Link(cli, spy)
+	daze.Link(cli, con)
 	return nil
 }
 
@@ -142,13 +142,13 @@ func (c *Client) Run() error {
 			idx++
 			ctx := &daze.Context{Cid: idx}
 			log.Printf("conn: %08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
-			go func(ctx *daze.Context, cli net.Conn) {
+			go func() {
 				defer cli.Close()
 				if err := c.Serve(ctx, cli); err != nil {
 					log.Printf("conn: %08x  error %s", ctx.Cid, err)
 				}
 				log.Printf("conn: %08x closed", ctx.Cid)
-			}(ctx, cli)
+			}()
 		}
 	}()
 	return nil
@@ -179,7 +179,7 @@ func (m *Middle) Close() error {
 }
 
 // Serve incoming connections. Parameter cli will be closed automatically when the function exits.
-func (m *Middle) Serve(ctx *daze.Context, cli net.Conn) error {
+func (m *Middle) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 	srv, err := daze.Dial("tcp", m.Server)
 	if err != nil {
 		return err
@@ -210,13 +210,13 @@ func (m *Middle) Run() error {
 			idx++
 			ctx := &daze.Context{Cid: idx}
 			log.Printf("conn: %08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
-			go func(ctx *daze.Context, cli net.Conn) {
+			go func() {
 				defer cli.Close()
 				if err := m.Serve(ctx, cli); err != nil {
 					log.Printf("conn: %08x  error %s", ctx.Cid, err)
 				}
 				log.Printf("conn: %08x closed", ctx.Cid)
-			}(ctx, cli)
+			}()
 		}
 	}()
 	return nil

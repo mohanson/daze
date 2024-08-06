@@ -101,22 +101,22 @@ func (c *UDPConn) Write(p []byte) (int, error) {
 // Server implemented the ashe protocol. The ASHE server will typically evaluate the request based on source and
 // destination addresses, and return one or more reply messages, as appropriate for the request type.
 type Server struct {
-	Listen string
 	// Cipher is a pre-shared key.
 	Cipher []byte
 	Closer io.Closer
+	Listen string
 }
 
 // Hello creates an encrypted channel.
-func (s *Server) Hello(con io.ReadWriteCloser) (io.ReadWriteCloser, error) {
+func (s *Server) Hello(cli io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	var (
 		buf     = make([]byte, 32)
-		cli     io.ReadWriteCloser
+		con     io.ReadWriteCloser
 		err     error
 		gap     int64
 		gapSign int64
 	)
-	_, err = io.ReadFull(con, buf[:])
+	_, err = io.ReadFull(cli, buf[:])
 	if err != nil {
 		return nil, err
 	}
@@ -124,8 +124,8 @@ func (s *Server) Hello(con io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	for i := range 32 {
 		buf[i] ^= s.Cipher[i]
 	}
-	cli = daze.Gravity(con, buf[:])
-	_, err = io.ReadFull(cli, buf[:8])
+	con = daze.Gravity(cli, buf[:])
+	_, err = io.ReadFull(con, buf[:8])
 	if err != nil {
 		return nil, err
 	}
@@ -136,31 +136,31 @@ func (s *Server) Hello(con io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	if gap^gapSign-gapSign > int64(Conf.LifeExpired) {
 		return nil, errors.New("daze: request expired")
 	}
-	return cli, nil
+	return con, nil
 }
 
 // Serve incoming connections. Parameter cli will be closed automatically when the function exits.
-func (s *Server) Serve(ctx *daze.Context, con io.ReadWriteCloser) error {
+func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 	var (
 		buf    = make([]byte, 256)
-		cli    io.ReadWriteCloser
+		con    io.ReadWriteCloser
 		dst    string
 		dstLen uint8
 		dstNet uint8
-		srv    io.ReadWriteCloser
 		err    error
+		srv    io.ReadWriteCloser
 	)
-	cli, err = s.Hello(con)
+	con, err = s.Hello(cli)
 	if err != nil {
 		return err
 	}
-	_, err = io.ReadFull(cli, buf[:2])
+	_, err = io.ReadFull(con, buf[:2])
 	if err != nil {
 		return err
 	}
 	dstNet = buf[0]
 	dstLen = buf[1]
-	_, err = io.ReadFull(cli, buf[:dstLen])
+	_, err = io.ReadFull(con, buf[:dstLen])
 	if err != nil {
 		return err
 	}
@@ -174,17 +174,17 @@ func (s *Server) Serve(ctx *daze.Context, con io.ReadWriteCloser) error {
 		srv, err = daze.Dial("udp", dst)
 	}
 	if err != nil {
-		cli.Write([]byte{1})
+		con.Write([]byte{1})
 		return err
 	}
-	cli.Write([]byte{0})
+	con.Write([]byte{0})
 	switch dstNet {
 	case 0x01:
-		cli = NewTCPConn(cli)
+		con = NewTCPConn(con)
 	case 0x03:
-		cli = NewUDPConn(cli)
+		con = NewUDPConn(con)
 	}
-	daze.Link(cli, srv)
+	daze.Link(con, srv)
 	return nil
 }
 
@@ -218,13 +218,13 @@ func (s *Server) Run() error {
 			idx++
 			ctx := &daze.Context{Cid: idx}
 			log.Printf("conn: %08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
-			go func(ctx *daze.Context, cli net.Conn) {
+			go func() {
 				defer cli.Close()
 				if err := s.Serve(ctx, cli); err != nil {
 					log.Printf("conn: %08x  error %s", ctx.Cid, err)
 				}
 				log.Printf("conn: %08x closed", ctx.Cid)
-			}(ctx, cli)
+			}()
 		}
 	}()
 
@@ -241,20 +241,20 @@ func NewServer(listen string, cipher string) *Server {
 
 // Client implemented the ashe protocol.
 type Client struct {
-	Server string
 	// Cipher is a pre-shared key.
 	Cipher []byte
+	Server string
 }
 
 // Hello creates an encrypted channel.
-func (c *Client) Hello(con io.ReadWriteCloser) (io.ReadWriteCloser, error) {
+func (c *Client) Hello(srv io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	var (
 		buf = make([]byte, 32)
+		con io.ReadWriteCloser
 		err error
-		srv io.ReadWriteCloser
 	)
 	io.ReadFull(&daze.RandomReader{}, buf[:])
-	_, err = con.Write(buf[:])
+	_, err = srv.Write(buf[:])
 	if err != nil {
 		return nil, err
 	}
@@ -262,22 +262,22 @@ func (c *Client) Hello(con io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	for i := range 32 {
 		buf[i] ^= c.Cipher[i]
 	}
-	srv = daze.Gravity(con, buf[:])
+	con = daze.Gravity(srv, buf[:])
 	binary.BigEndian.PutUint64(buf[:8], uint64(time.Now().Unix()))
-	_, err = srv.Write(buf[:8])
+	_, err = con.Write(buf[:8])
 	if err != nil {
 		return nil, err
 	}
-	return srv, nil
+	return con, nil
 }
 
 // Establish an existing connection. It is the caller's responsibility to close the con.
-func (c *Client) Estab(ctx *daze.Context, con io.ReadWriteCloser, network string, address string) (io.ReadWriteCloser, error) {
+func (c *Client) Estab(ctx *daze.Context, srv io.ReadWriteCloser, network string, address string) (io.ReadWriteCloser, error) {
 	var (
-		n   = len(address)
 		buf = make([]byte, 2)
+		con io.ReadWriteCloser
 		err error
-		srv io.ReadWriteCloser
+		n   = len(address)
 	)
 	if n > 255 {
 		return nil, fmt.Errorf("daze: destination address too long %s", address)
@@ -285,7 +285,7 @@ func (c *Client) Estab(ctx *daze.Context, con io.ReadWriteCloser, network string
 	if network != "tcp" && network != "udp" {
 		return nil, fmt.Errorf("daze: network must be tcp or udp")
 	}
-	srv, err = c.Hello(con)
+	con, err = c.Hello(srv)
 	if err != nil {
 		return nil, err
 	}
@@ -296,12 +296,12 @@ func (c *Client) Estab(ctx *daze.Context, con io.ReadWriteCloser, network string
 		buf[0x00] = 0x03
 	}
 	buf[0x01] = uint8(n)
-	srv.Write(buf[:2])
-	_, err = srv.Write([]byte(address))
+	con.Write(buf[:2])
+	_, err = con.Write([]byte(address))
 	if err != nil {
 		return nil, err
 	}
-	_, err = io.ReadFull(srv, buf[:1])
+	_, err = io.ReadFull(con, buf[:1])
 	if err != nil {
 		return nil, err
 	}
@@ -310,9 +310,9 @@ func (c *Client) Estab(ctx *daze.Context, con io.ReadWriteCloser, network string
 	}
 	switch network {
 	case "tcp":
-		return NewTCPConn(srv), nil
+		return NewTCPConn(con), nil
 	case "udp":
-		return NewUDPConn(srv), nil
+		return NewUDPConn(con), nil
 	}
 	panic("unreachable")
 }
@@ -323,11 +323,11 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	if err != nil {
 		return nil, err
 	}
-	ret, err := c.Estab(ctx, srv, network, address)
+	con, err := c.Estab(ctx, srv, network, address)
 	if err != nil {
 		srv.Close()
 	}
-	return ret, err
+	return con, err
 }
 
 // NewClient returns a new Client. A secret data needs to be passed in Cipher, as a sign to interface with the Server.
