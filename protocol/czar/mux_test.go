@@ -121,11 +121,11 @@ func (t *Tester) Mux() error {
 				break
 			}
 			mux := NewMuxServer(cli)
-			go func(mux *Mux) {
+			go func() {
 				for cli := range mux.Accept() {
 					go t.TCPServe(cli)
 				}
-			}(mux)
+			}()
 		}
 	}()
 	return nil
