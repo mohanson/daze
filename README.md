@@ -136,6 +136,15 @@ $ daze client -l :20002 -s 127.0.0.1:20001 -p dahlia
 
 Reminder again: Dahlia is not a proxy protocol but a port forwarding protocol.
 
+### Etch
+
+Protocol etch is an implementation of the ashe protocol based on [QUIC](https://en.wikipedia.org/wiki/QUIC). Since QUIC is a UDP-based transport protocol, the experience may be much better than other protocols in some cases (but it may also be the opposite, depending on your network operator).
+
+```sh
+$ daze server ... -p etch
+$ daze client ... -p etch
+```
+
 # Proxy Control
 
 Proxy control is a rule that determines whether network requests (TCP and UDP) go directly to the destination or are forwarded to the daze server. Use the `-f` option in the daze client to adjust the proxy configuration.
