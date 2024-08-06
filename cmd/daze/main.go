@@ -18,6 +18,7 @@ import (
 	"github.com/mohanson/daze/protocol/baboon"
 	"github.com/mohanson/daze/protocol/czar"
 	"github.com/mohanson/daze/protocol/dahlia"
+	"github.com/mohanson/daze/protocol/etch"
 )
 
 // Conf is acting as package level configuration.
@@ -106,6 +107,10 @@ func main() {
 			server := dahlia.NewServer(*flListen, *flExtend, *flCipher)
 			defer server.Close()
 			doa.Nil(server.Run())
+		case "etch":
+			server := etch.NewServer(*flListen, *flCipher)
+			defer server.Close()
+			doa.Nil(server.Run())
 		}
 		if *flGpprof != "" {
 			_ = pprof.Handler
@@ -175,6 +180,15 @@ func main() {
 			client := dahlia.NewClient(*flListen, *flServer, *flCipher)
 			defer client.Close()
 			doa.Nil(client.Run())
+		case "etch":
+			client := etch.NewClient(*flServer, *flCipher)
+			locale := daze.NewLocale(*flListen, daze.NewAimbot(client, &daze.AimbotOption{
+				Type: *flFilter,
+				Rule: *flRulels,
+				Cidr: *flCIDRls,
+			}))
+			defer locale.Close()
+			doa.Nil(locale.Run())
 		}
 		if *flGpprof != "" {
 			_ = pprof.Handler
