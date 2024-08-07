@@ -114,9 +114,16 @@ func NewServer(listen string, cipher string) *Server {
 
 // Client implemented the czar protocol.
 type Client struct {
+	Cancel chan struct{}
 	Cipher []byte
 	Mux    chan *Mux
 	Server string
+}
+
+// Close the connection. All streams will be closed at the same time.
+func (c *Client) Close() error {
+	close(c.Cancel)
+	return nil
 }
 
 // Dial connects to the address on the named network.
@@ -149,6 +156,9 @@ func (c *Client) Run() {
 			case c.Mux <- mux:
 				continue
 			case <-mux.rdn:
+			case <-c.Cancel:
+				mux.Close()
+				return
 			}
 			break
 		}
@@ -159,6 +169,7 @@ func (c *Client) Run() {
 // NewClient returns a new Client.
 func NewClient(server, cipher string) *Client {
 	client := &Client{
+		Cancel: make(chan struct{}),
 		Cipher: daze.Salt(cipher),
 		Mux:    make(chan *Mux),
 		Server: server,
