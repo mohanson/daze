@@ -13,6 +13,7 @@ import (
 
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/lib/doa"
+	"github.com/mohanson/daze/lib/gracefulexit"
 	"github.com/mohanson/daze/protocol/ashe"
 	"github.com/mohanson/daze/protocol/baboon"
 	"github.com/mohanson/daze/protocol/czar"
@@ -111,7 +112,9 @@ func main() {
 			log.Println("main: listen net/http/pprof on", *flGpprof)
 			go func() { doa.Nil(http.ListenAndServe(*flGpprof, nil)) }()
 		}
-		daze.Hang()
+		// Hang prevent program from exiting.
+		gracefulexit.Wait()
+		log.Println("main: exit")
 	case "client":
 		var (
 			flCIDRls = flag.String("c", filepath.Join(resExec, Conf.PathCIDR), "cidr path")
@@ -160,6 +163,7 @@ func main() {
 			doa.Nil(locale.Run())
 		case "czar":
 			client := czar.NewClient(*flServer, *flCipher)
+			defer client.Close()
 			locale := daze.NewLocale(*flListen, daze.NewAimbot(client, &daze.AimbotOption{
 				Type: *flFilter,
 				Rule: *flRulels,
@@ -177,7 +181,9 @@ func main() {
 			log.Println("main: listen net/http/pprof on", *flGpprof)
 			go func() { doa.Nil(http.ListenAndServe(*flGpprof, nil)) }()
 		}
-		daze.Hang()
+		// Hang prevent program from exiting.
+		gracefulexit.Wait()
+		log.Println("main: exit")
 	case "gen":
 		flag.Usage = func() {
 			fmt.Fprint(flag.CommandLine.Output(), helpGen)

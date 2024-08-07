@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/mohanson/daze"
-	"github.com/mohanson/daze/lib/doa"
 	"github.com/mohanson/daze/protocol/ashe"
 )
 
@@ -114,9 +113,16 @@ func NewServer(listen string, cipher string) *Server {
 
 // Client implemented the czar protocol.
 type Client struct {
+	Cancel chan struct{}
 	Cipher []byte
 	Mux    chan *Mux
 	Server string
+}
+
+// Close the connection. All streams will be closed at the same time.
+func (c *Client) Close() error {
+	close(c.Cancel)
+	return nil
 }
 
 // Dial connects to the address on the named network.
@@ -140,25 +146,54 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 
 // Run creates an establish connection to czar server.
 func (c *Client) Run() {
+	var (
+		err error
+		mux *Mux
+		rtt = 0
+		sid = 0
+		srv net.Conn
+	)
 	for {
-		srv := doa.Try(daze.Reno("tcp", c.Server))
-		log.Println("czar: mux init")
-		mux := NewMuxClient(srv)
-		for {
+		switch sid {
+		case 0:
+			srv, err = daze.Dial("tcp", c.Server)
+			switch {
+			case srv == nil:
+				log.Println("czar:", err)
+				select {
+				case <-time.After(time.Second * time.Duration(math.Pow(2, float64(rtt)))):
+					// A slow start reconnection algorithm.
+					rtt = min(rtt+1, 5)
+				case <-c.Cancel:
+					sid = 2
+				}
+			case err == nil:
+				log.Println("czar: mux init")
+				mux = NewMuxClient(srv)
+				rtt = 0
+				sid = 1
+			}
+		case 1:
 			select {
 			case c.Mux <- mux:
-				continue
 			case <-mux.rdn:
+				log.Println("czar: mux done")
+				sid = 0
+			case <-c.Cancel:
+				log.Println("czar: mux done")
+				sid = 2
 			}
-			break
+		case 2:
+			mux.Close()
+			return
 		}
-		log.Println("czar: mux done")
 	}
 }
 
 // NewClient returns a new Client.
 func NewClient(server, cipher string) *Client {
 	client := &Client{
+		Cancel: make(chan struct{}),
 		Cipher: daze.Salt(cipher),
 		Mux:    make(chan *Mux),
 		Server: server,

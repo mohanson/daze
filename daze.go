@@ -1022,11 +1022,6 @@ func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
 	}
 }
 
-// Hang prevent program from exiting.
-func Hang() {
-	select {}
-}
-
 // OpenFile select the appropriate method to open the file based on the incoming args automatically.
 //
 // Examples:
@@ -1053,22 +1048,6 @@ func (r *RandomReader) Read(p []byte) (int, error) {
 		p[i] = byte(rand.Uint64())
 	}
 	return len(p), nil
-}
-
-// Reno is a slow start reconnection algorithm.
-func Reno(network string, address string) (net.Conn, error) {
-	i := 0
-	for {
-		r, err := Dial(network, address)
-		if err == nil {
-			return r, err
-		}
-		log.Println("reno:", err)
-		time.Sleep(time.Second * time.Duration(math.Pow(2, float64(i))))
-		if i < 5 {
-			i++
-		}
-	}
 }
 
 // Salt converts the stupid password passed in by the user to 32-sized byte array.
