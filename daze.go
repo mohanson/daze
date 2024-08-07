@@ -1022,11 +1022,6 @@ func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
 	}
 }
 
-// Hang prevent program from exiting.
-func Hang() {
-	select {}
-}
-
 // OpenFile select the appropriate method to open the file based on the incoming args automatically.
 //
 // Examples:
