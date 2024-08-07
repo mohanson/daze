@@ -1055,22 +1055,6 @@ func (r *RandomReader) Read(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// Reno is a slow start reconnection algorithm.
-func Reno(network string, address string) (net.Conn, error) {
-	i := 0
-	for {
-		r, err := Dial(network, address)
-		if err == nil {
-			return r, err
-		}
-		log.Println("reno:", err)
-		time.Sleep(time.Second * time.Duration(math.Pow(2, float64(i))))
-		if i < 5 {
-			i++
-		}
-	}
-}
-
 // Salt converts the stupid password passed in by the user to 32-sized byte array.
 func Salt(s string) []byte {
 	h := sha256.Sum256([]byte(s))
