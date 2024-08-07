@@ -201,11 +201,14 @@ func main() {
 			flag.Usage()
 			return
 		}
-		f := doa.Try(os.OpenFile(filepath.Join(resExec, Conf.PathCIDR), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644))
+		name := filepath.Join(resExec, Conf.PathCIDR)
+		log.Println("main: save apnic data into", name)
+		f := doa.Try(os.OpenFile(name, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644))
 		defer f.Close()
 		for _, e := range cidr {
 			fmt.Fprintln(f, "L", e.String())
 		}
+		log.Println("main: save apnic data done")
 	case "ver":
 		fmt.Println("daze", Conf.Version)
 	case "", "-h", "--help":
