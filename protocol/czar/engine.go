@@ -156,16 +156,17 @@ func (c *Client) Run() {
 		switch sid {
 		case 0:
 			srv, err = daze.Dial("tcp", c.Server)
-			if err == nil {
+			switch {
+			case srv == nil:
+				log.Println("czar:", err)
+				select {
+				case <-time.After(time.Minute):
+				case <-c.Cancel:
+					sid = 2
+				}
+			case err == nil:
 				mux = NewMuxClient(srv)
 				sid = 1
-				continue
-			}
-			log.Println("czar:", err)
-			select {
-			case <-time.After(time.Minute):
-			case <-c.Cancel:
-				sid = 2
 			}
 		case 1:
 			select {
