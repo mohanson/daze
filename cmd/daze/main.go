@@ -160,6 +160,7 @@ func main() {
 			doa.Nil(locale.Run())
 		case "czar":
 			client := czar.NewClient(*flServer, *flCipher)
+			defer client.Close()
 			locale := daze.NewLocale(*flListen, daze.NewAimbot(client, &daze.AimbotOption{
 				Type: *flFilter,
 				Rule: *flRulels,
