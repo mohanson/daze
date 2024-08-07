@@ -149,6 +149,7 @@ func (c *Client) Run() {
 	var (
 		err error
 		mux *Mux
+		rtt = 0
 		sid = 0
 		srv net.Conn
 	)
@@ -160,12 +161,15 @@ func (c *Client) Run() {
 			case srv == nil:
 				log.Println("czar:", err)
 				select {
-				case <-time.After(time.Minute):
+				case <-time.After(time.Second * time.Duration(math.Pow(2, float64(rtt)))):
+					// A slow start reconnection algorithm.
+					rtt = min(rtt+1, 5)
 				case <-c.Cancel:
 					sid = 2
 				}
 			case err == nil:
 				mux = NewMuxClient(srv)
+				rtt = 0
 				sid = 1
 			}
 		case 1:
