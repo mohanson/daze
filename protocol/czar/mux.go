@@ -206,13 +206,13 @@ func (m *Mux) Spawn() {
 func (m *Mux) Write(priority int, b []byte) (int, error) {
 	if priority >= 1 {
 		m.wm1.Lock()
+		defer m.wm1.Unlock()
 	}
-	m.wm0.Lock()
+	if priority >= 0 {
+		m.wm0.Lock()
+		defer m.wm0.Unlock()
+	}
 	n, err := m.con.Write(b)
-	m.wm0.Unlock()
-	if priority >= 1 {
-		m.wm1.Unlock()
-	}
 	return n, err
 }
 
