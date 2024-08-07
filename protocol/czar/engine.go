@@ -168,6 +168,7 @@ func (c *Client) Run() {
 					sid = 2
 				}
 			case err == nil:
+				log.Println("czar: mux init")
 				mux = NewMuxClient(srv)
 				rtt = 0
 				sid = 1
@@ -176,9 +177,11 @@ func (c *Client) Run() {
 			select {
 			case c.Mux <- mux:
 			case <-mux.rdn:
+				log.Println("czar: mux done")
 				sid = 0
 			case <-c.Cancel:
-				sid = 3
+				log.Println("czar: mux done")
+				sid = 2
 			}
 		case 2:
 			mux.Close()
