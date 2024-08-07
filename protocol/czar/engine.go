@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/mohanson/daze"
-	"github.com/mohanson/daze/lib/doa"
 	"github.com/mohanson/daze/protocol/ashe"
 )
 
@@ -147,22 +146,39 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 
 // Run creates an establish connection to czar server.
 func (c *Client) Run() {
+	var (
+		err error
+		mux *Mux
+		sid = 0
+		srv net.Conn
+	)
 	for {
-		srv := doa.Try(daze.Reno("tcp", c.Server))
-		log.Println("czar: mux init")
-		mux := NewMuxClient(srv)
-		for {
+		switch sid {
+		case 0:
+			srv, err = daze.Dial("tcp", c.Server)
+			if err == nil {
+				mux = NewMuxClient(srv)
+				sid = 1
+				continue
+			}
+			log.Println("czar:", err)
+			select {
+			case <-time.After(time.Minute):
+			case <-c.Cancel:
+				sid = 2
+			}
+		case 1:
 			select {
 			case c.Mux <- mux:
-				continue
 			case <-mux.rdn:
+				sid = 0
 			case <-c.Cancel:
-				mux.Close()
-				return
+				sid = 3
 			}
-			break
+		case 2:
+			mux.Close()
+			return
 		}
-		log.Println("czar: mux done")
 	}
 }
 
