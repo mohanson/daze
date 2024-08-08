@@ -98,9 +98,9 @@ Daze currently has 4 middle protocols.
 
 ### Ashe
 
-The default protocol used by Daze is called Ashe. Ashe is a TCP-based cryptographic proxy protocol designed to bypass firewalls while providing a good user experience.
+The default protocol used by daze is called ashe. Ashe is a TCP-based cryptographic proxy protocol designed to bypass firewalls while providing a good user experience.
 
-Please note that **it is the user's responsibility to ensure that the date and time on both the server and client are consistent**. The Ashe protocol allows for a deviation of up to two minutes.
+Please note that **it is the user's responsibility to ensure that the date and time on both the server and client are consistent**. The ashe protocol allows for a deviation of up to two minutes.
 
 ### Baboon
 
