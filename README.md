@@ -64,18 +64,18 @@ Daze's network model consists of 7 components:
 ```
 
 - Destination: The destination is an internet service provider, for example, google.com.
-- Daze Server: A Daze server is an instance that runs using the command `daze server`.
+- Daze Server: A daze server is an instance that runs using the command `daze server`.
 - Firewall: A firewall is a network security system that monitors and controls incoming and outgoing network traffic based on pre-determined security rules.
-- Daze Client: A Daze client is an instance that runs using the command `daze client`.
+- Daze Client: A daze client is an instance that runs using the command `daze client`.
 - User: A user is a browser or any other application attempting to access the destination.
-- Middle Protocol: The middle protocol is the communication protocol between the Daze server and Daze client. Data is encrypted and obfuscated to bypass firewalls.
-- Client Protocol: The client protocol is the communication protocol between the Daze client and the user.
+- Middle Protocol: The middle protocol is the communication protocol between the daze server and daze client. Data is encrypted and obfuscated to bypass firewalls.
+- Client Protocol: The client protocol is the communication protocol between the daze client and the user.
 
 # Protocols
 
 ## Client Protocols
 
-The Daze client implements five different proxy protocols in one port. These protocols are HTTP Proxy, HTTPS Tunnel, SOCKS4, SOCKS4a, and SOCKS5.
+The daze client implements five different proxy protocols in one port. These protocols are HTTP Proxy, HTTPS Tunnel, SOCKS4, SOCKS4a, and SOCKS5.
 
 ```sh
 # HTTP Proxy
@@ -113,7 +113,7 @@ $ daze client ... -p baboon
 
 ### Czar
 
-Protocol czar is an implementation of the Ashe protocol based on TCP multiplexing. Multiplexing involves reusing a single TCP connection for multiple Ashe protocols, which saves time on the TCP three-way handshake. However, this may result in a slight decrease in data transfer rate (approximately 0.19%). In most cases, using Protocol czar provides a better user experience compared to using the Ashe protocol directly.
+Protocol czar is an implementation of the ashe protocol based on TCP multiplexing. Multiplexing involves reusing a single TCP connection for multiple ashe protocols, which saves time on the TCP three-way handshake. However, this may result in a slight decrease in data transfer rate (approximately 0.19%). In most cases, using Protocol czar provides a better user experience compared to using the ashe protocol directly.
 
 ```sh
 $ daze server ... -p czar
@@ -164,7 +164,7 @@ By default, daze has configured rule.cidr for China's mainland. You can update i
 
 # DNS resolver
 
-The DNS server and DNS protocol used by Daze can be specified through command line parameters.
+The DNS server and DNS protocol used by daze can be specified through command line parameters.
 
 - `DNS: daze ... -dns 1.1.1.1:53`
 - `DoT: daze ... -dns 1.1.1.1:853`
