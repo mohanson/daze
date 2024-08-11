@@ -27,7 +27,7 @@ func (l *List[K, V]) Init() *List[K, V] {
 	return l
 }
 
-// Insert inserts e after at, increments l.len, and returns e.
+// Insert inserts e after root, increments l's size, and returns e.
 func (l *List[K, V]) Insert(e *Elem[K, V]) *Elem[K, V] {
 	e.Prev = l.Root
 	e.Next = l.Root.Next
@@ -50,7 +50,7 @@ func (l *List[K, V]) Update(e *Elem[K, V]) {
 	e.Next.Prev = e
 }
 
-// Remove removes e from its list, decrements l.len
+// Remove removes e from its list, decrements l's size.
 func (l *List[K, V]) Remove(e *Elem[K, V]) {
 	e.Prev.Next = e.Next
 	e.Next.Prev = e.Prev
