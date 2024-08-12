@@ -161,6 +161,8 @@ func (m *Mux) Spawn() {
 		case cmd == 0x00:
 			// Make sure the stream has been closed properly.
 			old := m.usb[idx]
+			old.rer.Put(io.EOF)
+			old.wer.Put(io.ErrClosedPipe)
 			old.ron.Do(func() { close(old.rdn) })
 			old.won.Do(func() { close(old.wdn) })
 			old.son.Do(func() { old.idp <- old.idx })
