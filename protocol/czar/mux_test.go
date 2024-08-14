@@ -78,6 +78,28 @@ func TestProtocolMuxClientClose(t *testing.T) {
 	doa.Doa(strings.Contains(er2.Error(), "use of closed network connection"))
 }
 
+func TestProtocolMuxStreamClientReuse(t *testing.T) {
+	remote := Tester{daze.NewTester(EchoServerListenOn)}
+	remote.Mux()
+	defer remote.Close()
+
+	mux := NewMuxClient(doa.Try(net.Dial("tcp", EchoServerListenOn)))
+	defer mux.Close()
+	buf := make([]byte, 0x8000)
+
+	cl0 := doa.Try(mux.Open())
+	cl0.Write([]byte{0x00, 0x00, 0x80, 0x00})
+	cl0.Close()
+
+	cl1 := doa.Try(mux.Open())
+	doa.Try(cl1.Write([]byte{0x00, 0x01, 0x80, 0x00}))
+	doa.Doa(doa.Try(io.ReadFull(cl1, buf)) == 0x8000)
+	for i := range 0x8000 {
+		doa.Doa(buf[i] == 0x01)
+	}
+	cl1.Close()
+}
+
 func TestProtocolMuxServerRecvEvilPacket(t *testing.T) {
 	remote := Tester{daze.NewTester(EchoServerListenOn)}
 	remote.Mux()
