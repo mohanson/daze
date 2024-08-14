@@ -32,7 +32,7 @@ func TestProtocolBaboonTCP(t *testing.T) {
 
 	buf := make([]byte, 2048)
 	doa.Try(cli.Write([]byte{0x00, 0x00, 0x00, 0x80}))
-	doa.Try(io.ReadFull(cli, buf[:132]))
+	doa.Try(io.ReadFull(cli, buf[:128]))
 }
 
 func TestProtocolBaboonTCPClientClose(t *testing.T) {
@@ -50,7 +50,7 @@ func TestProtocolBaboonTCPClientClose(t *testing.T) {
 	defer cli.Close()
 
 	cli.Close()
-	_, er1 := cli.Write([]byte{0x01, 0x00, 0x00, 0x00})
+	_, er1 := cli.Write([]byte{0x02, 0x00, 0x00, 0x00})
 	doa.Doa(er1 != nil)
 	buf := make([]byte, 2048)
 	_, er2 := io.ReadFull(cli, buf[:1])
@@ -72,7 +72,7 @@ func TestProtocolBaboonTCPServerClose(t *testing.T) {
 	defer cli.Close()
 
 	buf := make([]byte, 2048)
-	doa.Try(cli.Write([]byte{0x01, 0x00, 0x00, 0x00}))
+	doa.Try(cli.Write([]byte{0x02, 0x00, 0x00, 0x00}))
 	_, err := io.ReadFull(cli, buf[:1])
 	doa.Doa(err != nil)
 }
@@ -93,7 +93,7 @@ func TestProtocolBaboonUDP(t *testing.T) {
 
 	buf := make([]byte, 2048)
 	doa.Try(cli.Write([]byte{0x00, 0x00, 0x00, 0x80}))
-	doa.Try(io.ReadFull(cli, buf[:132]))
+	doa.Try(io.ReadFull(cli, buf[:128]))
 }
 
 func TestProtocolBaboonMasker(t *testing.T) {

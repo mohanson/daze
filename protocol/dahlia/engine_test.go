@@ -32,5 +32,5 @@ func TestProtocolDahliaTCP(t *testing.T) {
 	defer cli.Close()
 	buf := make([]byte, 2048)
 	doa.Try(cli.Write([]byte{0x00, 0x00, 0x00, 0x80}))
-	doa.Try(io.ReadFull(cli, buf[:132]))
+	doa.Try(io.ReadFull(cli, buf[:128]))
 }

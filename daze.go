@@ -1195,7 +1195,7 @@ func (t *Tester) TCP() error {
 
 // TCPServe serves incoming connections.
 func (t *Tester) TCPServe(cli io.ReadWriteCloser) {
-	buf := make([]byte, 2048)
+	buf := make([]byte, 1024*64)
 	for {
 		_, err := io.ReadFull(cli, buf[:4])
 		if err != nil {
@@ -1204,12 +1204,20 @@ func (t *Tester) TCPServe(cli io.ReadWriteCloser) {
 		cmd := buf[0]
 		switch cmd {
 		case 0:
-			msg := binary.BigEndian.Uint16(buf[2:4])
-			doa.Doa(msg <= 2044)
-			io.ReadFull(&RandomReader{}, buf[4:4+msg])
-			buf[0] = 1
-			cli.Write(buf[:4+msg])
+			val := buf[1]
+			cnt := binary.BigEndian.Uint16(buf[2:4])
+			for i := range cnt {
+				buf[i] = val
+			}
+			cli.Write(buf[:cnt])
 		case 1:
+			val := buf[1]
+			cnt := binary.BigEndian.Uint16(buf[2:4])
+			io.ReadFull(cli, buf[:cnt])
+			for i := range cnt {
+				doa.Doa(buf[i] == val)
+			}
+		case 2:
 			cli.Close()
 		}
 	}
@@ -1226,7 +1234,7 @@ func (t *Tester) UDP() error {
 
 // UDPServe serves incoming connections.
 func (t *Tester) UDPServe(cli *net.UDPConn) error {
-	buf := make([]byte, 2048)
+	buf := make([]byte, 1024*64)
 	for {
 		_, addr, err := cli.ReadFromUDP(buf)
 		if err != nil {
@@ -1235,12 +1243,19 @@ func (t *Tester) UDPServe(cli *net.UDPConn) error {
 		cmd := buf[0]
 		switch cmd {
 		case 0:
-			msg := binary.BigEndian.Uint16(buf[2:4])
-			doa.Doa(msg <= 2044)
-			io.ReadFull(&RandomReader{}, buf[4:4+msg])
-			buf[0] = 1
-			doa.Try(cli.WriteToUDP(buf[:4+msg], addr))
+			val := buf[1]
+			cnt := binary.BigEndian.Uint16(buf[2:4])
+			for i := range cnt {
+				buf[i] = val
+			}
+			doa.Try(cli.WriteToUDP(buf[:cnt], addr))
 		case 1:
+			val := buf[1]
+			cnt := binary.BigEndian.Uint16(buf[2:4])
+			for i := range cnt {
+				doa.Doa(buf[4+i] == val)
+			}
+		case 2:
 			cli.Close()
 		}
 	}

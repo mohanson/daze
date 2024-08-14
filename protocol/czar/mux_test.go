@@ -25,10 +25,10 @@ func TestProtocolMux(t *testing.T) {
 
 	buf := make([]byte, 2048)
 	doa.Try(cli.Write([]byte{0x00, 0x00, 0x00, 0x80}))
-	doa.Doa(doa.Try(io.ReadFull(cli, buf[:132])) == 132)
+	doa.Doa(doa.Try(io.ReadFull(cli, buf[:128])) == 128)
 	doa.Try(cli.Write([]byte{0x00, 0x00, 0x00, 0x80}))
-	doa.Doa(doa.Try(io.ReadFull(cli, buf[:66])) == 66)
-	doa.Doa(doa.Try(io.ReadFull(cli, buf[:66])) == 66)
+	doa.Doa(doa.Try(io.ReadFull(cli, buf[:64])) == 64)
+	doa.Doa(doa.Try(io.ReadFull(cli, buf[:64])) == 64)
 }
 
 func TestProtocolMuxStreamClientClose(t *testing.T) {
@@ -54,7 +54,7 @@ func TestProtocolMuxStreamServerClose(t *testing.T) {
 	defer cli.Close()
 
 	buf := make([]byte, 2048)
-	doa.Try(cli.Write([]byte{0x01, 0x00, 0x00, 0x80}))
+	doa.Try(cli.Write([]byte{0x02, 0x00, 0x00, 0x80}))
 	doa.Doa(doa.Err(io.ReadFull(cli, buf[:1])) == io.EOF)
 }
 
@@ -96,9 +96,9 @@ func TestProtocolMuxServerRecvEvilPacket(t *testing.T) {
 	cl1.Write([]byte{0x00, 0x00, 0x00, 0x00})
 	cl1.Write([]byte{0x00, 0x00, 0x00, 0x00})
 	cl1.Write([]byte{0x00, 0x01, 0x00, 0x04, 0x00, 0x00, 0x00, 0x04})
-	_, er1 := io.ReadFull(cl1, buf[:12])
+	_, er1 := io.ReadFull(cl1, buf[:8])
 	doa.Nil(er1)
-	doa.Doa(slices.Equal(buf[:8], []byte{0x00, 0x01, 0x00, 0x08, 0x01, 0x00, 0x00, 0x04}))
+	doa.Doa(slices.Equal(buf[:8], []byte{0x00, 0x01, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00}))
 }
 
 type Tester struct {
