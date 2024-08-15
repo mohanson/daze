@@ -138,47 +138,52 @@ func (m *Mux) Open() (*Stream, error) {
 
 // Spawn continues to receive data until a fatal error is encountered.
 func (m *Mux) Spawn() {
+	var (
+		bsz uint16
+		buf = make([]byte, 4)
+		cmd uint8
+		err error
+		idx uint8
+		msg []byte
+		old *Stream
+		stm *Stream
+	)
 	for {
-		buf := make([]byte, 2048)
-		_, err := io.ReadFull(m.con, buf[:4])
+		_, err = io.ReadFull(m.con, buf[:4])
 		if err != nil {
 			m.rer.Put(err)
 			break
 		}
-		idx := buf[0]
-		cmd := buf[1]
+		idx = buf[0]
+		cmd = buf[1]
 		switch {
 		case cmd == 0x00:
 			// Make sure the stream has been closed properly.
-			old := m.usb[idx]
+			old = m.usb[idx]
 			if old.rer.Get() == nil || old.wer.Get() == nil {
 				m.con.Close()
 				break
 			}
-			stm := NewStream(idx, m)
+			stm = NewStream(idx, m)
 			// The mux server does not need to using an id pool.
 			stm.idp = make(chan uint8, 1)
 			m.usb[idx] = stm
 			m.ach <- stm
 		case cmd == 0x01:
-			bsz := binary.BigEndian.Uint16(buf[2:4])
-			if bsz > 2044 {
-				m.con.Close()
-				break
-			}
-			end := bsz + 4
-			_, err := io.ReadFull(m.con, buf[4:end])
+			bsz = binary.BigEndian.Uint16(buf[2:4])
+			msg = make([]byte, bsz)
+			_, err = io.ReadFull(m.con, msg)
 			if err != nil {
 				m.con.Close()
 				break
 			}
-			stm := m.usb[idx]
+			stm = m.usb[idx]
 			select {
-			case stm.rch <- buf[4:end]:
+			case stm.rch <- msg:
 			case <-stm.rer.Sig():
 			}
 		case cmd == 0x02:
-			stm := m.usb[idx]
+			stm = m.usb[idx]
 			stm.rer.Put(io.EOF)
 			stm.wer.Put(io.ErrClosedPipe)
 			stm.son.Do(func() { stm.idp <- stm.idx })

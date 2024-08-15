@@ -105,13 +105,6 @@ func TestProtocolMuxServerRecvEvilPacket(t *testing.T) {
 	defer remote.Close()
 
 	buf := make([]byte, 2048)
-
-	cl0 := doa.Try(net.Dial("tcp", EchoServerListenOn))
-	defer cl0.Close()
-	cl0.Write([]byte{0x00, 0x01, 0xff, 0xf0})
-	_, er0 := io.ReadFull(cl0, buf[:1])
-	doa.Doa(er0 == io.EOF)
-
 	cl1 := doa.Try(net.Dial("tcp", EchoServerListenOn))
 	defer cl1.Close()
 	cl1.Write([]byte{0x00, 0x00, 0x00, 0x00})
