@@ -133,6 +133,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		if err != nil {
 			return nil, err
 		}
+		log.Printf("czar: mux slot stream id=0x%02x", srv.idx)
 		spy := &ashe.Client{Cipher: c.Cipher}
 		con, err := spy.Estab(ctx, srv, network, address)
 		if err != nil {

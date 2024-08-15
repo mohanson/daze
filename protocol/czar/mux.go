@@ -180,10 +180,10 @@ func (m *Mux) Spawn() {
 			stm.rer.Put(io.EOF)
 			stm.wer.Put(io.ErrClosedPipe)
 			stm.son.Do(func() { stm.idp <- stm.idx })
-			air := NewStream(idx, m)
-			air.son.Do(func() {})
-			air.Close()
-			m.usb[idx] = air
+			old := NewStream(idx, m)
+			old.son.Do(func() {})
+			old.Close()
+			m.usb[idx] = old
 		case cmd >= 0x03:
 			// Packet format error, connection closed.
 			m.con.Close()
@@ -224,10 +224,10 @@ func NewMux(conn net.Conn) *Mux {
 func NewMuxServer(conn net.Conn) *Mux {
 	mux := NewMux(conn)
 	for i := range 256 {
-		air := NewStream(uint8(i), mux)
-		air.son.Do(func() {})
-		air.Close()
-		mux.usb[i] = air
+		old := NewStream(uint8(i), mux)
+		old.son.Do(func() {})
+		old.Close()
+		mux.usb[i] = old
 	}
 	go mux.Spawn()
 	return mux
