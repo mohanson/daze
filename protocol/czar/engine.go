@@ -176,7 +176,7 @@ func (c *Client) Run() {
 		case 1:
 			select {
 			case c.Mux <- mux:
-			case <-mux.rdn:
+			case <-mux.rer.Sig():
 				log.Println("czar: mux done")
 				sid = 0
 			case <-c.Cancel:

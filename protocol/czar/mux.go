@@ -14,21 +14,15 @@ type Stream struct {
 	mux *Mux
 	rbf []byte
 	rch chan []byte
-	rer Err
-	rdn chan struct{}
-	ron sync.Once
+	rer *Err
 	son sync.Once
-	wer Err
-	wdn chan struct{}
-	won sync.Once
+	wer *Err
 }
 
 // Close implements io.Closer.
 func (s *Stream) Close() error {
 	s.rer.Put(io.ErrClosedPipe)
 	s.wer.Put(io.ErrClosedPipe)
-	s.ron.Do(func() { close(s.rdn) })
-	s.won.Do(func() { close(s.wdn) })
 	s.son.Do(func() {
 		s.mux.Write(0, []byte{s.idx, 0x02, 0x00, 0x00})
 		s.idp <- s.idx
@@ -54,10 +48,10 @@ func (s *Stream) Read(p []byte) (int, error) {
 		n := copy(p, s.rbf)
 		s.rbf = s.rbf[n:]
 		return n, nil
-	case <-s.rdn:
-		return 0, s.rer.err
-	case <-s.mux.rdn:
-		return 0, s.mux.rer
+	case <-s.rer.Sig():
+		return 0, s.rer.Get()
+	case <-s.mux.rer.Sig():
+		return 0, s.mux.rer.Get()
 	}
 }
 
@@ -99,13 +93,9 @@ func NewStream(idx uint8, mux *Mux) *Stream {
 		mux: mux,
 		rbf: make([]byte, 0),
 		rch: make(chan []byte, 32),
-		rer: Err{},
-		rdn: make(chan struct{}),
-		ron: sync.Once{},
+		rer: NewErr(),
 		son: sync.Once{},
-		wer: Err{},
-		wdn: make(chan struct{}),
-		won: sync.Once{},
+		wer: NewErr(),
 	}
 }
 
@@ -114,8 +104,7 @@ type Mux struct {
 	ach chan *Stream
 	con net.Conn
 	idp chan uint8
-	rdn chan struct{}
-	rer error
+	rer *Err
 	usb []*Stream
 	wm0 sync.Mutex
 	wm1 sync.Mutex
@@ -152,7 +141,7 @@ func (m *Mux) Spawn() {
 		buf := make([]byte, 2048)
 		_, err := io.ReadFull(m.con, buf[:4])
 		if err != nil {
-			m.rer = err
+			m.rer.Put(err)
 			break
 		}
 		idx := buf[0]
@@ -163,8 +152,6 @@ func (m *Mux) Spawn() {
 			old := m.usb[idx]
 			old.rer.Put(io.EOF)
 			old.wer.Put(io.ErrClosedPipe)
-			old.ron.Do(func() { close(old.rdn) })
-			old.won.Do(func() { close(old.wdn) })
 			old.son.Do(func() { old.idp <- old.idx })
 			stm := NewStream(idx, m)
 			// The mux server does not need to using an id pool.
@@ -186,14 +173,12 @@ func (m *Mux) Spawn() {
 			stm := m.usb[idx]
 			select {
 			case stm.rch <- buf[4:end]:
-			case <-stm.rdn:
+			case <-stm.rer.Sig():
 			}
 		case cmd == 0x02:
 			stm := m.usb[idx]
 			stm.rer.Put(io.EOF)
 			stm.wer.Put(io.ErrClosedPipe)
-			stm.ron.Do(func() { close(stm.rdn) })
-			stm.won.Do(func() { close(stm.wdn) })
 			stm.son.Do(func() { stm.idp <- stm.idx })
 		case cmd >= 0x03:
 			// Packet format error, connection closed.
@@ -201,7 +186,6 @@ func (m *Mux) Spawn() {
 		}
 	}
 	close(m.ach)
-	close(m.rdn)
 }
 
 // Write writes data to the connection. The code implements a simple priority write using two locks.
@@ -224,8 +208,7 @@ func NewMux(conn net.Conn) *Mux {
 		ach: make(chan *Stream),
 		con: conn,
 		idp: nil,
-		rdn: make(chan struct{}),
-		rer: nil,
+		rer: NewErr(),
 		usb: make([]*Stream, 256),
 		wm0: sync.Mutex{},
 		wm1: sync.Mutex{},
