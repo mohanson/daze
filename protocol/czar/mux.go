@@ -79,6 +79,7 @@ func (s *Stream) Write(p []byte) (int, error) {
 		}
 		_, err := s.mux.Write(1, b[:4+l])
 		if err != nil {
+			s.wer.Put(err)
 			return n, err
 		}
 		n += l
@@ -150,9 +151,10 @@ func (m *Mux) Spawn() {
 		case cmd == 0x00:
 			// Make sure the stream has been closed properly.
 			old := m.usb[idx]
-			old.rer.Put(io.EOF)
-			old.wer.Put(io.ErrClosedPipe)
-			old.son.Do(func() { old.idp <- old.idx })
+			if old.rer.Get() == nil || old.wer.Get() == nil {
+				m.con.Close()
+				break
+			}
 			stm := NewStream(idx, m)
 			// The mux server does not need to using an id pool.
 			stm.idp = make(chan uint8, 1)
@@ -161,13 +163,13 @@ func (m *Mux) Spawn() {
 		case cmd == 0x01:
 			bsz := binary.BigEndian.Uint16(buf[2:4])
 			if bsz > 2044 {
-				// Packet format error, connection closed.
 				m.con.Close()
 				break
 			}
 			end := bsz + 4
 			_, err := io.ReadFull(m.con, buf[4:end])
 			if err != nil {
+				m.con.Close()
 				break
 			}
 			stm := m.usb[idx]
@@ -180,10 +182,6 @@ func (m *Mux) Spawn() {
 			stm.rer.Put(io.EOF)
 			stm.wer.Put(io.ErrClosedPipe)
 			stm.son.Do(func() { stm.idp <- stm.idx })
-			old := NewStream(idx, m)
-			old.son.Do(func() {})
-			old.Close()
-			m.usb[idx] = old
 		case cmd >= 0x03:
 			// Packet format error, connection closed.
 			m.con.Close()

@@ -5,7 +5,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"slices"
 	"strings"
 	"testing"
 
@@ -117,10 +116,8 @@ func TestProtocolMuxServerRecvEvilPacket(t *testing.T) {
 	defer cl1.Close()
 	cl1.Write([]byte{0x00, 0x00, 0x00, 0x00})
 	cl1.Write([]byte{0x00, 0x00, 0x00, 0x00})
-	cl1.Write([]byte{0x00, 0x01, 0x00, 0x04, 0x00, 0x00, 0x00, 0x04})
-	_, er1 := io.ReadFull(cl1, buf[:8])
-	doa.Nil(er1)
-	doa.Doa(slices.Equal(buf[:8], []byte{0x00, 0x01, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00}))
+	_, er1 := io.ReadFull(cl1, buf[:1])
+	doa.Doa(er1 != nil)
 }
 
 type Tester struct {
