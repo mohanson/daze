@@ -53,7 +53,7 @@ func TestProtocolMuxStreamServerClose(t *testing.T) {
 	defer cli.Close()
 
 	buf := make([]byte, 2048)
-	doa.Try(cli.Write([]byte{0x02, 0x00, 0x00, 0x80}))
+	doa.Try(cli.Write([]byte{0x02, 0x00, 0x00, 0x00}))
 	doa.Doa(doa.Err(io.ReadFull(cli, buf[:1])) == io.EOF)
 }
 
@@ -111,6 +111,44 @@ func TestProtocolMuxServerRecvEvilPacket(t *testing.T) {
 	cl1.Write([]byte{0x00, 0x00, 0x00, 0x00})
 	_, er1 := io.ReadFull(cl1, buf[:1])
 	doa.Doa(er1 != nil)
+}
+
+func TestProtocolMuxLoopCreationClientClose(t *testing.T) {
+	remote := Tester{daze.NewTester(EchoServerListenOn)}
+	remote.Mux()
+	defer remote.Close()
+
+	mux := NewMuxClient(doa.Try(net.Dial("tcp", EchoServerListenOn)))
+	defer mux.Close()
+
+	for range 256 {
+		cli := doa.Try(mux.Open())
+		cli.Close()
+	}
+	buf := make([]byte, 2048)
+	cli := doa.Try(mux.Open())
+	defer cli.Close()
+	doa.Try(cli.Write([]byte{0x00, 0x00, 0x00, 0x80}))
+	doa.Doa(doa.Try(io.ReadFull(cli, buf[:128])) == 128)
+}
+
+func TestProtocolMuxLoopCreationServerClose(t *testing.T) {
+	remote := Tester{daze.NewTester(EchoServerListenOn)}
+	remote.Mux()
+	defer remote.Close()
+
+	mux := NewMuxClient(doa.Try(net.Dial("tcp", EchoServerListenOn)))
+	defer mux.Close()
+
+	for range 256 {
+		cli := doa.Try(mux.Open())
+		doa.Try(cli.Write([]byte{0x02, 0x00, 0x00, 0x00}))
+	}
+	buf := make([]byte, 2048)
+	cli := doa.Try(mux.Open())
+	defer cli.Close()
+	doa.Try(cli.Write([]byte{0x00, 0x00, 0x00, 0x80}))
+	doa.Doa(doa.Try(io.ReadFull(cli, buf[:128])) == 128)
 }
 
 type Tester struct {

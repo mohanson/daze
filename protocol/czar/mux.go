@@ -15,17 +15,25 @@ type Stream struct {
 	rbf []byte
 	rch chan []byte
 	rer *Err
-	son sync.Once
 	wer *Err
+	zon []sync.Once
 }
 
 // Close implements io.Closer.
 func (s *Stream) Close() error {
 	s.rer.Put(io.ErrClosedPipe)
 	s.wer.Put(io.ErrClosedPipe)
-	s.son.Do(func() {
+	s.zon[0].Do(func() {
 		s.mux.Write(0, []byte{s.idx, 0x02, 0x00, 0x00})
-		s.idp <- s.idx
+	})
+	return nil
+}
+
+func (s *Stream) Esolc() error {
+	s.rer.Put(io.EOF)
+	s.wer.Put(io.ErrClosedPipe)
+	s.zon[1].Do(func() {
+		s.mux.Write(0, []byte{s.idx, 0x02, 0x01, 0x00})
 	})
 	return nil
 }
@@ -95,8 +103,8 @@ func NewStream(idx uint8, mux *Mux) *Stream {
 		rbf: make([]byte, 0),
 		rch: make(chan []byte, 32),
 		rer: NewErr(),
-		son: sync.Once{},
 		wer: NewErr(),
+		zon: []sync.Once{{}, {}, {}},
 	}
 }
 
@@ -184,9 +192,12 @@ func (m *Mux) Spawn() {
 			}
 		case cmd == 0x02:
 			stm = m.usb[idx]
-			stm.rer.Put(io.EOF)
-			stm.wer.Put(io.ErrClosedPipe)
-			stm.son.Do(func() { stm.idp <- stm.idx })
+			if buf[2] == 0x00 {
+				stm.Esolc()
+			}
+			stm.zon[2].Do(func() {
+				stm.idp <- stm.idx
+			})
 		case cmd >= 0x03:
 			// Packet format error, connection closed.
 			m.con.Close()
@@ -228,7 +239,9 @@ func NewMuxServer(conn net.Conn) *Mux {
 	mux := NewMux(conn)
 	for i := range 256 {
 		old := NewStream(uint8(i), mux)
-		old.son.Do(func() {})
+		for j := range 3 {
+			old.zon[j].Do(func() {})
+		}
 		old.Close()
 		mux.usb[i] = old
 	}
