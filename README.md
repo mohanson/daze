@@ -32,6 +32,8 @@ $ daze client -s $SERVER:1081 -k $PASSWORD
 $ curl -x socks5://127.0.0.1:1080 google.com
 ```
 
+When using daze, it is your responsibility to ensure that both the server and the client are using the same version of daze (check with the `daze ver` command). Daze is still under development, and I cannot guarantee any compatibility.
+
 # Using Daze for Different Platforms
 
 Daze is implemented in pure Go language, so it can run on almost any operating system. The following are some of the browsers/operating systems commonly used by me:
