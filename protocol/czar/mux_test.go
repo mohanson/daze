@@ -7,6 +7,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/lib/doa"
@@ -125,9 +126,11 @@ func TestProtocolMuxLoopCreationClientClose(t *testing.T) {
 		cli := doa.Try(mux.Open())
 		cli.Close()
 	}
+	time.Sleep(time.Millisecond * 20)
 	buf := make([]byte, 2048)
 	cli := doa.Try(mux.Open())
 	defer cli.Close()
+	doa.Doa(cli.idx == 0)
 	doa.Try(cli.Write([]byte{0x00, 0x00, 0x00, 0x80}))
 	doa.Doa(doa.Try(io.ReadFull(cli, buf[:128])) == 128)
 }
@@ -144,9 +147,11 @@ func TestProtocolMuxLoopCreationServerClose(t *testing.T) {
 		cli := doa.Try(mux.Open())
 		doa.Try(cli.Write([]byte{0x02, 0x00, 0x00, 0x00}))
 	}
+	time.Sleep(time.Millisecond * 20)
 	buf := make([]byte, 2048)
 	cli := doa.Try(mux.Open())
 	defer cli.Close()
+	doa.Doa(cli.idx == 0)
 	doa.Try(cli.Write([]byte{0x00, 0x00, 0x00, 0x80}))
 	doa.Doa(doa.Try(io.ReadFull(cli, buf[:128])) == 128)
 }

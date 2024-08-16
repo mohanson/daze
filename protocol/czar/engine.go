@@ -38,7 +38,7 @@ import (
 // Close the specified stream.
 //
 // +-----+-----+-----+-----+
-// | Sid |  2  |    Rsv    |
+// | Sid |  2  | 0/1 | Rsv |
 // +-----+-----+-----+-----+
 
 // Server implemented the czar protocol.

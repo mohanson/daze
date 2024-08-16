@@ -5,11 +5,13 @@ import (
 	"io"
 	"net"
 	"sync"
+
+	"github.com/mohanson/daze/lib/doa"
 )
 
 // A Stream managed by the multiplexer.
 type Stream struct {
-	idp chan uint8
+	idp *Sip
 	idx uint8
 	mux *Mux
 	rbf []byte
@@ -112,7 +114,7 @@ func NewStream(idx uint8, mux *Mux) *Stream {
 type Mux struct {
 	ach chan *Stream
 	con net.Conn
-	idp chan uint8
+	idp *Sip
 	rer *Err
 	usb []*Stream
 	wm0 sync.Mutex
@@ -132,12 +134,16 @@ func (m *Mux) Close() error {
 
 // Open is used to create a new stream as a net.Conn.
 func (m *Mux) Open() (*Stream, error) {
-	idx := <-m.idp
-	_, err := m.Write(0, []byte{idx, 0x00, 0x00, 0x00})
+	idx, err := m.idp.Get()
 	if err != nil {
-		m.idp <- idx
 		return nil, err
 	}
+	cnt, err := m.Write(0, []byte{idx, 0x00, 0x00, 0x00})
+	if err != nil {
+		m.idp.Put(idx)
+		return nil, err
+	}
+	doa.Doa(cnt == 4)
 	stm := NewStream(idx, m)
 	stm.idp = m.idp
 	m.usb[idx] = stm
@@ -174,7 +180,8 @@ func (m *Mux) Spawn() {
 			}
 			stm = NewStream(idx, m)
 			// The mux server does not need to using an id pool.
-			stm.idp = make(chan uint8, 1)
+			stm.idp = NewSip()
+			stm.idp.Set(idx)
 			m.usb[idx] = stm
 			m.ach <- stm
 		case cmd == 0x01:
@@ -196,7 +203,7 @@ func (m *Mux) Spawn() {
 				stm.Esolc()
 			}
 			stm.zon[2].Do(func() {
-				stm.idp <- stm.idx
+				stm.idp.Put(stm.idx)
 			})
 		case cmd >= 0x03:
 			// Packet format error, connection closed.
@@ -251,12 +258,8 @@ func NewMuxServer(conn net.Conn) *Mux {
 
 // NewMuxClient returns a new MuxClient.
 func NewMuxClient(conn net.Conn) *Mux {
-	idp := make(chan uint8, 256)
-	for i := range 256 {
-		idp <- uint8(i)
-	}
 	mux := NewMux(conn)
-	mux.idp = idp
+	mux.idp = NewSip()
 	go mux.Spawn()
 	return mux
 }
