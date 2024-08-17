@@ -30,6 +30,16 @@ func (s *Stream) Close() error {
 	return nil
 }
 
+// Esolc closing a stream passively.
+func (s *Stream) Esolc() error {
+	s.rer.Put(io.EOF)
+	s.wer.Put(io.ErrClosedPipe)
+	s.son.Do(func() {
+		s.idp <- s.idx
+	})
+	return nil
+}
+
 // Read implements io.Reader.
 func (s *Stream) Read(p []byte) (int, error) {
 	if len(s.rbf) != 0 {
@@ -43,6 +53,9 @@ func (s *Stream) Read(p []byte) (int, error) {
 		s.rbf = s.rbf[n:]
 		return n, nil
 	}
+	if err := s.rer.Get(); err != nil {
+		return 0, err
+	}
 	select {
 	case s.rbf = <-s.rch:
 		n := copy(p, s.rbf)
@@ -51,6 +64,7 @@ func (s *Stream) Read(p []byte) (int, error) {
 	case <-s.rer.Sig():
 		return 0, s.rer.Get()
 	case <-s.mux.rer.Sig():
+		s.rer.Put(s.mux.rer.Get())
 		return 0, s.mux.rer.Get()
 	}
 }
@@ -178,15 +192,16 @@ func (m *Mux) Spawn() {
 				break
 			}
 			stm = m.usb[idx]
+			if stm.rer.Get() != nil {
+				break
+			}
 			select {
 			case stm.rch <- msg:
 			case <-stm.rer.Sig():
 			}
 		case cmd == 0x02:
 			stm = m.usb[idx]
-			stm.rer.Put(io.EOF)
-			stm.wer.Put(io.ErrClosedPipe)
-			stm.son.Do(func() { stm.idp <- stm.idx })
+			stm.Esolc()
 		case cmd >= 0x03:
 			// Packet format error, connection closed.
 			m.con.Close()
