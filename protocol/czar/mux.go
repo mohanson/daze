@@ -35,6 +35,7 @@ func (s *Stream) Esolc() error {
 	s.rer.Put(io.EOF)
 	s.wer.Put(io.ErrClosedPipe)
 	s.son.Do(func() {
+		s.mux.Write(0, []byte{s.idx, 0x02, 0x01, 0x00})
 		s.idp <- s.idx
 	})
 	return nil
