@@ -130,6 +130,15 @@ func NewStream(idx uint8, mux *Mux) *Stream {
 	}
 }
 
+// NewWither returns a new Stream. Stream has been automatically closed, used as a placeholder.
+func NewWither(idx uint8, mux *Mux) *Stream {
+	stm := NewStream(idx, mux)
+	stm.zo0.Do(func() {})
+	stm.zo1.Do(func() {})
+	stm.Close()
+	return stm
+}
+
 // Mux is used to wrap a reliable ordered connection and to multiplex it into multiple streams.
 type Mux struct {
 	ach chan *Stream
@@ -223,6 +232,8 @@ func (m *Mux) Recv() {
 		case cmd == 0x02:
 			stm = m.usb[idx]
 			stm.Esolc()
+			old = NewWither(idx, m)
+			m.usb[idx] = old
 		case cmd >= 0x03:
 			// Packet format error, connection closed.
 			m.con.Close()
@@ -264,11 +275,7 @@ func NewMuxServer(conn net.Conn) *Mux {
 	mux := NewMux(conn)
 	mux.idp = NewSip()
 	for i := range 256 {
-		old := NewStream(uint8(i), mux)
-		old.zo0.Do(func() {})
-		old.zo1.Do(func() {})
-		old.Close()
-		mux.usb[i] = old
+		mux.usb[i] = NewWither(uint8(i), mux)
 	}
 	go mux.Recv()
 	return mux
