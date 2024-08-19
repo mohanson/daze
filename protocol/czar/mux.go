@@ -5,27 +5,32 @@ import (
 	"io"
 	"net"
 	"sync"
+
+	"github.com/mohanson/daze/lib/doa"
 )
 
 // A Stream managed by the multiplexer.
 type Stream struct {
-	idp chan uint8
+	idp *Sip
 	idx uint8
 	mux *Mux
 	rbf []byte
 	rch chan []byte
 	rer *Err
-	son sync.Once
 	wer *Err
+	wmu sync.Mutex
+	zo0 sync.Once
+	zo1 sync.Once
 }
 
 // Close implements io.Closer.
 func (s *Stream) Close() error {
 	s.rer.Put(io.ErrClosedPipe)
 	s.wer.Put(io.ErrClosedPipe)
-	s.son.Do(func() {
+	s.zo0.Do(func() {
+		s.wmu.Lock()
 		s.mux.Write(0, []byte{s.idx, 0x02, 0x00, 0x00})
-		s.idp <- s.idx
+		s.wmu.Unlock()
 	})
 	return nil
 }
@@ -34,9 +39,13 @@ func (s *Stream) Close() error {
 func (s *Stream) Esolc() error {
 	s.rer.Put(io.EOF)
 	s.wer.Put(io.ErrClosedPipe)
-	s.son.Do(func() {
+	s.zo0.Do(func() {
+		s.wmu.Lock()
 		s.mux.Write(0, []byte{s.idx, 0x02, 0x01, 0x00})
-		s.idp <- s.idx
+		s.wmu.Unlock()
+	})
+	s.zo1.Do(func() {
+		s.idp.Put(s.idx)
 	})
 	return nil
 }
@@ -89,14 +98,18 @@ func (s *Stream) Write(p []byte) (int, error) {
 		binary.BigEndian.PutUint16(b[2:4], uint16(l))
 		copy(b[4:], p[:l])
 		p = p[l:]
+		s.wmu.Lock()
 		if err := s.wer.Get(); err != nil {
+			s.wmu.Unlock()
 			return n, err
 		}
 		_, err := s.mux.Write(1, b[:4+l])
 		if err != nil {
 			s.wer.Put(err)
+			s.wmu.Unlock()
 			return n, err
 		}
+		s.wmu.Unlock()
 		n += l
 	}
 }
@@ -110,16 +123,27 @@ func NewStream(idx uint8, mux *Mux) *Stream {
 		rbf: make([]byte, 0),
 		rch: make(chan []byte, 32),
 		rer: NewErr(),
-		son: sync.Once{},
 		wer: NewErr(),
+		wmu: sync.Mutex{},
+		zo0: sync.Once{},
+		zo1: sync.Once{},
 	}
+}
+
+// NewWither returns a new Stream. Stream has been automatically closed, used as a placeholder.
+func NewWither(idx uint8, mux *Mux) *Stream {
+	stm := NewStream(idx, mux)
+	stm.zo0.Do(func() {})
+	stm.zo1.Do(func() {})
+	stm.Close()
+	return stm
 }
 
 // Mux is used to wrap a reliable ordered connection and to multiplex it into multiple streams.
 type Mux struct {
 	ach chan *Stream
 	con net.Conn
-	idp chan uint8
+	idp *Sip
 	rer *Err
 	usb []*Stream
 	wm0 sync.Mutex
@@ -139,20 +163,24 @@ func (m *Mux) Close() error {
 
 // Open is used to create a new stream as a net.Conn.
 func (m *Mux) Open() (*Stream, error) {
-	idx := <-m.idp
-	_, err := m.Write(0, []byte{idx, 0x00, 0x00, 0x00})
+	idx, err := m.idp.Get()
 	if err != nil {
-		m.idp <- idx
 		return nil, err
 	}
+	cnt, err := m.Write(0, []byte{idx, 0x00, 0x00, 0x00})
+	if err != nil {
+		m.idp.Put(idx)
+		return nil, err
+	}
+	doa.Doa(cnt == 4)
 	stm := NewStream(idx, m)
 	stm.idp = m.idp
 	m.usb[idx] = stm
 	return stm, nil
 }
 
-// Spawn continues to receive data until a fatal error is encountered.
-func (m *Mux) Spawn() {
+// Recv continues to receive data until a fatal error is encountered.
+func (m *Mux) Recv() {
 	var (
 		bsz uint16
 		buf = make([]byte, 4)
@@ -181,7 +209,8 @@ func (m *Mux) Spawn() {
 			}
 			stm = NewStream(idx, m)
 			// The mux server does not need to using an id pool.
-			stm.idp = make(chan uint8, 1)
+			stm.idp = m.idp
+			stm.idp.Set(idx)
 			m.usb[idx] = stm
 			m.ach <- stm
 		case cmd == 0x01:
@@ -203,6 +232,8 @@ func (m *Mux) Spawn() {
 		case cmd == 0x02:
 			stm = m.usb[idx]
 			stm.Esolc()
+			old = NewWither(idx, m)
+			m.usb[idx] = old
 		case cmd >= 0x03:
 			// Packet format error, connection closed.
 			m.con.Close()
@@ -242,24 +273,18 @@ func NewMux(conn net.Conn) *Mux {
 // NewMuxServer returns a new MuxServer.
 func NewMuxServer(conn net.Conn) *Mux {
 	mux := NewMux(conn)
+	mux.idp = NewSip()
 	for i := range 256 {
-		old := NewStream(uint8(i), mux)
-		old.son.Do(func() {})
-		old.Close()
-		mux.usb[i] = old
+		mux.usb[i] = NewWither(uint8(i), mux)
 	}
-	go mux.Spawn()
+	go mux.Recv()
 	return mux
 }
 
 // NewMuxClient returns a new MuxClient.
 func NewMuxClient(conn net.Conn) *Mux {
-	idp := make(chan uint8, 256)
-	for i := range 256 {
-		idp <- uint8(i)
-	}
 	mux := NewMux(conn)
-	mux.idp = idp
-	go mux.Spawn()
+	mux.idp = NewSip()
+	go mux.Recv()
 	return mux
 }
