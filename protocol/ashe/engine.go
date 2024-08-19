@@ -305,9 +305,12 @@ func (c *Client) Estab(ctx *daze.Context, srv io.ReadWriteCloser, network string
 	if err != nil {
 		return nil, err
 	}
-	doa.Doa(buf[0] <= 1)
-	if buf[0] == 1 {
+	switch {
+	case buf[0] == 0:
+	case buf[0] == 1:
 		return nil, errors.New("daze: general server failure")
+	case buf[0] >= 2:
+		return nil, errors.New("daze: receive error response")
 	}
 	switch network {
 	case "tcp":
