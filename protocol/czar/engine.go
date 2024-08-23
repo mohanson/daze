@@ -179,13 +179,14 @@ func (c *Client) Run() {
 			case c.Mux <- mux:
 			case <-mux.rer.Sig():
 				log.Println("czar: mux done")
+				mux.Close()
 				sid = 0
 			case <-c.Cancel:
 				log.Println("czar: mux done")
+				mux.Close()
 				sid = 2
 			}
 		case 2:
-			mux.Close()
 			return
 		}
 	}
