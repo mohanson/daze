@@ -6,7 +6,7 @@ import (
 
 // Err is an object that will only store an error once.
 type Err struct {
-	mux sync.Mutex // Guards following
+	mux *sync.Mutex // Guards following
 	err error
 	sig chan struct{}
 }
@@ -36,7 +36,7 @@ func (e *Err) Sig() <-chan struct{} {
 
 func NewErr() *Err {
 	return &Err{
-		mux: sync.Mutex{},
+		mux: &sync.Mutex{},
 		err: nil,
 		sig: make(chan struct{}),
 	}
