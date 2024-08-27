@@ -43,7 +43,7 @@ func (s *Sip) Set(x uint8) {
 	s.i = s.i.SetBit(s.i, int(x), 1)
 }
 
-// NewSip returns a new sid.
+// NewSip returns a new sip.
 func NewSip() *Sip {
 	return &Sip{
 		i: big.NewInt(0),

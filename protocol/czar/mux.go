@@ -11,7 +11,6 @@ import (
 
 // A Stream managed by the multiplexer.
 type Stream struct {
-	idp *Sip
 	idx uint8
 	mux *Mux
 	rbf []byte
@@ -46,7 +45,7 @@ func (s *Stream) Esolc() error {
 		})
 	})
 	s.zo1.Do(func() {
-		s.idp.Put(s.idx)
+		s.mux.idp.Put(s.idx)
 	})
 	return nil
 }
@@ -120,7 +119,6 @@ func (s *Stream) Write(p []byte) (int, error) {
 // NewStream returns a new Stream.
 func NewStream(idx uint8, mux *Mux) *Stream {
 	return &Stream{
-		idp: nil,
 		idx: idx,
 		mux: mux,
 		rbf: make([]byte, 0),
@@ -181,7 +179,6 @@ func (m *Mux) Open() (*Stream, error) {
 		return nil, err
 	}
 	stm = NewStream(idx, m)
-	stm.idp = m.idp
 	m.usb[idx] = stm
 	return stm, nil
 }
@@ -215,9 +212,7 @@ func (m *Mux) Recv() {
 				break
 			}
 			stm = NewStream(idx, m)
-			// The mux server does not need to using an id pool.
-			stm.idp = m.idp
-			stm.idp.Set(idx)
+			m.idp.Set(idx)
 			m.usb[idx] = stm
 			m.ach <- stm
 		case cmd == 0x01:
@@ -254,7 +249,7 @@ func NewMux(conn net.Conn) *Mux {
 	mux := &Mux{
 		ach: make(chan *Stream),
 		con: conn,
-		idp: nil,
+		idp: NewSip(),
 		pri: NewPriority(),
 		rer: NewErr(),
 		usb: make([]*Stream, 256),
@@ -265,7 +260,6 @@ func NewMux(conn net.Conn) *Mux {
 // NewMuxServer returns a new MuxServer.
 func NewMuxServer(conn net.Conn) *Mux {
 	mux := NewMux(conn)
-	mux.idp = NewSip()
 	for i := range 256 {
 		mux.usb[i] = NewWither(uint8(i), mux)
 	}
@@ -276,7 +270,6 @@ func NewMuxServer(conn net.Conn) *Mux {
 // NewMuxClient returns a new MuxClient.
 func NewMuxClient(conn net.Conn) *Mux {
 	mux := NewMux(conn)
-	mux.idp = NewSip()
 	go mux.Recv()
 	return mux
 }
