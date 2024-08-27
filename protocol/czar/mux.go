@@ -249,7 +249,7 @@ func NewMux(conn net.Conn) *Mux {
 	mux := &Mux{
 		ach: make(chan *Stream),
 		con: conn,
-		idp: nil,
+		idp: NewSip(),
 		pri: NewPriority(),
 		rer: NewErr(),
 		usb: make([]*Stream, 256),
@@ -260,7 +260,6 @@ func NewMux(conn net.Conn) *Mux {
 // NewMuxServer returns a new MuxServer.
 func NewMuxServer(conn net.Conn) *Mux {
 	mux := NewMux(conn)
-	mux.idp = NewSip()
 	for i := range 256 {
 		mux.usb[i] = NewWither(uint8(i), mux)
 	}
@@ -271,7 +270,6 @@ func NewMuxServer(conn net.Conn) *Mux {
 // NewMuxClient returns a new MuxClient.
 func NewMuxClient(conn net.Conn) *Mux {
 	mux := NewMux(conn)
-	mux.idp = NewSip()
 	go mux.Recv()
 	return mux
 }
