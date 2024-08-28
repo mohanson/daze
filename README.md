@@ -32,7 +32,7 @@ $ daze client -s $SERVER:1081 -k $PASSWORD
 $ curl -x socks5://127.0.0.1:1080 google.com
 ```
 
-When using daze, it is your responsibility to ensure that both the server and the client are using the same version of daze (check with the `daze ver` command). Daze is still under development, and I cannot guarantee any compatibility.
+Daze is still under development. You should make sure that the server and client have the same version number (check with the `daze ver` command) or commit hash.
 
 # Using Daze for Different Platforms
 
