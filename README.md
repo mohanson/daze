@@ -77,19 +77,21 @@ Daze's network model consists of 7 components:
 
 ## Client Protocols
 
-The daze client implements five different proxy protocols in one port. These protocols are HTTP Proxy, HTTPS Tunnel, SOCKS4, SOCKS4a, and SOCKS5.
+The daze client implements five different proxy protocols in one port. These protocols are http proxy, https tunnel, socks4, socks4a, socks5 and socks5h.
 
 ```sh
-# HTTP Proxy
-$ curl -x http://127.0.0.1:1080    http(s)://google.com
-# HTTPS Tunnel
-$ curl -x http://127.0.0.1:1080    http(s)://google.com
-# SOCKS4
-$ curl -x socks4://127.0.0.1:1080  http(s)://google.com
-# SOCKS4a
-$ curl -x socks4a://127.0.0.1:1080 http(s)://google.com
-# SOCKS5
-$ curl -x socks5://127.0.0.1:1080  http(s)://google.com
+# Protocol http proxy
+$ curl -x http://127.0.0.1:1080    http://google.com
+# Protocol https tunnel
+$ curl -x http://127.0.0.1:1080    https://google.com
+# Protocol socks4
+$ curl -x socks4://127.0.0.1:1080  https://google.com
+# Protocol socks4a
+$ curl -x socks4a://127.0.0.1:1080 https://google.com
+# Protocol socks5
+$ curl -x socks5://127.0.0.1:1080  https://google.com
+# Protocol socks5h
+$ curl -x socks5h://127.0.0.1:1080 https://google.com
 ```
 
 Why can one port support so many protocols? Because it's magic!
