@@ -77,7 +77,7 @@ Daze's network model consists of 7 components:
 
 ## Client Protocols
 
-The daze client implements five different proxy protocols in one port. These protocols are http proxy, https tunnel, socks4, socks4a, socks5 and socks5h.
+The daze client implements 6 different proxy protocols in one port. These protocols are http proxy, https tunnel, socks4, socks4a, socks5 and socks5h.
 
 ```sh
 # Protocol http proxy
