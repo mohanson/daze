@@ -7,7 +7,7 @@ import (
 	"github.com/mohanson/daze/lib/doa"
 )
 
-func TestErr(t *testing.T) {
+func TestProtocolCzarErr(t *testing.T) {
 	er0 := errors.New("0")
 	er1 := errors.New("1")
 	e := NewErr()

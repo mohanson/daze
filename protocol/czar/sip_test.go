@@ -6,7 +6,7 @@ import (
 	"github.com/mohanson/daze/lib/doa"
 )
 
-func TestSip(t *testing.T) {
+func TestProtocolCzarSip(t *testing.T) {
 	sid := NewSip()
 	for i := range 256 {
 		doa.Doa(doa.Try(sid.Get()) == uint8(i))

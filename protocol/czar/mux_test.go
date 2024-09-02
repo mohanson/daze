@@ -12,7 +12,7 @@ import (
 	"github.com/mohanson/daze/lib/doa"
 )
 
-func TestProtocolMux(t *testing.T) {
+func TestProtocolCzarMux(t *testing.T) {
 	remote := Tester{daze.NewTester(EchoServerListenOn)}
 	remote.Mux()
 	defer remote.Close()
@@ -30,7 +30,7 @@ func TestProtocolMux(t *testing.T) {
 	doa.Doa(doa.Try(io.ReadFull(cli, buf[:64])) == 64)
 }
 
-func TestProtocolMuxStreamClientClose(t *testing.T) {
+func TestProtocolCzarMuxStreamClientClose(t *testing.T) {
 	remote := Tester{daze.NewTester(EchoServerListenOn)}
 	remote.Mux()
 	defer remote.Close()
@@ -42,7 +42,7 @@ func TestProtocolMuxStreamClientClose(t *testing.T) {
 	doa.Doa(doa.Err(cli.Write([]byte{0x00, 0x00, 0x00, 0x80})) == io.ErrClosedPipe)
 }
 
-func TestProtocolMuxStreamServerClose(t *testing.T) {
+func TestProtocolCzarMuxStreamServerClose(t *testing.T) {
 	remote := Tester{daze.NewTester(EchoServerListenOn)}
 	remote.Mux()
 	defer remote.Close()
@@ -57,7 +57,7 @@ func TestProtocolMuxStreamServerClose(t *testing.T) {
 	doa.Doa(doa.Err(io.ReadFull(cli, buf[:1])) == io.EOF)
 }
 
-func TestProtocolMuxClientClose(t *testing.T) {
+func TestProtocolCzarMuxClientClose(t *testing.T) {
 	remote := Tester{daze.NewTester(EchoServerListenOn)}
 	remote.Mux()
 	defer remote.Close()
@@ -77,7 +77,7 @@ func TestProtocolMuxClientClose(t *testing.T) {
 	doa.Doa(strings.Contains(er2.Error(), "use of closed network connection"))
 }
 
-func TestProtocolMuxStreamClientReuse(t *testing.T) {
+func TestProtocolCzarMuxStreamClientReuse(t *testing.T) {
 	remote := Tester{daze.NewTester(EchoServerListenOn)}
 	remote.Mux()
 	defer remote.Close()
@@ -99,7 +99,7 @@ func TestProtocolMuxStreamClientReuse(t *testing.T) {
 	cl1.Close()
 }
 
-func TestProtocolMuxServerRecvEvilPacket(t *testing.T) {
+func TestProtocolCzarMuxServerRecvEvilPacket(t *testing.T) {
 	remote := Tester{daze.NewTester(EchoServerListenOn)}
 	remote.Mux()
 	defer remote.Close()
