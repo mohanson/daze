@@ -1,3 +1,4 @@
+// A data structure that follows the constraints of a least recently used (lru) cache.
 package lru
 
 import (

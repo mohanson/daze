@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/mohanson/daze/lib/doa"
+	"github.com/mohanson/daze/lib/priority"
 )
 
 // A Stream managed by the multiplexer.
@@ -26,7 +27,7 @@ func (s *Stream) Close() error {
 	s.rer.Put(io.ErrClosedPipe)
 	s.wer.Put(io.ErrClosedPipe)
 	s.zo0.Do(func() {
-		s.mux.pri.H(func() error {
+		s.mux.pri.Pri(0, func() error {
 			s.mux.con.Write([]byte{s.idx, 0x02, 0x00, 0x00})
 			return nil
 		})
@@ -39,7 +40,7 @@ func (s *Stream) Esolc() error {
 	s.rer.Put(io.EOF)
 	s.wer.Put(io.ErrClosedPipe)
 	s.zo0.Do(func() {
-		s.mux.pri.H(func() error {
+		s.mux.pri.Pri(0, func() error {
 			s.mux.con.Write([]byte{s.idx, 0x02, 0x01, 0x00})
 			return nil
 		})
@@ -98,7 +99,7 @@ func (s *Stream) Write(p []byte) (int, error) {
 		binary.BigEndian.PutUint16(b[2:4], uint16(l))
 		copy(b[4:], p[:l])
 		p = p[l:]
-		err := s.mux.pri.M(func() error {
+		err := s.mux.pri.Pri(1, func() error {
 			if err := s.wer.Get(); err != nil {
 				return err
 			}
@@ -144,7 +145,7 @@ type Mux struct {
 	ach chan *Stream
 	con net.Conn
 	idp *Sip
-	pri *Priority
+	pri *priority.Priority
 	rer *Err
 	usb []*Stream
 }
@@ -171,7 +172,7 @@ func (m *Mux) Open() (*Stream, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = m.pri.H(func() error {
+	err = m.pri.Pri(0, func() error {
 		return doa.Err(m.con.Write([]byte{idx, 0x00, 0x00, 0x00}))
 	})
 	if err != nil {
@@ -250,7 +251,7 @@ func NewMux(conn net.Conn) *Mux {
 		ach: make(chan *Stream),
 		con: conn,
 		idp: NewSip(),
-		pri: NewPriority(),
+		pri: priority.NewPriority(2),
 		rer: NewErr(),
 		usb: make([]*Stream, 256),
 	}
