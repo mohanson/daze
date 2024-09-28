@@ -3,7 +3,6 @@ package czar
 import (
 	"encoding/binary"
 	"io"
-	"net"
 	"sync"
 
 	"github.com/mohanson/daze/lib/doa"
@@ -143,7 +142,7 @@ func NewWither(idx uint8, mux *Mux) *Stream {
 // Mux is used to wrap a reliable ordered connection and to multiplex it into multiple streams.
 type Mux struct {
 	ach chan *Stream
-	con net.Conn
+	con io.ReadWriteCloser
 	idp *Sip
 	pri *priority.Priority
 	rer *Err
@@ -161,7 +160,7 @@ func (m *Mux) Close() error {
 	return m.con.Close()
 }
 
-// Open is used to create a new stream as a net.Conn.
+// Open is used to create a new stream as a io.ReadWriteCloser.
 func (m *Mux) Open() (*Stream, error) {
 	var (
 		err error
@@ -246,7 +245,7 @@ func (m *Mux) Recv() {
 }
 
 // NewMux returns a new Mux.
-func NewMux(conn net.Conn) *Mux {
+func NewMux(conn io.ReadWriteCloser) *Mux {
 	mux := &Mux{
 		ach: make(chan *Stream),
 		con: conn,
@@ -259,7 +258,7 @@ func NewMux(conn net.Conn) *Mux {
 }
 
 // NewMuxServer returns a new MuxServer.
-func NewMuxServer(conn net.Conn) *Mux {
+func NewMuxServer(conn io.ReadWriteCloser) *Mux {
 	mux := NewMux(conn)
 	for i := range 256 {
 		mux.usb[i] = NewWither(uint8(i), mux)
@@ -269,7 +268,7 @@ func NewMuxServer(conn net.Conn) *Mux {
 }
 
 // NewMuxClient returns a new MuxClient.
-func NewMuxClient(conn net.Conn) *Mux {
+func NewMuxClient(conn io.ReadWriteCloser) *Mux {
 	mux := NewMux(conn)
 	go mux.Recv()
 	return mux
