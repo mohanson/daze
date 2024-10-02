@@ -11,8 +11,7 @@ const (
 
 func TestProtocolEtch(t *testing.T) {
 	server := NewServer(DazeServerListenOn)
-	go server.Run()
-	time.Sleep(time.Second)
+	server.Run()
 
 	client := NewClient(DazeServerListenOn)
 	client.Run()

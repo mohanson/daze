@@ -70,9 +70,7 @@ type Client struct {
 func (s *Client) Run() {
 	addr := doa.Try(net.ResolveUDPAddr("udp", s.Server))
 	conn := doa.Try(net.DialUDP("udp", nil, addr))
-	for range 32 {
-		doa.Try(conn.Write([]byte("Hello World!")))
-	}
+	doa.Try(conn.Write([]byte("Hello World!")))
 }
 
 func NewClient(server string) *Client {
