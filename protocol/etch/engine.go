@@ -59,6 +59,7 @@ func (s *Server) Run() error {
 
 func NewServer(listen string) *Server {
 	return &Server{
+		Closer: nil,
 		Listen: listen,
 	}
 }
