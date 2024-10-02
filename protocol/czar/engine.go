@@ -13,8 +13,8 @@ import (
 	"github.com/mohanson/daze/protocol/ashe"
 )
 
-// The czar protocol is a proxy protocol built on TCP multiplexing technology. By establishing multiple TCP connections
-// in one TCP channel, czar protocol effectively reduces the consumption of establishing connections between the client
+// The czar protocol is a proxy protocol built on tcp multiplexing technology. By establishing multiple tcp connections
+// in one tcp channel, czar protocol effectively reduces the consumption of establishing connections between the client
 // and the server:
 //
 // Client port: a.com ------------┐                   ┌------------ Server port: a.com
@@ -103,7 +103,7 @@ func (s *Server) Run() error {
 	return nil
 }
 
-// NewServer returns a new Server.
+// NewServer returns a new Server. Cipher is a password in string form, with no length limit.
 func NewServer(listen string, cipher string) *Server {
 	return &Server{
 		Cipher: daze.Salt(cipher),
@@ -192,7 +192,7 @@ func (c *Client) Run() {
 	}
 }
 
-// NewClient returns a new Client.
+// NewClient returns a new Client. Cipher is a password in string form, with no length limit.
 func NewClient(server, cipher string) *Client {
 	client := &Client{
 		Cancel: make(chan struct{}),

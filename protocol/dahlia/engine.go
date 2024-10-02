@@ -79,7 +79,7 @@ func (s *Server) Run() error {
 	return nil
 }
 
-// NewServer returns a new Server.
+// NewServer returns a new Server. Cipher is a password in string form, with no length limit.
 func NewServer(listen string, server string, cipher string) *Server {
 	return &Server{
 		Cipher: daze.Salt(cipher),
@@ -154,7 +154,7 @@ func (c *Client) Run() error {
 	return nil
 }
 
-// NewClient returns a new Client.
+// NewClient returns a new Client. Cipher is a password in string form, with no length limit.
 func NewClient(listen string, server string, cipher string) *Client {
 	return &Client{
 		Cipher: daze.Salt(cipher),

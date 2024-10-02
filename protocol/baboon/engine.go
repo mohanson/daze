@@ -17,7 +17,7 @@ import (
 	"github.com/mohanson/daze/protocol/ashe"
 )
 
-// Protocol baboon is the ashe protocol based on HTTP.
+// Protocol baboon is the ashe protocol based on http.
 
 // Conf is acting as package level configuration.
 var Conf = struct {
@@ -60,7 +60,7 @@ func (s *Server) ServeMask(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, ret.Body)
 }
 
-// ServeDaze degenerate HTTP protocol and run ashe protocol on it.
+// ServeDaze degenerate http protocol and run ashe protocol on it.
 func (s *Server) ServeDaze(w http.ResponseWriter, r *http.Request) {
 	hj, _ := w.(http.Hijacker)
 	cc, rw, _ := hj.Hijack()
@@ -139,7 +139,7 @@ func (s *Server) Run() error {
 	return nil
 }
 
-// NewServer returns a new Server.
+// NewServer returns a new Server. Cipher is a password in string form, with no length limit.
 func NewServer(listen string, cipher string) *Server {
 	return &Server{
 		Cipher: daze.Salt(cipher),
@@ -184,7 +184,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	return con, err
 }
 
-// NewClient returns a new Client.
+// NewClient returns a new Client. Cipher is a password in string form, with no length limit.
 func NewClient(server string, cipher string) *Client {
 	return &Client{
 		Cipher: daze.Salt(cipher),

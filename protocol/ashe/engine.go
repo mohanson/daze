@@ -14,14 +14,14 @@ import (
 	"github.com/mohanson/daze/lib/doa"
 )
 
-// This document describes a TCP-based cryptographic proxy protocol. The main purpose of this protocol is to bypass
+// This document describes a tcp-based cryptographic proxy protocol. The main purpose of this protocol is to bypass
 // firewalls while providing a good user experience, so it only provides minimal security, which is one of the reasons
-// for choosing the RC4 algorithm(RC4 is cryptographically broken and should not be used for secure applications).
+// for choosing the rc4 algorithm(rc4 is cryptographically broken and should not be used for secure applications).
 //
 // The client connects to the server, and sends a request details:
 //
 // +------+------+-----+---------+---------+
-// | Salt | Time | Net | DST.Len | DST     |
+// | Salt | Time | Net | Dst.Len | Dst     |
 // +------+------+-----+---------+---------+
 // | 128  | 8    | 1   | 1       | 0 - 255 |
 // +------+------+-----+---------+---------+
@@ -31,8 +31,8 @@ import (
 //             attacks
 // - Net     : 0x01 : TCP
 //             0x03 : UDP
-// - DST.Len : Len of DST
-// - DST     : Desired destination address
+// - Dst.Len : Destination address's length
+// - Dst     : Destination address
 //
 // The server returns:
 //
@@ -42,8 +42,8 @@ import (
 // |  1   |
 // +------+
 //
-// - Code: 0x00: succeed
-//         0x01: general server failure
+// - Code: 0x00: Succeed.
+//         0x01: General server failure
 
 // Conf is acting as package level configuration.
 var Conf = struct {
@@ -53,7 +53,7 @@ var Conf = struct {
 	LifeExpired: 120,
 }
 
-// TCPConn is an implementation of the Conn interface for TCP network connections.
+// TCPConn is an implementation of the Conn interface for tcp network connections.
 type TCPConn struct {
 	io.ReadWriteCloser
 }
@@ -63,7 +63,7 @@ func NewTCPConn(c io.ReadWriteCloser) *TCPConn {
 	return &TCPConn{c}
 }
 
-// UDPConn is an implementation of the Conn interface for UDP network connections.
+// UDPConn is an implementation of the Conn interface for udp network connections.
 type UDPConn struct {
 	io.ReadWriteCloser
 	b []byte
@@ -74,7 +74,7 @@ func NewUDPConn(c io.ReadWriteCloser) *UDPConn {
 	return &UDPConn{ReadWriteCloser: c, b: make([]byte, 2)}
 }
 
-// Read implements the Conn Read method.
+// Read reads up to len(p) bytes into p.
 func (c *UDPConn) Read(p []byte) (int, error) {
 	_, err := io.ReadFull(c.ReadWriteCloser, p[:2])
 	if err != nil {
@@ -84,12 +84,11 @@ func (c *UDPConn) Read(p []byte) (int, error) {
 	return io.ReadFull(c.ReadWriteCloser, p[:n])
 }
 
-// Write implements the Conn Write method.
+// Write writes len(p) bytes from p to the underlying data stream.
 func (c *UDPConn) Write(p []byte) (int, error) {
-	// Maximum UDP packet size is 2^16 bytes in theoretically.
-	// But every packet lives in an Ethernet frame. Ethernet frames can only contain 1500 bytes of data. This is called
-	// the "maximum transmission unit" or "MTU".
-	doa.Doa(len(p) <= math.MaxUint16)
+	// Maximum udp payload size is 65527(equal to 65535 - 8) bytes in theoretically. The 8 in the formula means the udp
+	// header, which contains source port, destination port, length and checksum.
+	doa.Doa(len(p) <= 65527)
 	binary.BigEndian.PutUint16(c.b, uint16(len(p)))
 	_, err := c.ReadWriteCloser.Write(c.b[:2])
 	if err != nil {
@@ -98,7 +97,7 @@ func (c *UDPConn) Write(p []byte) (int, error) {
 	return c.ReadWriteCloser.Write(p)
 }
 
-// Server implemented the ashe protocol. The ASHE server will typically evaluate the request based on source and
+// Server implemented the ashe protocol. The ashe server will typically evaluate the request based on source and
 // destination addresses, and return one or more reply messages, as appropriate for the request type.
 type Server struct {
 	// Cipher is a pre-shared key.
@@ -231,7 +230,7 @@ func (s *Server) Run() error {
 	return nil
 }
 
-// NewServer returns a new Server.
+// NewServer returns a new Server. Cipher is a password in string form, with no length limit.
 func NewServer(listen string, cipher string) *Server {
 	return &Server{
 		Listen: listen,
@@ -271,7 +270,7 @@ func (c *Client) Hello(srv io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	return con, nil
 }
 
-// Establish an existing connection. It is the caller's responsibility to close the con.
+// Establish an existing connection. It is the caller's responsibility to close the conn.
 func (c *Client) Estab(ctx *daze.Context, srv io.ReadWriteCloser, network string, address string) (io.ReadWriteCloser, error) {
 	var (
 		buf = make([]byte, 2)
@@ -334,7 +333,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	return con, err
 }
 
-// NewClient returns a new Client. A secret data needs to be passed in Cipher, as a sign to interface with the Server.
+// NewClient returns a new Client. Cipher is a password in string form, with no length limit.
 func NewClient(server, cipher string) *Client {
 	return &Client{
 		Server: server,
