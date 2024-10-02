@@ -66,12 +66,11 @@ func NewTCPConn(c io.ReadWriteCloser) *TCPConn {
 // UDPConn is an implementation of the Conn interface for udp network connections.
 type UDPConn struct {
 	io.ReadWriteCloser
-	b []byte
 }
 
 // NewUDPConn returns a new UDPConn.
 func NewUDPConn(c io.ReadWriteCloser) *UDPConn {
-	return &UDPConn{ReadWriteCloser: c, b: make([]byte, 2)}
+	return &UDPConn{ReadWriteCloser: c}
 }
 
 // Read reads up to len(p) bytes into p.
@@ -89,8 +88,9 @@ func (c *UDPConn) Write(p []byte) (int, error) {
 	// Maximum udp payload size is 65527(equal to 65535 - 8) bytes in theoretically. The 8 in the formula means the udp
 	// header, which contains source port, destination port, length and checksum.
 	doa.Doa(len(p) <= 65527)
-	binary.BigEndian.PutUint16(c.b, uint16(len(p)))
-	_, err := c.ReadWriteCloser.Write(c.b[:2])
+	b := make([]byte, 2)
+	binary.BigEndian.PutUint16(b, uint16(len(p)))
+	_, err := c.ReadWriteCloser.Write(b)
 	if err != nil {
 		return 0, err
 	}
