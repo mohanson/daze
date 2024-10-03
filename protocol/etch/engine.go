@@ -12,6 +12,8 @@ import (
 var Conf = struct {
 	PayloadSize int
 }{
+	// The maximum safe udp payload is 508 bytes. This is a packet size of 576 (the minimum maximum reassembly buffer
+	// size), minus the maximum 60-byte ip header and the 8-byte udp header.
 	PayloadSize: 508,
 }
 
