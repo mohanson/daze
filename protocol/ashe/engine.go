@@ -112,13 +112,14 @@ type Server struct {
 // Hello creates an encrypted channel.
 func (s *Server) Hello(cli io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	var (
-		buf     = make([]byte, 32)
+		buf     []byte
 		con     io.ReadWriteCloser
 		err     error
 		gap     int64
 		gapSign int64
 	)
-	_, err = io.ReadFull(cli, buf[:])
+	buf = make([]byte, 32)
+	_, err = io.ReadFull(cli, buf)
 	if err != nil {
 		return nil, err
 	}
@@ -126,14 +127,15 @@ func (s *Server) Hello(cli io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	for i := range 32 {
 		buf[i] ^= s.Cipher[i]
 	}
-	con = daze.Gravity(cli, buf[:])
-	_, err = io.ReadFull(con, buf[:8])
+	con = daze.Gravity(cli, buf)
+	buf = buf[:8]
+	_, err = io.ReadFull(con, buf)
 	if err != nil {
 		return nil, err
 	}
 	// Get absolute value. Hacker's Delight, 2-4, Absolute Value Function.
 	// See https://doc.lagout.org/security/Hackers%20Delight.pdf
-	gap = time.Now().Unix() - int64(binary.BigEndian.Uint64(buf[:8]))
+	gap = time.Now().Unix() - int64(binary.BigEndian.Uint64(buf))
 	gapSign = gap >> 63
 	if gap^gapSign-gapSign > int64(Conf.LifeExpired) {
 		return nil, errors.New("daze: request expired")
@@ -251,12 +253,13 @@ type Client struct {
 // Hello creates an encrypted channel.
 func (c *Client) Hello(srv io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	var (
-		buf = make([]byte, 32)
+		buf []byte
 		con io.ReadWriteCloser
 		err error
 	)
-	io.ReadFull(&daze.RandomReader{}, buf[:])
-	_, err = srv.Write(buf[:])
+	buf = make([]byte, 32)
+	io.ReadFull(&daze.RandomReader{}, buf)
+	_, err = srv.Write(buf)
 	if err != nil {
 		return nil, err
 	}
@@ -264,9 +267,10 @@ func (c *Client) Hello(srv io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	for i := range 32 {
 		buf[i] ^= c.Cipher[i]
 	}
-	con = daze.Gravity(srv, buf[:])
-	binary.BigEndian.PutUint64(buf[:8], uint64(time.Now().Unix()))
-	_, err = con.Write(buf[:8])
+	con = daze.Gravity(srv, buf)
+	buf = buf[:8]
+	binary.BigEndian.PutUint64(buf, uint64(time.Now().Unix()))
+	_, err = con.Write(buf)
 	if err != nil {
 		return nil, err
 	}
