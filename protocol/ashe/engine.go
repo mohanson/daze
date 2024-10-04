@@ -90,13 +90,14 @@ func (c *UDPConn) Write(p []byte) (int, error) {
 	// Maximum udp payload size is 65527(equal to 65535 - 8) bytes in theoretically. The 8 in the formula means the udp
 	// header, which contains source port, destination port, length and checksum.
 	doa.Doa(len(p) <= 65527)
-	b := make([]byte, 2)
+	b := make([]byte, 2+len(p))
 	binary.BigEndian.PutUint16(b, uint16(len(p)))
-	_, err := c.ReadWriteCloser.Write(b)
+	copy(b[2:], p)
+	n, err := c.ReadWriteCloser.Write(b)
 	if err != nil {
 		return 0, err
 	}
-	return c.ReadWriteCloser.Write(p)
+	return n - 2, nil
 }
 
 // Server implemented the ashe protocol. The ashe server will typically evaluate the request based on source and
