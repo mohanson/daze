@@ -42,7 +42,7 @@ import (
 // |  1   |
 // +------+
 //
-// - Code: 0x00: Succeed.
+// - Code: 0x00: Succeed
 //         0x01: General server failure
 
 // Conf is acting as package level configuration.
@@ -75,11 +75,13 @@ func NewUDPConn(c io.ReadWriteCloser) *UDPConn {
 
 // Read reads up to len(p) bytes into p.
 func (c *UDPConn) Read(p []byte) (int, error) {
+	doa.Doa(len(p) >= 2)
 	_, err := io.ReadFull(c.ReadWriteCloser, p[:2])
 	if err != nil {
 		return 0, err
 	}
-	n := binary.BigEndian.Uint16(p[:2])
+	n := int(binary.BigEndian.Uint16(p[:2]))
+	doa.Doa(len(p) >= n)
 	return io.ReadFull(c.ReadWriteCloser, p[:n])
 }
 
