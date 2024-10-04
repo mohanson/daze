@@ -81,28 +81,32 @@ func (s *Stream) Read(p []byte) (int, error) {
 
 // Write implements io.Writer.
 func (s *Stream) Write(p []byte) (int, error) {
-	n := 0
-	l := 0
-	b := make([]byte, 2048)
-	b[0] = s.idx
-	b[1] = 0x01
+	var (
+		buf []byte
+		l   = 0
+		n   = 0
+	)
 	for {
 		switch {
 		case len(p) >= 2044:
+			buf = make([]byte, 2048)
 			l = 2044
 		case len(p) >= 1:
+			buf = make([]byte, 4+len(p))
 			l = len(p)
 		case len(p) >= 0:
 			return n, nil
 		}
-		binary.BigEndian.PutUint16(b[2:4], uint16(l))
-		copy(b[4:], p[:l])
+		buf[0] = s.idx
+		buf[1] = 0x01
+		binary.BigEndian.PutUint16(buf[2:4], uint16(l))
+		copy(buf[4:], p[:l])
 		p = p[l:]
 		err := s.mux.pri.Pri(1, func() error {
 			if err := s.wer.Get(); err != nil {
 				return err
 			}
-			_, err := s.mux.con.Write(b[:4+l])
+			_, err := s.mux.con.Write(buf)
 			if err != nil {
 				s.wer.Put(err)
 				return err
