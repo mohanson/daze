@@ -128,7 +128,7 @@ func (s *Server) Hello(cli io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 		buf[i] ^= s.Cipher[i]
 	}
 	con = daze.Gravity(cli, buf)
-	buf = buf[:8]
+	buf = make([]byte, 8)
 	_, err = io.ReadFull(con, buf)
 	if err != nil {
 		return nil, err
@@ -268,7 +268,7 @@ func (c *Client) Hello(srv io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 		buf[i] ^= c.Cipher[i]
 	}
 	con = daze.Gravity(srv, buf)
-	buf = buf[:8]
+	buf = make([]byte, 8)
 	binary.BigEndian.PutUint64(buf, uint64(time.Now().Unix()))
 	_, err = con.Write(buf)
 	if err != nil {
@@ -280,7 +280,7 @@ func (c *Client) Hello(srv io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 // Establish an existing connection. It is the caller's responsibility to close the conn.
 func (c *Client) Estab(ctx *daze.Context, srv io.ReadWriteCloser, network string, address string) (io.ReadWriteCloser, error) {
 	var (
-		buf = make([]byte, 2)
+		buf []byte
 		con io.ReadWriteCloser
 		err error
 		n   = len(address)
@@ -295,19 +295,21 @@ func (c *Client) Estab(ctx *daze.Context, srv io.ReadWriteCloser, network string
 	if err != nil {
 		return nil, err
 	}
+	buf = make([]byte, 2+len(address))
 	switch network {
 	case "tcp":
-		buf[0x00] = 0x01
+		buf[0] = 1
 	case "udp":
-		buf[0x00] = 0x03
+		buf[0] = 3
 	}
-	buf[0x01] = uint8(n)
-	con.Write(buf[:2])
-	_, err = con.Write([]byte(address))
+	buf[1] = uint8(n)
+	copy(buf[2:], []byte(address))
+	_, err = con.Write(buf)
 	if err != nil {
 		return nil, err
 	}
-	_, err = io.ReadFull(con, buf[:1])
+	buf = make([]byte, 1)
+	_, err = io.ReadFull(con, buf)
 	if err != nil {
 		return nil, err
 	}
