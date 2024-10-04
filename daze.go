@@ -1195,7 +1195,7 @@ func (t *Tester) TCP() error {
 
 // TCPServe serves incoming connections.
 func (t *Tester) TCPServe(cli io.ReadWriteCloser) {
-	buf := make([]byte, 256)
+	buf := make([]byte, 2048)
 	for {
 		_, err := io.ReadFull(cli, buf[:4])
 		if err != nil {
@@ -1249,7 +1249,7 @@ func (t *Tester) UDP() error {
 
 // UDPServe serves incoming connections.
 func (t *Tester) UDPServe(cli *net.UDPConn) error {
-	buf := make([]byte, 256)
+	buf := make([]byte, 2048)
 	for {
 		_, addr, err := cli.ReadFromUDP(buf)
 		if err != nil {
