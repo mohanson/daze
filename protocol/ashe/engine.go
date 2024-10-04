@@ -146,7 +146,7 @@ func (s *Server) Hello(cli io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 // Serve incoming connections. Parameter cli will be closed automatically when the function exits.
 func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 	var (
-		buf    = make([]byte, 256)
+		buf    []byte
 		con    io.ReadWriteCloser
 		dst    string
 		dstLen uint8
@@ -158,17 +158,19 @@ func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 	if err != nil {
 		return err
 	}
-	_, err = io.ReadFull(con, buf[:2])
+	buf = make([]byte, 2)
+	_, err = io.ReadFull(con, buf)
 	if err != nil {
 		return err
 	}
 	dstNet = buf[0]
 	dstLen = buf[1]
-	_, err = io.ReadFull(con, buf[:dstLen])
+	buf = make([]byte, dstLen)
+	_, err = io.ReadFull(con, buf)
 	if err != nil {
 		return err
 	}
-	dst = string(buf[:dstLen])
+	dst = string(buf)
 	switch dstNet {
 	case 0x01:
 		log.Printf("conn: %08x   dial network=tcp address=%s", ctx.Cid, dst)
