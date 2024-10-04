@@ -158,7 +158,7 @@ type Client struct {
 // Dial connects to the address on the named network.
 func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.ReadWriteCloser, error) {
 	var (
-		buf = make([]byte, 256)
+		buf []byte
 		err error
 		req *http.Request
 		srv io.ReadWriteCloser
@@ -167,15 +167,17 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	if err != nil {
 		return nil, err
 	}
+	buf = make([]byte, 32)
 	io.ReadFull(&daze.RandomReader{}, buf[:16])
-	copy(buf[16:32], c.Cipher[:16])
-	sign := md5.Sum(buf[:32])
-	copy(buf[16:32], sign[:])
+	copy(buf[16:], c.Cipher[:16])
+	sign := md5.Sum(buf)
+	copy(buf[16:], sign[:])
 	req = doa.Try(http.NewRequest("POST", "http://"+c.Server+"/sync", http.NoBody))
-	req.Header.Set("Authorization", hex.EncodeToString(buf[:32]))
+	req.Header.Set("Authorization", hex.EncodeToString(buf))
 	req.Write(srv)
 	// Discard responded header
-	io.ReadFull(srv, buf[:147])
+	buf = make([]byte, 147)
+	io.ReadFull(srv, buf)
 	spy := &ashe.Client{Cipher: c.Cipher}
 	con, err := spy.Estab(ctx, srv, network, address)
 	if err != nil {

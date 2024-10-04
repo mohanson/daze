@@ -90,13 +90,14 @@ func (c *UDPConn) Write(p []byte) (int, error) {
 	// Maximum udp payload size is 65527(equal to 65535 - 8) bytes in theoretically. The 8 in the formula means the udp
 	// header, which contains source port, destination port, length and checksum.
 	doa.Doa(len(p) <= 65527)
-	b := make([]byte, 2)
+	b := make([]byte, 2+len(p))
 	binary.BigEndian.PutUint16(b, uint16(len(p)))
-	_, err := c.ReadWriteCloser.Write(b)
+	copy(b[2:], p)
+	n, err := c.ReadWriteCloser.Write(b)
 	if err != nil {
 		return 0, err
 	}
-	return c.ReadWriteCloser.Write(p)
+	return n - 2, nil
 }
 
 // Server implemented the ashe protocol. The ashe server will typically evaluate the request based on source and
@@ -111,13 +112,14 @@ type Server struct {
 // Hello creates an encrypted channel.
 func (s *Server) Hello(cli io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	var (
-		buf     = make([]byte, 32)
+		buf     []byte
 		con     io.ReadWriteCloser
 		err     error
 		gap     int64
 		gapSign int64
 	)
-	_, err = io.ReadFull(cli, buf[:])
+	buf = make([]byte, 32)
+	_, err = io.ReadFull(cli, buf)
 	if err != nil {
 		return nil, err
 	}
@@ -125,14 +127,15 @@ func (s *Server) Hello(cli io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	for i := range 32 {
 		buf[i] ^= s.Cipher[i]
 	}
-	con = daze.Gravity(cli, buf[:])
-	_, err = io.ReadFull(con, buf[:8])
+	con = daze.Gravity(cli, buf)
+	buf = make([]byte, 8)
+	_, err = io.ReadFull(con, buf)
 	if err != nil {
 		return nil, err
 	}
 	// Get absolute value. Hacker's Delight, 2-4, Absolute Value Function.
 	// See https://doc.lagout.org/security/Hackers%20Delight.pdf
-	gap = time.Now().Unix() - int64(binary.BigEndian.Uint64(buf[:8]))
+	gap = time.Now().Unix() - int64(binary.BigEndian.Uint64(buf))
 	gapSign = gap >> 63
 	if gap^gapSign-gapSign > int64(Conf.LifeExpired) {
 		return nil, errors.New("daze: request expired")
@@ -143,7 +146,7 @@ func (s *Server) Hello(cli io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 // Serve incoming connections. Parameter cli will be closed automatically when the function exits.
 func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 	var (
-		buf    = make([]byte, 256)
+		buf    []byte
 		con    io.ReadWriteCloser
 		dst    string
 		dstLen uint8
@@ -155,17 +158,19 @@ func (s *Server) Serve(ctx *daze.Context, cli io.ReadWriteCloser) error {
 	if err != nil {
 		return err
 	}
-	_, err = io.ReadFull(con, buf[:2])
+	buf = make([]byte, 2)
+	_, err = io.ReadFull(con, buf)
 	if err != nil {
 		return err
 	}
 	dstNet = buf[0]
 	dstLen = buf[1]
-	_, err = io.ReadFull(con, buf[:dstLen])
+	buf = make([]byte, dstLen)
+	_, err = io.ReadFull(con, buf)
 	if err != nil {
 		return err
 	}
-	dst = string(buf[:dstLen])
+	dst = string(buf)
 	switch dstNet {
 	case 0x01:
 		log.Printf("conn: %08x   dial network=tcp address=%s", ctx.Cid, dst)
@@ -250,12 +255,13 @@ type Client struct {
 // Hello creates an encrypted channel.
 func (c *Client) Hello(srv io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	var (
-		buf = make([]byte, 32)
+		buf []byte
 		con io.ReadWriteCloser
 		err error
 	)
-	io.ReadFull(&daze.RandomReader{}, buf[:])
-	_, err = srv.Write(buf[:])
+	buf = make([]byte, 32)
+	io.ReadFull(&daze.RandomReader{}, buf)
+	_, err = srv.Write(buf)
 	if err != nil {
 		return nil, err
 	}
@@ -263,9 +269,10 @@ func (c *Client) Hello(srv io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	for i := range 32 {
 		buf[i] ^= c.Cipher[i]
 	}
-	con = daze.Gravity(srv, buf[:])
-	binary.BigEndian.PutUint64(buf[:8], uint64(time.Now().Unix()))
-	_, err = con.Write(buf[:8])
+	con = daze.Gravity(srv, buf)
+	buf = make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, uint64(time.Now().Unix()))
+	_, err = con.Write(buf)
 	if err != nil {
 		return nil, err
 	}
@@ -275,7 +282,7 @@ func (c *Client) Hello(srv io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 // Establish an existing connection. It is the caller's responsibility to close the conn.
 func (c *Client) Estab(ctx *daze.Context, srv io.ReadWriteCloser, network string, address string) (io.ReadWriteCloser, error) {
 	var (
-		buf = make([]byte, 2)
+		buf []byte
 		con io.ReadWriteCloser
 		err error
 		n   = len(address)
@@ -290,19 +297,21 @@ func (c *Client) Estab(ctx *daze.Context, srv io.ReadWriteCloser, network string
 	if err != nil {
 		return nil, err
 	}
+	buf = make([]byte, 2+len(address))
 	switch network {
 	case "tcp":
-		buf[0x00] = 0x01
+		buf[0] = 0x01
 	case "udp":
-		buf[0x00] = 0x03
+		buf[0] = 0x03
 	}
-	buf[0x01] = uint8(n)
-	con.Write(buf[:2])
-	_, err = con.Write([]byte(address))
+	buf[1] = uint8(n)
+	copy(buf[2:], []byte(address))
+	_, err = con.Write(buf)
 	if err != nil {
 		return nil, err
 	}
-	_, err = io.ReadFull(con, buf[:1])
+	buf = make([]byte, 1)
+	_, err = io.ReadFull(con, buf)
 	if err != nil {
 		return nil, err
 	}
