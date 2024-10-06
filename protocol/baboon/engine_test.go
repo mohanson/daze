@@ -85,11 +85,9 @@ func TestProtocolBaboonTCPClientClose(t *testing.T) {
 	defer cli.Close()
 
 	cli.Close()
-	_, er1 := cli.Write([]byte{0x02, 0x00, 0x00, 0x00})
-	doa.Doa(er1 != nil)
-	buf := make([]byte, 2048)
-	_, er2 := io.ReadFull(cli, buf[:1])
-	doa.Doa(er2 != nil)
+	doa.Doa(doa.Err(cli.Write([]byte{0x02, 0x00, 0x00, 0x00})) != nil)
+	buf := make([]byte, 1)
+	doa.Doa(doa.Err(io.ReadFull(cli, buf[:1])) != nil)
 }
 
 func TestProtocolBaboonTCPServerClose(t *testing.T) {
@@ -106,10 +104,9 @@ func TestProtocolBaboonTCPServerClose(t *testing.T) {
 	cli := doa.Try(dazeClient.Dial(ctx, "tcp", EchoServerListenOn))
 	defer cli.Close()
 
-	buf := make([]byte, 2048)
 	doa.Try(cli.Write([]byte{0x02, 0x00, 0x00, 0x00}))
-	_, err := io.ReadFull(cli, buf[:1])
-	doa.Doa(err != nil)
+	buf := make([]byte, 1)
+	doa.Doa(doa.Err(io.ReadFull(cli, buf[:1])) != nil)
 }
 
 func TestProtocolBaboonUDP(t *testing.T) {
@@ -126,8 +123,8 @@ func TestProtocolBaboonUDP(t *testing.T) {
 	cli := doa.Try(dazeClient.Dial(ctx, "udp", EchoServerListenOn))
 	defer cli.Close()
 
-	buf := make([]byte, 2048)
 	doa.Try(cli.Write([]byte{0x00, 0x00, 0x00, 0x80}))
+	buf := make([]byte, 128)
 	doa.Try(io.ReadFull(cli, buf[:128]))
 }
 
