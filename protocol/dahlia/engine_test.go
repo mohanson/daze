@@ -18,9 +18,9 @@ const (
 )
 
 func TestProtocolDahliaTCP(t *testing.T) {
-	remote := daze.NewTester(EchoServerListenOn)
-	defer remote.Close()
-	remote.TCP()
+	dazeRemote := daze.NewTester(EchoServerListenOn)
+	defer dazeRemote.Close()
+	dazeRemote.TCP()
 
 	dazeServer := NewServer(DazeServerListenOn, EchoServerListenOn, Password)
 	defer dazeServer.Close()
@@ -29,7 +29,6 @@ func TestProtocolDahliaTCP(t *testing.T) {
 	dazeClient := NewClient(DazeClientListenOn, DazeServerListenOn, Password)
 	defer dazeClient.Close()
 	dazeClient.Run()
-
 	cli := doa.Try(daze.Dial("tcp", DazeClientListenOn))
 	defer cli.Close()
 
@@ -39,7 +38,6 @@ func TestProtocolDahliaTCP(t *testing.T) {
 		cnt int
 		rsz = int(rand.Uint32N(65536))
 	)
-
 	copy(buf[0:2], []byte{0x00, 0x00})
 	binary.BigEndian.PutUint16(buf[2:], uint16(rsz))
 	doa.Try(cli.Write(buf[:4]))
@@ -55,7 +53,6 @@ func TestProtocolDahliaTCP(t *testing.T) {
 			break
 		}
 	}
-
 	copy(buf[0:2], []byte{0x01, 0x00})
 	binary.BigEndian.PutUint16(buf[2:], uint16(rsz))
 	doa.Try(cli.Write(buf[:4]))

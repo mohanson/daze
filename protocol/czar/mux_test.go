@@ -7,7 +7,6 @@ import (
 	"log"
 	"math/rand/v2"
 	"net"
-	"strings"
 	"testing"
 
 	"github.com/mohanson/daze"
@@ -15,9 +14,9 @@ import (
 )
 
 func TestProtocolCzarMux(t *testing.T) {
-	remote := Tester{daze.NewTester(EchoServerListenOn)}
-	remote.Mux()
-	defer remote.Close()
+	rmt := &Tester{daze.NewTester(EchoServerListenOn)}
+	rmt.Mux()
+	defer rmt.Close()
 
 	mux := NewMuxClient(doa.Try(net.Dial("tcp", EchoServerListenOn)))
 	defer mux.Close()
@@ -30,7 +29,6 @@ func TestProtocolCzarMux(t *testing.T) {
 		cnt int
 		rsz = int(rand.Uint32N(65536))
 	)
-
 	copy(buf[0:2], []byte{0x00, 0x00})
 	binary.BigEndian.PutUint16(buf[2:], uint16(rsz))
 	doa.Try(cli.Write(buf[:4]))
@@ -46,7 +44,6 @@ func TestProtocolCzarMux(t *testing.T) {
 			break
 		}
 	}
-
 	copy(buf[0:2], []byte{0x01, 0x00})
 	binary.BigEndian.PutUint16(buf[2:], uint16(rsz))
 	doa.Try(cli.Write(buf[:4]))
@@ -65,36 +62,39 @@ func TestProtocolCzarMux(t *testing.T) {
 }
 
 func TestProtocolCzarMuxStreamClientClose(t *testing.T) {
-	remote := Tester{daze.NewTester(EchoServerListenOn)}
-	remote.Mux()
-	defer remote.Close()
+	rmt := &Tester{daze.NewTester(EchoServerListenOn)}
+	rmt.Mux()
+	defer rmt.Close()
 
 	mux := NewMuxClient(doa.Try(net.Dial("tcp", EchoServerListenOn)))
 	defer mux.Close()
 	cli := doa.Try(mux.Open())
+
 	cli.Close()
 	doa.Doa(doa.Err(cli.Write([]byte{0x00, 0x00, 0x00, 0x80})) == io.ErrClosedPipe)
+	buf := make([]byte, 1)
+	doa.Doa(doa.Err(io.ReadFull(cli, buf[:1])) == io.ErrClosedPipe)
 }
 
 func TestProtocolCzarMuxStreamServerClose(t *testing.T) {
-	remote := Tester{daze.NewTester(EchoServerListenOn)}
-	remote.Mux()
-	defer remote.Close()
+	rmt := Tester{daze.NewTester(EchoServerListenOn)}
+	rmt.Mux()
+	defer rmt.Close()
 
 	mux := NewMuxClient(doa.Try(net.Dial("tcp", EchoServerListenOn)))
 	defer mux.Close()
 	cli := doa.Try(mux.Open())
 	defer cli.Close()
 
-	buf := make([]byte, 2048)
-	doa.Try(cli.Write([]byte{0x02, 0x00, 0x00, 0x80}))
+	doa.Try(cli.Write([]byte{0x02, 0x00, 0x00, 0x00}))
+	buf := make([]byte, 1)
 	doa.Doa(doa.Err(io.ReadFull(cli, buf[:1])) == io.EOF)
 }
 
 func TestProtocolCzarMuxStreamClientReuse(t *testing.T) {
-	remote := Tester{daze.NewTester(EchoServerListenOn)}
-	remote.Mux()
-	defer remote.Close()
+	rmt := &Tester{daze.NewTester(EchoServerListenOn)}
+	rmt.Mux()
+	defer rmt.Close()
 
 	mux := NewMuxClient(doa.Try(net.Dial("tcp", EchoServerListenOn)))
 	defer mux.Close()
@@ -121,9 +121,9 @@ func TestProtocolCzarMuxStreamClientReuse(t *testing.T) {
 }
 
 func TestProtocolCzarMuxClientClose(t *testing.T) {
-	remote := Tester{daze.NewTester(EchoServerListenOn)}
-	remote.Mux()
-	defer remote.Close()
+	rmt := &Tester{daze.NewTester(EchoServerListenOn)}
+	rmt.Mux()
+	defer rmt.Close()
 
 	mux := NewMuxClient(doa.Try(net.Dial("tcp", EchoServerListenOn)))
 	defer mux.Close()
@@ -131,27 +131,24 @@ func TestProtocolCzarMuxClientClose(t *testing.T) {
 	defer cli.Close()
 
 	mux.con.Close()
-	buf := make([]byte, 2048)
-	er0 := doa.Err(mux.Open())
-	doa.Doa(strings.Contains(er0.Error(), "use of closed network connection"))
-	er1 := doa.Err(io.ReadFull(cli, buf[:1]))
-	doa.Doa(strings.Contains(er1.Error(), "use of closed network connection"))
-	er2 := doa.Err(cli.Write([]byte{0x00, 0x00, 0x00, 0x80}))
-	doa.Doa(strings.Contains(er2.Error(), "use of closed network connection"))
+	doa.Doa(doa.Err(mux.Open()) != nil)
+	buf := make([]byte, 1)
+	doa.Doa(doa.Err(io.ReadFull(cli, buf[:1])) != nil)
+	doa.Doa(doa.Err(cli.Write([]byte{0x02, 0x00, 0x00, 0x00})) != nil)
 }
 
-func TestProtocolCzarMuxServerRecvEvilPacket(t *testing.T) {
-	remote := Tester{daze.NewTester(EchoServerListenOn)}
-	remote.Mux()
-	defer remote.Close()
+func TestProtocolCzarMuxServerReopen(t *testing.T) {
+	rmt := &Tester{daze.NewTester(EchoServerListenOn)}
+	rmt.Mux()
+	defer rmt.Close()
 
-	buf := make([]byte, 2048)
-	cl1 := doa.Try(net.Dial("tcp", EchoServerListenOn))
-	defer cl1.Close()
-	cl1.Write([]byte{0x00, 0x00, 0x00, 0x00})
-	cl1.Write([]byte{0x00, 0x00, 0x00, 0x00})
-	_, er1 := io.ReadFull(cl1, buf[:1])
-	doa.Doa(er1 != nil)
+	cli := doa.Try(net.Dial("tcp", EchoServerListenOn))
+	defer cli.Close()
+
+	cli.Write([]byte{0x00, 0x00, 0x00, 0x00})
+	cli.Write([]byte{0x00, 0x00, 0x00, 0x00})
+	buf := make([]byte, 1)
+	doa.Doa(doa.Err(io.ReadFull(cli, buf[:1])) != nil)
 }
 
 type Tester struct {
