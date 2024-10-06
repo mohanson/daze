@@ -38,7 +38,6 @@ func TestProtocolBaboonTCP(t *testing.T) {
 		cnt int
 		rsz = int(rand.Uint32N(65536))
 	)
-
 	copy(buf[0:2], []byte{0x00, 0x00})
 	binary.BigEndian.PutUint16(buf[2:], uint16(rsz))
 	doa.Try(cli.Write(buf[:4]))
@@ -54,7 +53,6 @@ func TestProtocolBaboonTCP(t *testing.T) {
 			break
 		}
 	}
-
 	copy(buf[0:2], []byte{0x01, 0x00})
 	binary.BigEndian.PutUint16(buf[2:], uint16(rsz))
 	doa.Try(cli.Write(buf[:4]))
