@@ -19,9 +19,9 @@ const (
 )
 
 func TestProtocolBaboonTCP(t *testing.T) {
-	remote := daze.NewTester(EchoServerListenOn)
-	defer remote.Close()
-	remote.TCP()
+	dazeRemote := daze.NewTester(EchoServerListenOn)
+	defer dazeRemote.Close()
+	dazeRemote.TCP()
 
 	dazeServer := NewServer(DazeServerListenOn, Password)
 	defer dazeServer.Close()
@@ -73,9 +73,9 @@ func TestProtocolBaboonTCP(t *testing.T) {
 }
 
 func TestProtocolBaboonTCPClientClose(t *testing.T) {
-	remote := daze.NewTester(EchoServerListenOn)
-	defer remote.Close()
-	remote.TCP()
+	dazeRemote := daze.NewTester(EchoServerListenOn)
+	defer dazeRemote.Close()
+	dazeRemote.TCP()
 
 	dazeServer := NewServer(DazeServerListenOn, Password)
 	defer dazeServer.Close()
@@ -95,9 +95,9 @@ func TestProtocolBaboonTCPClientClose(t *testing.T) {
 }
 
 func TestProtocolBaboonTCPServerClose(t *testing.T) {
-	remote := daze.NewTester(EchoServerListenOn)
-	defer remote.Close()
-	remote.TCP()
+	dazeRemote := daze.NewTester(EchoServerListenOn)
+	defer dazeRemote.Close()
+	dazeRemote.TCP()
 
 	dazeServer := NewServer(DazeServerListenOn, Password)
 	defer dazeServer.Close()
@@ -115,9 +115,9 @@ func TestProtocolBaboonTCPServerClose(t *testing.T) {
 }
 
 func TestProtocolBaboonUDP(t *testing.T) {
-	remote := daze.NewTester(EchoServerListenOn)
-	defer remote.Close()
-	remote.UDP()
+	dazeRemote := daze.NewTester(EchoServerListenOn)
+	defer dazeRemote.Close()
+	dazeRemote.UDP()
 
 	dazeServer := NewServer(DazeServerListenOn, Password)
 	defer dazeServer.Close()

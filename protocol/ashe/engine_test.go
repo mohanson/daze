@@ -17,9 +17,9 @@ const (
 )
 
 func TestProtocolAsheTCP(t *testing.T) {
-	remote := daze.NewTester(EchoServerListenOn)
-	defer remote.Close()
-	remote.TCP()
+	dazeRemote := daze.NewTester(EchoServerListenOn)
+	defer dazeRemote.Close()
+	dazeRemote.TCP()
 
 	dazeServer := NewServer(DazeServerListenOn, Password)
 	defer dazeServer.Close()
@@ -71,9 +71,9 @@ func TestProtocolAsheTCP(t *testing.T) {
 }
 
 func TestProtocolAsheTCPClientClose(t *testing.T) {
-	remote := daze.NewTester(EchoServerListenOn)
-	defer remote.Close()
-	remote.TCP()
+	dazeRemote := daze.NewTester(EchoServerListenOn)
+	defer dazeRemote.Close()
+	dazeRemote.TCP()
 
 	dazeServer := NewServer(DazeServerListenOn, Password)
 	defer dazeServer.Close()
@@ -93,9 +93,9 @@ func TestProtocolAsheTCPClientClose(t *testing.T) {
 }
 
 func TestProtocolAsheTCPServerClose(t *testing.T) {
-	remote := daze.NewTester(EchoServerListenOn)
-	defer remote.Close()
-	remote.TCP()
+	dazeRemote := daze.NewTester(EchoServerListenOn)
+	defer dazeRemote.Close()
+	dazeRemote.TCP()
 
 	dazeServer := NewServer(DazeServerListenOn, Password)
 	defer dazeServer.Close()
@@ -113,9 +113,9 @@ func TestProtocolAsheTCPServerClose(t *testing.T) {
 }
 
 func TestProtocolAsheUDP(t *testing.T) {
-	remote := daze.NewTester(EchoServerListenOn)
-	defer remote.Close()
-	remote.UDP()
+	dazeRemote := daze.NewTester(EchoServerListenOn)
+	defer dazeRemote.Close()
+	dazeRemote.UDP()
 
 	dazeServer := NewServer(DazeServerListenOn, Password)
 	defer dazeServer.Close()
