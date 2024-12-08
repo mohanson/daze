@@ -11,9 +11,9 @@ $ git clone https://github.com/mohanson/daze
 $ cd daze
 
 # On Linux or macOS
-$ ./cmd/develop.sh
+$ cmd/develop.sh
 # On Windows
-$ ./cmd/develop.ps1
+$ cmd/develop.ps1
 ```
 
 The build results will be saved in the bin directory. You can keep this directory, and all other files are not required.
@@ -146,7 +146,7 @@ Proxy control is a rule that determines whether network requests (TCP and UDP) g
 
 ## File rule.ls
 
-Daze uses a "rule.ls" file to customize your own rules(optional). "rule.ls" has the highest priority in routers so you should carefully maintain it. The "rule.ls" is located on the "./rule.ls" by default, or you can use `daze client -r path/to/rule.ls` to apply it.
+Daze uses a "rule.ls" file to customize your own rules(optional). "rule.ls" has the highest priority in routers so you should carefully maintain it. The "rule.ls" is located on the "rule.ls" by default, or you can use `daze client -r path/to/rule.ls` to apply it.
 
 ```text
 L a.com
@@ -162,7 +162,7 @@ Glob is supported, such as `R *.google.com`.
 
 ## File rule.cidr
 
-Daze also uses a CIDR(Classless Inter-Domain Routing) file to route addresses. The CIDR file is located at "./rule.cidr", and has a lower priority than "rule.ls".
+Daze also uses a CIDR(Classless Inter-Domain Routing) file to route addresses. The CIDR file is located at "rule.cidr", and has a lower priority than "rule.ls".
 
 By default, daze has configured rule.cidr for China's mainland. You can update it manually via `daze gen cn`, this will pull the latest data from [http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest](http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest).
 
