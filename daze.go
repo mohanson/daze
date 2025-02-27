@@ -291,7 +291,10 @@ func (l *Locale) ServeSocks4(ctx *Context, cli io.ReadWriteCloser) error {
 		err       error
 	)
 	cliReader.Discard(1)
-	fCode, _ = cliReader.ReadByte()
+	fCode, err = cliReader.ReadByte()
+	if err != nil {
+		return err
+	}
 	io.ReadFull(cliReader, fDstPort)
 	dstPort = binary.BigEndian.Uint16(fDstPort)
 	io.ReadFull(cliReader, fDstIP)
@@ -352,13 +355,13 @@ func (l *Locale) ServeSocks5(ctx *Context, cli io.ReadWriteCloser) error {
 		err      error
 	)
 	cliReader.Discard(1)
-	fN, _ = cliReader.ReadByte()
+	fN = doa.Val(cliReader.ReadByte())
 	cliReader.Discard(int(fN))
 	cli.Write([]byte{0x05, 0x00})
 	cliReader.Discard(1)
-	fCmd, _ = cliReader.ReadByte()
+	fCmd = doa.Val(cliReader.ReadByte())
 	cliReader.Discard(1)
-	fAT, _ = cliReader.ReadByte()
+	fAT = doa.Val(cliReader.ReadByte())
 	switch fAT {
 	case 0x01:
 		fDstAddr = make([]byte, 4)
