@@ -1047,7 +1047,7 @@ type RandomReader struct{}
 
 // Read implements io.Reader.
 func (r *RandomReader) Read(p []byte) (int, error) {
-	for i := 0; i < len(p); i++ {
+	for i := range len(p) {
 		p[i] = byte(rand.Uint64())
 	}
 	return len(p), nil
