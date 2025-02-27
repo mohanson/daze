@@ -280,15 +280,15 @@ func (l *Locale) ServeSocks4(ctx *Context, cli io.ReadWriteCloser) error {
 		Closer: cli,
 	}
 	var (
-		fCode     uint8
-		fDstPort  = make([]byte, 2)
-		fDstIP    = make([]byte, 4)
-		fHostName []byte
 		dstHost   string
 		dstPort   uint16
 		dst       string
-		srv       io.ReadWriteCloser
 		err       error
+		fCode     uint8
+		fDstIP    = make([]byte, 4)
+		fDstPort  = make([]byte, 2)
+		fHostName []byte
+		srv       io.ReadWriteCloser
 	)
 	cliReader.Discard(1)
 	fCode, err = cliReader.ReadByte()
@@ -344,15 +344,15 @@ func (l *Locale) ServeSocks5(ctx *Context, cli io.ReadWriteCloser) error {
 		Closer: cli,
 	}
 	var (
-		fN       uint8
-		fCmd     uint8
-		fAT      uint8
-		fDstAddr []byte
-		fDstPort = make([]byte, 2)
 		dstHost  string
 		dstPort  uint16
 		dst      string
 		err      error
+		fAT      uint8
+		fCmd     uint8
+		fDstAddr []byte
+		fDstPort = make([]byte, 2)
+		fN       uint8
 	)
 	cliReader.Discard(1)
 	fN = doa.Val(cliReader.ReadByte())
