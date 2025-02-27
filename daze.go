@@ -411,21 +411,21 @@ func (l *Locale) ServeSocks5TCP(ctx *Context, cli io.ReadWriteCloser, dst string
 // ServeSocks5UDP serves socks5 UDP protocol.
 func (l *Locale) ServeSocks5UDP(ctx *Context, cli io.ReadWriteCloser) error {
 	var (
+		appAddr     *net.UDPAddr
+		appHeadSize int
+		appHead     []byte
+		appSize     int
 		bndAddr     *net.UDPAddr
 		bndPort     uint16
 		bnd         *net.UDPConn
-		appAddr     *net.UDPAddr
-		appSize     int
-		appHeadSize int
-		appHead     []byte
+		buf         = make([]byte, 2048)
+		b           bool
+		cpl         = map[string]io.ReadWriteCloser{}
 		dstHost     string
 		dstPort     uint16
 		dst         string
-		srv         io.ReadWriteCloser
-		b           bool
-		cpl         = map[string]io.ReadWriteCloser{}
-		buf         = make([]byte, 2048)
 		err         error
+		srv         io.ReadWriteCloser
 	)
 	bndAddr = doa.Try(net.ResolveUDPAddr("udp", "127.0.0.1:0"))
 	bnd = doa.Try(net.ListenUDP("udp", bndAddr))
