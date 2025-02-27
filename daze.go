@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -280,15 +281,15 @@ func (l *Locale) ServeSocks4(ctx *Context, cli io.ReadWriteCloser) error {
 		Closer: cli,
 	}
 	var (
-		fCode     uint8
-		fDstPort  = make([]byte, 2)
-		fDstIP    = make([]byte, 4)
-		fHostName []byte
 		dstHost   string
 		dstPort   uint16
 		dst       string
-		srv       io.ReadWriteCloser
 		err       error
+		fCode     uint8
+		fDstIP    = make([]byte, 4)
+		fDstPort  = make([]byte, 2)
+		fHostName []byte
+		srv       io.ReadWriteCloser
 	)
 	cliReader.Discard(1)
 	fCode, err = cliReader.ReadByte()
@@ -344,15 +345,15 @@ func (l *Locale) ServeSocks5(ctx *Context, cli io.ReadWriteCloser) error {
 		Closer: cli,
 	}
 	var (
-		fN       uint8
-		fCmd     uint8
-		fAT      uint8
-		fDstAddr []byte
-		fDstPort = make([]byte, 2)
 		dstHost  string
 		dstPort  uint16
 		dst      string
 		err      error
+		fAT      uint8
+		fCmd     uint8
+		fDstAddr []byte
+		fDstPort = make([]byte, 2)
+		fN       uint8
 	)
 	cliReader.Discard(1)
 	fN = doa.Val(cliReader.ReadByte())
@@ -411,21 +412,20 @@ func (l *Locale) ServeSocks5TCP(ctx *Context, cli io.ReadWriteCloser, dst string
 // ServeSocks5UDP serves socks5 UDP protocol.
 func (l *Locale) ServeSocks5UDP(ctx *Context, cli io.ReadWriteCloser) error {
 	var (
+		appAddr     *net.UDPAddr
+		appHeadSize int
+		appHead     []byte
+		appSize     int
 		bndAddr     *net.UDPAddr
 		bndPort     uint16
 		bnd         *net.UDPConn
-		appAddr     *net.UDPAddr
-		appSize     int
-		appHeadSize int
-		appHead     []byte
+		buf         = make([]byte, 2048)
+		cpl         = map[string]io.ReadWriteCloser{}
 		dstHost     string
 		dstPort     uint16
 		dst         string
-		srv         io.ReadWriteCloser
-		b           bool
-		cpl         = map[string]io.ReadWriteCloser{}
-		buf         = make([]byte, 2048)
 		err         error
+		srv         io.ReadWriteCloser
 	)
 	bndAddr = doa.Try(net.ResolveUDPAddr("udp", "127.0.0.1:0"))
 	bnd = doa.Try(net.ListenUDP("udp", bndAddr))
@@ -478,10 +478,7 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, cli io.ReadWriteCloser) error {
 		case 0x04:
 			appHeadSize = 22
 		}
-
-		appHead = make([]byte, appHeadSize)
-		copy(appHead, buf[0:appHeadSize])
-
+		appHead = buf[0:appHeadSize]
 		switch appHead[3] {
 		case 0x01:
 			dstHost = net.IP(appHead[4:8]).String()
@@ -495,45 +492,25 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, cli io.ReadWriteCloser) error {
 			dstPort = binary.BigEndian.Uint16(appHead[20:22])
 		}
 		dst = dstHost + ":" + strconv.Itoa(int(dstPort))
-
-		srv, b = cpl[dst]
-		if b {
-			goto send
-		} else {
-			goto init
-		}
-	init:
-		log.Printf("conn: %08x  proto format=socks5", ctx.Cid)
-		srv, err = l.Dialer.Dial(ctx, "udp", dst)
-		if err != nil {
-			log.Printf("conn: %08x  error %s", ctx.Cid, err)
-			continue
-		}
-		cpl[dst] = srv
-		go func(srv io.ReadWriteCloser, appHead []byte, appAddr *net.UDPAddr) error {
-			var (
-				buf = make([]byte, 2048)
-				l   = len(appHead)
-				n   int
-				err error
-			)
-			copy(buf, appHead)
-			for {
-				n, err = srv.Read(buf[l:])
-				if err != nil {
-					break
-				}
-				_, err = bnd.WriteToUDP(buf[:l+n], appAddr)
-				if err != nil {
-					break
-				}
+		srv = cpl[dst]
+		if srv == nil {
+			log.Printf("conn: %08x  proto format=socks5", ctx.Cid)
+			srv, err = l.Dialer.Dial(ctx, "udp", dst)
+			if err != nil {
+				log.Printf("conn: %08x  error %s", ctx.Cid, err)
+				continue
 			}
-			return err
-		}(srv, appHead, appAddr)
-	send:
+			cpl[dst] = srv
+			retHead := slices.Clone(appHead)
+			go ReadCall(srv, func(data []byte) error {
+				return doa.Err(bnd.WriteToUDP(append(retHead, data...), appAddr))
+			})
+		}
 		_, err = srv.Write(buf[appHeadSize:appSize])
 		if err != nil {
 			log.Printf("conn: %08x  error %s", ctx.Cid, err)
+			srv.Close()
+			delete(cpl, dst)
 			continue
 		}
 	}
@@ -1047,10 +1024,29 @@ type RandomReader struct{}
 
 // Read implements io.Reader.
 func (r *RandomReader) Read(p []byte) (int, error) {
-	for i := 0; i < len(p); i++ {
+	for i := range len(p) {
 		p[i] = byte(rand.Uint64())
 	}
 	return len(p), nil
+}
+
+// ReadCall reads data from the given io.Reader and passes it to the provided call function.
+func ReadCall(conn io.Reader, call func([]byte) error) error {
+	var (
+		buf = make([]byte, 2048)
+		err error
+		n   int
+	)
+	for {
+		n, err = conn.Read(buf)
+		if err != nil {
+			break
+		}
+		if err = call(buf[:n]); err != nil {
+			break
+		}
+	}
+	return err
 }
 
 // Salt converts the stupid password passed in by the user to 32-sized byte array.
