@@ -455,16 +455,16 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, cli io.ReadWriteCloser) error {
 		// 	+----+------+------+----------+----------+----------+
 		// 	| 2  |  1   |  1   | Variable |    2     | Variable |
 		// 	+----+------+------+----------+----------+----------+
-		//    The fields in the UDP request header are:
-		// 	    *  RSV  Reserved X'0000'
-		// 	    *  FRAG    Current fragment number
-		// 	    *  ATYP    address type of following addresses:
-		// 	       *  IP V4 address: X'01'
-		// 	       *  DOMAINNAME: X'03'
-		// 	       *  IP V6 address: X'04'
-		// 	    *  DST.ADDR       desired destination address
-		// 	    *  DST.PORT       desired destination port
-		// 	    *  DATA     user data
+		//  The fields in the UDP request header are:
+		// 	*  RSV                               Reserved  0x0000
+		// 	*  FRAG                       Current fragment number
+		// 	*  ATYP          Address type of following addresses:
+		// 	   *  IP V4 address:                             0x01
+		// 	   *  DOMAINNAME:                                0x03
+		// 	   *  IP V6 address:                             0x04
+		// 	*  DST.ADDR               Desired destination address
+		// 	*  DST.PORT                  Desired destination port
+		// 	*  DATA                                     User data
 		doa.Doa(buf[0] == 0x00)
 		doa.Doa(buf[1] == 0x00)
 		// Implementation of fragmentation is optional; an implementation that does not support fragmentation MUST drop
