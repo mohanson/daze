@@ -111,8 +111,8 @@ func (l *Lru[K, V]) Del(k K) {
 	l.M.Lock()
 	defer l.M.Unlock()
 	if e, ok := l.C[k]; ok {
-		l.List.Remove(e)
 		delete(l.C, k)
+		l.List.Remove(e)
 	}
 }
 
