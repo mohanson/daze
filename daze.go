@@ -49,12 +49,14 @@ import (
 var Conf = struct {
 	DialerTimeout time.Duration
 	RouterLruSize int
+	Socks5LruSize int
 }{
 	DialerTimeout: time.Second * 8,
 	// A single cache entry represents a single host or DNS name lookup. Make the cache as large as the maximum number
 	// of clients that access your web site concurrently. Note that setting the cache size too high is a waste of
 	// memory and degrades performance.
 	RouterLruSize: 64,
+	Socks5LruSize: 8,
 }
 
 // ResolverDns returns a DNS resolver.
@@ -441,7 +443,7 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, cli io.ReadWriteCloser) error {
 		bndPort     uint16
 		bnd         *net.UDPConn
 		buf         = make([]byte, 2048)
-		cpl         = map[string]io.ReadWriteCloser{}
+		cpl         = lru.New[string, io.ReadWriteCloser](Conf.Socks5LruSize)
 		dstHost     string
 		dstPort     uint16
 		dst         string
@@ -457,6 +459,9 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, cli io.ReadWriteCloser) error {
 	_, err = cli.Write(buf[:10])
 	if err != nil {
 		return err
+	}
+	cpl.Drop = func(k string, v io.ReadWriteCloser) {
+		v.Close()
 	}
 
 	// https://datatracker.ietf.org/doc/html/rfc1928, Page 7, UDP ASSOCIATE:
@@ -513,27 +518,26 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, cli io.ReadWriteCloser) error {
 			dstPort = binary.BigEndian.Uint16(appHead[20:22])
 		}
 		dst = dstHost + ":" + strconv.Itoa(int(dstPort))
-		srv = cpl[dst]
-		if srv == nil {
+		if !cpl.Has(dst) {
 			log.Printf("conn: %08x  proto format=socks5", ctx.Cid)
 			srv, err = l.Dialer.Dial(ctx, "udp", dst)
 			if err != nil {
 				log.Printf("conn: %08x  error %s", ctx.Cid, err)
 				continue
 			}
-			cpl[dst] = srv
+			cpl.Set(dst, srv)
 			go l.ServeSocks5UDPRead(srv, bnd, appAddr, appHead)
 		}
+		srv = cpl.Get(dst)
 		_, err = srv.Write(buf[appHeadSize:appSize])
 		if err != nil {
 			log.Printf("conn: %08x  error %s", ctx.Cid, err)
-			srv.Close()
-			delete(cpl, dst)
+			cpl.Del(dst)
 			continue
 		}
 	}
-	for _, e := range cpl {
-		e.Close()
+	for k := range cpl.C {
+		cpl.Del(k)
 	}
 	return nil
 }
