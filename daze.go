@@ -22,7 +22,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -409,6 +408,28 @@ func (l *Locale) ServeSocks5TCP(ctx *Context, cli io.ReadWriteCloser, dst string
 	return err
 }
 
+// ServeSocks5UDPRead handles the reading and forwarding of udp data.
+func (l *Locale) ServeSocks5UDPRead(srv io.Reader, bnd *net.UDPConn, app *net.UDPAddr, pre []byte) error {
+	var (
+		buf = make([]byte, 2048)
+		err error
+		m   = len(pre)
+		n   int
+	)
+	copy(buf[:m], pre)
+	for {
+		n, err = srv.Read(buf[m:])
+		if err != nil {
+			break
+		}
+		_, err = bnd.WriteToUDP(buf[:m+n], app)
+		if err != nil {
+			break
+		}
+	}
+	return err
+}
+
 // ServeSocks5UDP serves socks5 UDP protocol.
 func (l *Locale) ServeSocks5UDP(ctx *Context, cli io.ReadWriteCloser) error {
 	var (
@@ -501,10 +522,7 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, cli io.ReadWriteCloser) error {
 				continue
 			}
 			cpl[dst] = srv
-			retHead := slices.Clone(appHead)
-			go ReadCall(srv, func(data []byte) error {
-				return doa.Err(bnd.WriteToUDP(append(retHead, data...), appAddr))
-			})
+			go l.ServeSocks5UDPRead(srv, bnd, appAddr, appHead)
 		}
 		_, err = srv.Write(buf[appHeadSize:appSize])
 		if err != nil {
@@ -1028,25 +1046,6 @@ func (r *RandomReader) Read(p []byte) (int, error) {
 		p[i] = byte(rand.Uint64())
 	}
 	return len(p), nil
-}
-
-// ReadCall reads data from the given io.Reader and passes it to the provided call function.
-func ReadCall(conn io.Reader, call func([]byte) error) error {
-	var (
-		buf = make([]byte, 2048)
-		err error
-		n   int
-	)
-	for {
-		n, err = conn.Read(buf)
-		if err != nil {
-			break
-		}
-		if err = call(buf[:n]); err != nil {
-			break
-		}
-	}
-	return err
 }
 
 // Salt converts the stupid password passed in by the user to 32-sized byte array.
