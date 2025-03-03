@@ -22,7 +22,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -50,12 +49,14 @@ import (
 var Conf = struct {
 	DialerTimeout time.Duration
 	RouterLruSize int
+	Socks5LruSize int
 }{
 	DialerTimeout: time.Second * 8,
 	// A single cache entry represents a single host or DNS name lookup. Make the cache as large as the maximum number
 	// of clients that access your web site concurrently. Note that setting the cache size too high is a waste of
 	// memory and degrades performance.
 	RouterLruSize: 64,
+	Socks5LruSize: 8,
 }
 
 // ResolverDns returns a DNS resolver.
@@ -409,6 +410,28 @@ func (l *Locale) ServeSocks5TCP(ctx *Context, cli io.ReadWriteCloser, dst string
 	return err
 }
 
+// ServeSocks5UDPRead handles the reading and forwarding of udp data.
+func (l *Locale) ServeSocks5UDPRead(srv io.Reader, bnd *net.UDPConn, app *net.UDPAddr, pre []byte) error {
+	var (
+		buf = make([]byte, 2048)
+		err error
+		m   = len(pre)
+		n   int
+	)
+	copy(buf[:m], pre)
+	for {
+		n, err = srv.Read(buf[m:])
+		if err != nil {
+			break
+		}
+		_, err = bnd.WriteToUDP(buf[:m+n], app)
+		if err != nil {
+			break
+		}
+	}
+	return err
+}
+
 // ServeSocks5UDP serves socks5 UDP protocol.
 func (l *Locale) ServeSocks5UDP(ctx *Context, cli io.ReadWriteCloser) error {
 	var (
@@ -420,7 +443,7 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, cli io.ReadWriteCloser) error {
 		bndPort     uint16
 		bnd         *net.UDPConn
 		buf         = make([]byte, 2048)
-		cpl         = map[string]io.ReadWriteCloser{}
+		cpl         = lru.New[string, io.ReadWriteCloser](Conf.Socks5LruSize)
 		dstHost     string
 		dstPort     uint16
 		dst         string
@@ -436,6 +459,9 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, cli io.ReadWriteCloser) error {
 	_, err = cli.Write(buf[:10])
 	if err != nil {
 		return err
+	}
+	cpl.Drop = func(k string, v io.ReadWriteCloser) {
+		v.Close()
 	}
 
 	// https://datatracker.ietf.org/doc/html/rfc1928, Page 7, UDP ASSOCIATE:
@@ -492,30 +518,26 @@ func (l *Locale) ServeSocks5UDP(ctx *Context, cli io.ReadWriteCloser) error {
 			dstPort = binary.BigEndian.Uint16(appHead[20:22])
 		}
 		dst = dstHost + ":" + strconv.Itoa(int(dstPort))
-		srv = cpl[dst]
-		if srv == nil {
+		if !cpl.Has(dst) {
 			log.Printf("conn: %08x  proto format=socks5", ctx.Cid)
 			srv, err = l.Dialer.Dial(ctx, "udp", dst)
 			if err != nil {
 				log.Printf("conn: %08x  error %s", ctx.Cid, err)
 				continue
 			}
-			cpl[dst] = srv
-			retHead := slices.Clone(appHead)
-			go ReadCall(srv, func(data []byte) error {
-				return doa.Err(bnd.WriteToUDP(append(retHead, data...), appAddr))
-			})
+			cpl.Set(dst, srv)
+			go l.ServeSocks5UDPRead(srv, bnd, appAddr, appHead)
 		}
+		srv = cpl.Get(dst)
 		_, err = srv.Write(buf[appHeadSize:appSize])
 		if err != nil {
 			log.Printf("conn: %08x  error %s", ctx.Cid, err)
-			srv.Close()
-			delete(cpl, dst)
+			cpl.Del(dst)
 			continue
 		}
 	}
-	for _, e := range cpl {
-		e.Close()
+	for k := range cpl.C {
+		cpl.Del(k)
 	}
 	return nil
 }
@@ -1028,25 +1050,6 @@ func (r *RandomReader) Read(p []byte) (int, error) {
 		p[i] = byte(rand.Uint64())
 	}
 	return len(p), nil
-}
-
-// ReadCall reads data from the given io.Reader and passes it to the provided call function.
-func ReadCall(conn io.Reader, call func([]byte) error) error {
-	var (
-		buf = make([]byte, 2048)
-		err error
-		n   int
-	)
-	for {
-		n, err = conn.Read(buf)
-		if err != nil {
-			break
-		}
-		if err = call(buf[:n]); err != nil {
-			break
-		}
-	}
-	return err
 }
 
 // Salt converts the stupid password passed in by the user to 32-sized byte array.
