@@ -29,6 +29,7 @@ import (
 
 	"github.com/mohanson/daze/lib/doa"
 	"github.com/mohanson/daze/lib/lru"
+	"github.com/mohanson/daze/lib/pretty"
 )
 
 // ============================================================================
@@ -1052,6 +1053,24 @@ func (r *RandomReader) Read(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// The PrettyReader struct represents a custom reader that keeps track of read bytes and prints progress.
+type PrettyReader struct {
+	E uint64    // Total number of bytes read so far
+	F uint64    // Total capacity of the input stream
+	R io.Reader // The underlying reader that this object wraps around
+}
+
+// The Read method reads data from the wrapped reader and prints progress updates.
+func (r *PrettyReader) Read(p []byte) (int, error) {
+	if r.E == 0 {
+		pretty.PrintProgress(0)
+	}
+	n, err := r.R.Read(p)
+	r.E += uint64(n)
+	pretty.PrintProgress(float64(r.E) / float64(r.F))
+	return n, err
+}
+
 // Salt converts the stupid password passed in by the user to 32-sized byte array.
 func Salt(s string) []byte {
 	h := sha256.Sum256([]byte(s))
@@ -1075,8 +1094,14 @@ func Salt(s string) []byte {
 // LoadApnic loads remote resource. APNIC is the Regional Internet Registry administering IP addresses for the Asia
 // Pacific.
 func LoadApnic() map[string][]*net.IPNet {
-	log.Println("main: load apnic data from http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest")
-	f := doa.Try(OpenFile("http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest"))
+	url := "http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest"
+	log.Println("main: load apnic data from", url)
+	rep := doa.Try(http.Get(url))
+	f := &ReadWriteCloser{
+		Reader: &PrettyReader{0, uint64(rep.ContentLength), rep.Body},
+		Writer: nil,
+		Closer: rep.Body,
+	}
 	defer f.Close()
 	r := map[string][]*net.IPNet{}
 	s := bufio.NewScanner(f)
