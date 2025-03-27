@@ -103,6 +103,8 @@ func (l *Lru[K, V]) Del(k K) {
 
 // Has returns true if a key exists.
 func (l *Lru[K, V]) Has(k K) bool {
+	l.M.Lock()
+	defer l.M.Unlock()
 	_, b := l.C[k]
 	return b
 }
