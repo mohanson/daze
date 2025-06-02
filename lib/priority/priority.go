@@ -15,7 +15,7 @@ func (p *Priority) Pri(n int, f func() error) error {
 		p.l[i].Lock()
 	}
 	err := f()
-	for i := n; i >= 0; i-- {
+	for i := 0; i <= n; i++ {
 		p.l[i].Unlock()
 	}
 	return err
