@@ -87,7 +87,7 @@ func (s *Stream) Write(p []byte) (int, error) {
 		buf []byte
 		l   = 0
 		n   = 0
-		z   = 0
+		z   = 1
 	)
 	for {
 		switch {
@@ -105,12 +105,9 @@ func (s *Stream) Write(p []byte) (int, error) {
 		binary.BigEndian.PutUint16(buf[2:4], uint16(l))
 		copy(buf[4:], p[:l])
 		p = p[l:]
-		z = func() int {
-			if time.Now().After(s.qtw) {
-				return 2
-			}
-			return 1
-		}()
+		if time.Now().After(s.qtw) {
+			z = 2
+		}
 		err := s.mux.pri.Pri(z, func() error {
 			if err := s.wer.Get(); err != nil {
 				return err
