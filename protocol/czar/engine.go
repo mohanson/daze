@@ -157,24 +157,27 @@ func (c *Client) Run() {
 	for {
 		switch sid {
 		case 0:
+			sid = 2
 			srv, err = daze.Dial("tcp", c.Server)
-			switch {
-			case srv == nil:
-				log.Println("czar:", err)
-				select {
-				case <-time.After(time.Second * time.Duration(math.Pow(2, float64(rtt)))):
-					// A slow start reconnection algorithm.
-					rtt = min(rtt+1, 5)
-				case <-c.Cancel:
-					sid = 2
-				}
-			case err == nil:
-				log.Println("czar: mux init")
-				mux = NewMuxClient(srv)
-				rtt = 0
+			if err != nil {
 				sid = 1
 			}
 		case 1:
+			log.Println("czar:", err)
+			select {
+			case <-time.After(time.Second * time.Duration(math.Pow(2, float64(rtt)))):
+				// A slow start reconnection algorithm.
+				rtt = min(rtt+1, 5)
+				sid = 0
+			case <-c.Cancel:
+				sid = 4
+			}
+		case 2:
+			log.Println("czar: mux init")
+			mux = NewMuxClient(srv)
+			rtt = 0
+			sid = 3
+		case 3:
 			select {
 			case c.Mux <- mux:
 			case <-mux.rer.Sig():
@@ -184,9 +187,9 @@ func (c *Client) Run() {
 			case <-c.Cancel:
 				log.Println("czar: mux done")
 				mux.Close()
-				sid = 2
+				sid = 4
 			}
-		case 2:
+		case 4:
 			return
 		}
 	}
