@@ -147,6 +147,13 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 
 // Run creates an establish connection to czar server.
 func (c *Client) Run() {
+	const (
+		clientStatusClosed int = iota
+		clientStatusDialFailure
+		clientStatusDialSuccess
+		clientStatusEstablished
+		clientStatusCancel
+	)
 	var (
 		err error
 		mux *Mux
@@ -156,40 +163,41 @@ func (c *Client) Run() {
 	)
 	for {
 		switch sid {
-		case 0:
-			sid = 2
+		case clientStatusClosed:
 			srv, err = daze.Dial("tcp", c.Server)
 			if err != nil {
-				sid = 1
+				sid = clientStatusDialFailure
+			} else {
+				sid = clientStatusDialSuccess
 			}
-		case 1:
+		case clientStatusDialFailure:
 			log.Println("czar:", err)
 			select {
 			case <-time.After(time.Second * time.Duration(math.Pow(2, float64(rtt)))):
 				// A slow start reconnection algorithm.
 				rtt = min(rtt+1, 5)
-				sid = 0
+				sid = clientStatusClosed
 			case <-c.Cancel:
-				sid = 4
+				sid = clientStatusCancel
 			}
-		case 2:
+		case clientStatusDialSuccess:
 			log.Println("czar: mux init")
 			mux = NewMuxClient(srv)
 			rtt = 0
-			sid = 3
-		case 3:
+			sid = clientStatusEstablished
+		case clientStatusEstablished:
 			select {
 			case c.Mux <- mux:
 			case <-mux.rer.Sig():
 				log.Println("czar: mux done")
 				mux.Close()
-				sid = 0
+				sid = clientStatusClosed
 			case <-c.Cancel:
 				log.Println("czar: mux done")
 				mux.Close()
-				sid = 4
+				sid = clientStatusCancel
 			}
-		case 4:
+		case clientStatusCancel:
 			return
 		}
 	}
