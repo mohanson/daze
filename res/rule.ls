@@ -1,8 +1,6 @@
-# RULE file aims to be a minimal configuration file format that's easy to read
-# due to obvious semantics. Each line in the file represents a rule, and each
-# rule consists of mode and glob. Mode is a character that describes whether
-# the host should be accessed through a proxy, and the glob is a glob-style
-# string.
+# Rule file aims to be a minimal configuration file format that's easy to read due to obvious semantics. Each line in
+# the file represents a rule, and each rule consists of mode and glob. Mode is a character that describes whether the
+# host should be accessed through a proxy, and the glob is a glob-style string.
 #
 # Glob patterns:
 #   h?llo matches hello, hallo and hxllo
@@ -11,7 +9,7 @@
 #   h[^e]llo matches hallo, hbllo, ... but not hello
 #   h[a-b]llo matches hallo and hbllo
 #
-# This is a normal RULE document:
+# This is a normal rule.ls document:
 #   L a.com a.a.com
 #   R b.com *.b.com
 #   B c.com
