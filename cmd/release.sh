@@ -13,6 +13,8 @@ make() {
 }
 
 # https://golang.org/doc/install/source#environment
+make darwin amd64
+make darwin arm64
 make android arm64
 make linux amd64
 make windows amd64

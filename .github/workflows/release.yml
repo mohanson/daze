@@ -18,6 +18,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
+            bin/release/daze_darwin_amd64.zip
+            bin/release/daze_darwin_arm64.zip
             bin/release/daze_android_arm64.zip
             bin/release/daze_linux_amd64.zip
             bin/release/daze_windows_amd64.zip
