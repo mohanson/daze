@@ -14,6 +14,7 @@ import (
 
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/lib/doa"
+	"github.com/mohanson/daze/lib/rate"
 	"github.com/mohanson/daze/protocol/ashe"
 )
 
@@ -34,6 +35,7 @@ var Conf = struct {
 type Server struct {
 	Cipher []byte
 	Closer io.Closer
+	Limits *rate.Limiter
 	Listen string
 	Masker string
 	NextID uint32
@@ -74,10 +76,14 @@ func (s *Server) ServeDaze(w http.ResponseWriter, r *http.Request) {
 		Writer: cc,
 		Closer: cc,
 	}
+	rwc := &daze.RateConn{
+		Conn: cli,
+		Rate: s.Limits,
+	}
 	spy := &ashe.Server{Cipher: s.Cipher}
 	ctx := &daze.Context{Cid: atomic.AddUint32(&s.NextID, 1)}
 	log.Printf("conn: %08x accept remote=%s", ctx.Cid, cc.RemoteAddr())
-	if err := spy.Serve(ctx, cli); err != nil {
+	if err := spy.Serve(ctx, rwc); err != nil {
 		log.Printf("conn: %08x  error %s", ctx.Cid, err)
 	}
 	log.Printf("conn: %08x closed", ctx.Cid)
@@ -143,6 +149,7 @@ func (s *Server) Run() error {
 func NewServer(listen string, cipher string) *Server {
 	return &Server{
 		Cipher: daze.Salt(cipher),
+		Limits: rate.NewLimiter(rate.Inf, 0),
 		Listen: listen,
 		Masker: Conf.Masker,
 		NextID: uint32(math.MaxUint32),

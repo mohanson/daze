@@ -30,6 +30,7 @@ import (
 	"github.com/mohanson/daze/lib/doa"
 	"github.com/mohanson/daze/lib/lru"
 	"github.com/mohanson/daze/lib/pretty"
+	"github.com/mohanson/daze/lib/rate"
 )
 
 // ============================================================================
@@ -1042,18 +1043,6 @@ func OpenFile(name string) (io.ReadCloser, error) {
 	return os.Open(name)
 }
 
-// RandomReader is a simple random number generator. Note that it is not cryptographically secure, but for daze, the
-// randomness it provides is enough.
-type RandomReader struct{}
-
-// Read implements io.Reader.
-func (r *RandomReader) Read(p []byte) (int, error) {
-	for i := range len(p) {
-		p[i] = byte(rand.Uint64())
-	}
-	return len(p), nil
-}
-
 // The PrettyReader struct represents a custom reader that keeps track of read bytes and prints progress.
 type PrettyReader struct {
 	E uint64    // Total number of bytes read so far
@@ -1072,10 +1061,64 @@ func (r *PrettyReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
+// RandomReader is a simple random number generator. Note that it is not cryptographically secure, but for daze, the
+// randomness it provides is enough.
+type RandomReader struct{}
+
+// Read implements io.Reader.
+func (r *RandomReader) Read(p []byte) (int, error) {
+	for i := range len(p) {
+		p[i] = byte(rand.Uint64())
+	}
+	return len(p), nil
+}
+
+// RateConn wraps a net.Conn with a per-conn and a rate limiter.
+type RateConn struct {
+	Conn io.ReadWriteCloser
+	Rate *rate.Limiter
+}
+
+// Close closes the connection.
+func (r *RateConn) Close() error {
+	return r.Conn.Close()
+}
+
+// Read reads up to len(p) bytes into p.
+func (r *RateConn) Read(p []byte) (int, error) {
+	n, err := r.Conn.Read(p)
+	r.Rate.WaitN(context.Background(), n)
+	return n, err
+}
+
+// Write writes len(p) bytes from p to the underlying data stream.
+func (r *RateConn) Write(p []byte) (int, error) {
+	n, err := r.Conn.Write(p)
+	r.Rate.WaitN(context.Background(), n)
+	return n, err
+}
+
 // Salt converts the stupid password passed in by the user to 32-sized byte array.
 func Salt(s string) []byte {
 	h := sha256.Sum256([]byte(s))
 	return h[:]
+}
+
+// SizeParser converts a string like "1K", "1M", or "1G" to bytes as uint64. It expects the input string to end with a
+// unit (K, M, or G) and panics if the unit is invalid. The number part can be a float (e.g., "1.5M") and is converted
+// to bytes based on the unit.
+func SizeParser(s string) uint64 {
+	f := doa.Try(strconv.ParseFloat(s[:len(s)-1], 64))
+	u := strings.ToLower(s[len(s)-1:])
+	switch u {
+	case "k":
+		return uint64(f * 1024)
+	case "m":
+		return uint64(f * 1024 * 1024)
+	case "g":
+		return uint64(f * 1024 * 1024 * 1024)
+	}
+	panic("unreachable")
 }
 
 // ============================================================================

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/mohanson/daze"
+	"github.com/mohanson/daze/lib/rate"
 	"github.com/mohanson/daze/protocol/ashe"
 )
 
@@ -58,6 +59,7 @@ var Conf = struct {
 type Server struct {
 	Cipher []byte
 	Closer io.Closer
+	Limits *rate.Limiter
 	Listen string
 }
 
@@ -94,7 +96,11 @@ func (s *Server) Run() error {
 				}
 				break
 			}
-			mux := NewMuxServer(cli)
+			rwc := &daze.RateConn{
+				Conn: cli,
+				Rate: s.Limits,
+			}
+			mux := NewMuxServer(rwc)
 			go func() {
 				defer mux.Close()
 				for con := range mux.Accept() {
@@ -120,6 +126,7 @@ func (s *Server) Run() error {
 func NewServer(listen string, cipher string) *Server {
 	return &Server{
 		Cipher: daze.Salt(cipher),
+		Limits: rate.NewLimiter(rate.Inf, 0),
 		Listen: listen,
 	}
 }

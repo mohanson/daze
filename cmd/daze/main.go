@@ -14,6 +14,7 @@ import (
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/lib/doa"
 	"github.com/mohanson/daze/lib/gracefulexit"
+	"github.com/mohanson/daze/lib/rate"
 	"github.com/mohanson/daze/protocol/ashe"
 	"github.com/mohanson/daze/protocol/baboon"
 	"github.com/mohanson/daze/protocol/czar"
@@ -68,6 +69,7 @@ func main() {
 			flDnserv = flag.String("dns", "", "specifies the DNS, DoT or DoH server")
 			flExtend = flag.String("e", "", "extend data for different protocols")
 			flGpprof = flag.String("g", "", "specify an address to enable net/http/pprof")
+			flLimits = flag.String("b", "", "set the maximum bandwidth in bytes per second, for example, 128k or 1.5m")
 			flCipher = flag.String("k", "daze", "password, should be same with the one specified by client")
 			flListen = flag.String("l", "0.0.0.0:1081", "listen address")
 			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon, czar, dahlia}")
@@ -90,21 +92,37 @@ func main() {
 		case "ashe":
 			server := ashe.NewServer(*flListen, *flCipher)
 			defer server.Close()
+			if *flLimits != "" {
+				n := daze.SizeParser(*flLimits)
+				server.Limits = rate.NewLimiter(rate.Limit(n), 1024*1024)
+			}
 			doa.Nil(server.Run())
 		case "baboon":
 			server := baboon.NewServer(*flListen, *flCipher)
+			defer server.Close()
 			if *flExtend != "" {
 				server.Masker = *flExtend
 			}
-			defer server.Close()
+			if *flLimits != "" {
+				n := daze.SizeParser(*flLimits)
+				server.Limits = rate.NewLimiter(rate.Limit(n), 1024*1024)
+			}
 			doa.Nil(server.Run())
 		case "czar":
 			server := czar.NewServer(*flListen, *flCipher)
 			defer server.Close()
+			if *flLimits != "" {
+				n := daze.SizeParser(*flLimits)
+				server.Limits = rate.NewLimiter(rate.Limit(n), 1024*1024)
+			}
 			doa.Nil(server.Run())
 		case "dahlia":
 			server := dahlia.NewServer(*flListen, *flExtend, *flCipher)
 			defer server.Close()
+			if *flLimits != "" {
+				n := daze.SizeParser(*flLimits)
+				server.Limits = rate.NewLimiter(rate.Limit(n), 1024*1024)
+			}
 			doa.Nil(server.Run())
 		}
 		if *flGpprof != "" {
