@@ -41,6 +41,14 @@ import (
 // | Sid |  2  | 0/1 | Rsv |
 // +-----+-----+-----+-----+
 
+// Conf is acting as package level configuration.
+var Conf = struct {
+	// The newly created stream has a higher write priority.
+	FastWriteDuration time.Duration
+}{
+	FastWriteDuration: time.Second * 8,
+}
+
 // Server implemented the czar protocol.
 type Server struct {
 	Cipher []byte
