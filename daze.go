@@ -57,6 +57,7 @@ var Conf = struct {
 	// of clients that access your web site concurrently. Note that setting the cache size too high is a waste of
 	// memory and degrades performance.
 	RouterLruSize: 64,
+	// The maximum number of udp connections allowed by socks5.
 	Socks5LruSize: 8,
 }
 
