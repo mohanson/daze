@@ -45,8 +45,13 @@ import (
 var Conf = struct {
 	// The newly created stream has a higher write priority.
 	FastWriteDuration time.Duration
+	// Packet size. Since the size of the packet header is 4, this value must be greater than 4. If the value is too
+	// small, the transmission efficiency will be reduced, and if it is too large, the concurrency capability of mux
+	// will be reduced.
+	PacketSize int
 }{
 	FastWriteDuration: time.Second * 8,
+	PacketSize:        2048,
 }
 
 // Server implemented the czar protocol.

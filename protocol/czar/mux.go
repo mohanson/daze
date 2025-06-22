@@ -12,7 +12,7 @@ import (
 
 // A Stream managed by the multiplexer.
 type Stream struct {
-	fwd time.Time
+	fwu time.Time
 	idx uint8
 	mux *Mux
 	rbf []byte
@@ -91,9 +91,9 @@ func (s *Stream) Write(p []byte) (int, error) {
 	)
 	for {
 		switch {
-		case len(p) >= 2044:
-			buf = make([]byte, 2048)
-			l = 2044
+		case len(p) >= Conf.PacketSize-4:
+			buf = make([]byte, Conf.PacketSize)
+			l = Conf.PacketSize - 4
 		case len(p) >= 1:
 			buf = make([]byte, 4+len(p))
 			l = len(p)
@@ -105,7 +105,7 @@ func (s *Stream) Write(p []byte) (int, error) {
 		binary.BigEndian.PutUint16(buf[2:4], uint16(l))
 		copy(buf[4:], p[:l])
 		p = p[l:]
-		if time.Now().After(s.fwd) {
+		if time.Now().After(s.fwu) {
 			z = 2
 		}
 		err := s.mux.pri.Pri(z, func() error {
@@ -129,7 +129,7 @@ func (s *Stream) Write(p []byte) (int, error) {
 // NewStream returns a new Stream.
 func NewStream(idx uint8, mux *Mux) *Stream {
 	return &Stream{
-		fwd: time.Now().Add(Conf.FastWriteDuration),
+		fwu: time.Now().Add(Conf.FastWriteDuration),
 		idx: idx,
 		mux: mux,
 		rbf: make([]byte, 0),
