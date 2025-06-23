@@ -192,7 +192,7 @@ func (d *Direct) Dial(ctx *Context, network string, address string) (io.ReadWrit
 type Locale struct {
 	Closer io.Closer
 	Dialer Dialer
-	Limits *rate.Limiter
+	Limits *rate.Limits
 	Listen string
 }
 
@@ -627,7 +627,7 @@ func (l *Locale) Run() error {
 func NewLocale(listen string, dialer Dialer) *Locale {
 	return &Locale{
 		Dialer: dialer,
-		Limits: rate.NewLimiter(rate.Inf, 0),
+		Limits: rate.NewLimits(math.MaxUint64, time.Second),
 		Listen: listen,
 	}
 }
@@ -1082,7 +1082,7 @@ func (r *RandomReader) Read(p []byte) (int, error) {
 // RateConn wraps a net.Conn with a per-conn and a rate limiter.
 type RateConn struct {
 	Conn io.ReadWriteCloser
-	Rate *rate.Limiter
+	Rate *rate.Limits
 }
 
 // Close closes the connection.
@@ -1093,14 +1093,14 @@ func (r *RateConn) Close() error {
 // Read reads up to len(p) bytes into p.
 func (r *RateConn) Read(p []byte) (int, error) {
 	n, err := r.Conn.Read(p)
-	r.Rate.WaitN(context.Background(), n)
+	r.Rate.Wait(uint64(n))
 	return n, err
 }
 
 // Write writes len(p) bytes from p to the underlying data stream.
 func (r *RateConn) Write(p []byte) (int, error) {
 	n, err := r.Conn.Write(p)
-	r.Rate.WaitN(context.Background(), n)
+	r.Rate.Wait(uint64(n))
 	return n, err
 }
 

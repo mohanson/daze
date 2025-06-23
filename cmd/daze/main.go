@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/lib/doa"
@@ -95,7 +96,7 @@ func main() {
 			if *flLimits != "" {
 				n := daze.SizeParser(*flLimits)
 				doa.Doa(n <= math.MaxInt)
-				server.Limits = rate.NewLimiter(rate.Limit(n), int(n))
+				server.Limits = rate.NewLimits(n, time.Second)
 			}
 			defer server.Close()
 			doa.Nil(server.Run())
@@ -107,7 +108,7 @@ func main() {
 			if *flLimits != "" {
 				n := daze.SizeParser(*flLimits)
 				doa.Doa(n <= math.MaxInt)
-				server.Limits = rate.NewLimiter(rate.Limit(n), int(n))
+				server.Limits = rate.NewLimits(n, time.Second)
 			}
 			defer server.Close()
 			doa.Nil(server.Run())
@@ -116,7 +117,7 @@ func main() {
 			if *flLimits != "" {
 				n := daze.SizeParser(*flLimits)
 				doa.Doa(n <= math.MaxInt)
-				server.Limits = rate.NewLimiter(rate.Limit(n), int(n))
+				server.Limits = rate.NewLimits(n, time.Second)
 			}
 			defer server.Close()
 			doa.Nil(server.Run())
@@ -125,7 +126,7 @@ func main() {
 			if *flLimits != "" {
 				n := daze.SizeParser(*flLimits)
 				doa.Doa(n <= math.MaxInt)
-				server.Limits = rate.NewLimiter(rate.Limit(n), int(n))
+				server.Limits = rate.NewLimits(n, time.Second)
 			}
 			defer server.Close()
 			doa.Nil(server.Run())
@@ -177,7 +178,7 @@ func main() {
 			if *flLimits != "" {
 				n := daze.SizeParser(*flLimits)
 				doa.Doa(n <= math.MaxInt)
-				locale.Limits = rate.NewLimiter(rate.Limit(n), int(n))
+				locale.Limits = rate.NewLimits(n, time.Second)
 			}
 			defer locale.Close()
 			doa.Nil(locale.Run())
@@ -191,7 +192,7 @@ func main() {
 			if *flLimits != "" {
 				n := daze.SizeParser(*flLimits)
 				doa.Doa(n <= math.MaxInt)
-				locale.Limits = rate.NewLimiter(rate.Limit(n), int(n))
+				locale.Limits = rate.NewLimits(n, time.Second)
 			}
 			defer locale.Close()
 			doa.Nil(locale.Run())
@@ -206,7 +207,7 @@ func main() {
 			if *flLimits != "" {
 				n := daze.SizeParser(*flLimits)
 				doa.Doa(n <= math.MaxInt)
-				locale.Limits = rate.NewLimiter(rate.Limit(n), int(n))
+				locale.Limits = rate.NewLimits(n, time.Second)
 			}
 			defer locale.Close()
 			doa.Nil(locale.Run())
@@ -215,7 +216,7 @@ func main() {
 			if *flLimits != "" {
 				n := daze.SizeParser(*flLimits)
 				doa.Doa(n <= math.MaxInt)
-				client.Limits = rate.NewLimiter(rate.Limit(n), int(n))
+				client.Limits = rate.NewLimits(n, time.Second)
 			}
 			defer client.Close()
 			doa.Nil(client.Run())
