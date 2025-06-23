@@ -140,11 +140,11 @@ func main() {
 		log.Println("main: exit")
 	case "client":
 		var (
-			flCIDRls = flag.String("c", filepath.Join(resExec, Conf.PathCIDR), "cidr path")
+			flCidrls = flag.String("c", filepath.Join(resExec, Conf.PathCIDR), "cidr path")
+			flCipher = flag.String("k", "daze", "password, should be same with the one specified by server")
 			flDnserv = flag.String("dns", "", "specifies the DNS, DoT or DoH server")
 			flFilter = flag.String("f", "rule", "filter {rule, remote, locale}")
 			flGpprof = flag.String("g", "", "specify an address to enable net/http/pprof")
-			flCipher = flag.String("k", "daze", "password, should be same with the one specified by server")
 			flLimits = flag.String("b", "", "set the maximum bandwidth in bytes per second, for example, 128k or 1.5m")
 			flListen = flag.String("l", "127.0.0.1:1080", "listen address")
 			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon, czar, dahlia}")
@@ -172,7 +172,7 @@ func main() {
 			locale := daze.NewLocale(*flListen, daze.NewAimbot(client, &daze.AimbotOption{
 				Type: *flFilter,
 				Rule: *flRulels,
-				Cidr: *flCIDRls,
+				Cidr: *flCidrls,
 			}))
 			defer locale.Close()
 			if *flLimits != "" {
@@ -186,7 +186,7 @@ func main() {
 			locale := daze.NewLocale(*flListen, daze.NewAimbot(client, &daze.AimbotOption{
 				Type: *flFilter,
 				Rule: *flRulels,
-				Cidr: *flCIDRls,
+				Cidr: *flCidrls,
 			}))
 			defer locale.Close()
 			if *flLimits != "" {
@@ -201,7 +201,7 @@ func main() {
 			locale := daze.NewLocale(*flListen, daze.NewAimbot(client, &daze.AimbotOption{
 				Type: *flFilter,
 				Rule: *flRulels,
-				Cidr: *flCIDRls,
+				Cidr: *flCidrls,
 			}))
 			defer locale.Close()
 			if *flLimits != "" {
