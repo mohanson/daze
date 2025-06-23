@@ -59,7 +59,7 @@ var Conf = struct {
 type Server struct {
 	Cipher []byte
 	Closer io.Closer
-	Limits *rate.Limiter
+	Limits *rate.Limits
 	Listen string
 }
 
@@ -126,7 +126,7 @@ func (s *Server) Run() error {
 func NewServer(listen string, cipher string) *Server {
 	return &Server{
 		Cipher: daze.Salt(cipher),
-		Limits: rate.NewLimiter(rate.Inf, 0),
+		Limits: rate.NewLimits(math.MaxUint64, time.Second),
 		Listen: listen,
 	}
 }

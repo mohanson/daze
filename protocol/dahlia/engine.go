@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"net"
+	"time"
 
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/lib/rate"
@@ -20,7 +21,7 @@ type Server struct {
 	Cipher []byte
 	Closer io.Closer
 	Listen string
-	Limits *rate.Limiter
+	Limits *rate.Limits
 	Server string
 }
 
@@ -90,7 +91,7 @@ func NewServer(listen string, server string, cipher string) *Server {
 	return &Server{
 		Cipher: daze.Salt(cipher),
 		Listen: listen,
-		Limits: rate.NewLimiter(rate.Inf, 0),
+		Limits: rate.NewLimits(math.MaxUint64, time.Second),
 		Server: server,
 	}
 }
@@ -99,7 +100,7 @@ func NewServer(listen string, server string, cipher string) *Server {
 type Client struct {
 	Cipher []byte
 	Closer io.Closer
-	Limits *rate.Limiter
+	Limits *rate.Limits
 	Listen string
 	Server string
 }
@@ -170,7 +171,7 @@ func (c *Client) Run() error {
 func NewClient(listen string, server string, cipher string) *Client {
 	return &Client{
 		Cipher: daze.Salt(cipher),
-		Limits: rate.NewLimiter(rate.Inf, 0),
+		Limits: rate.NewLimits(math.MaxUint64, time.Second),
 		Listen: listen,
 		Server: server,
 	}
