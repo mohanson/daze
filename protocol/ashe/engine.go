@@ -247,7 +247,7 @@ func (s *Server) Run() error {
 func NewServer(listen string, cipher string) *Server {
 	return &Server{
 		Cipher: daze.Salt(cipher),
-		Limits: rate.NewLimits(math.MaxUint64, time.Second),
+		Limits: rate.NewLimits(math.MaxUint32, time.Second),
 		Listen: listen,
 	}
 }

@@ -91,7 +91,7 @@ func NewServer(listen string, server string, cipher string) *Server {
 	return &Server{
 		Cipher: daze.Salt(cipher),
 		Listen: listen,
-		Limits: rate.NewLimits(math.MaxUint64, time.Second),
+		Limits: rate.NewLimits(math.MaxUint32, time.Second),
 		Server: server,
 	}
 }
@@ -171,7 +171,7 @@ func (c *Client) Run() error {
 func NewClient(listen string, server string, cipher string) *Client {
 	return &Client{
 		Cipher: daze.Salt(cipher),
-		Limits: rate.NewLimits(math.MaxUint64, time.Second),
+		Limits: rate.NewLimits(math.MaxUint32, time.Second),
 		Listen: listen,
 		Server: server,
 	}

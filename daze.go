@@ -627,7 +627,7 @@ func (l *Locale) Run() error {
 func NewLocale(listen string, dialer Dialer) *Locale {
 	return &Locale{
 		Dialer: dialer,
-		Limits: rate.NewLimits(math.MaxUint64, time.Second),
+		Limits: rate.NewLimits(math.MaxUint32, time.Second),
 		Listen: listen,
 	}
 }
