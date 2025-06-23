@@ -92,16 +92,15 @@ func main() {
 		switch *flProtoc {
 		case "ashe":
 			server := ashe.NewServer(*flListen, *flCipher)
-			defer server.Close()
 			if *flLimits != "" {
 				n := daze.SizeParser(*flLimits)
 				doa.Doa(n <= math.MaxInt)
 				server.Limits = rate.NewLimiter(rate.Limit(n), int(n))
 			}
+			defer server.Close()
 			doa.Nil(server.Run())
 		case "baboon":
 			server := baboon.NewServer(*flListen, *flCipher)
-			defer server.Close()
 			if *flExtend != "" {
 				server.Masker = *flExtend
 			}
@@ -110,24 +109,25 @@ func main() {
 				doa.Doa(n <= math.MaxInt)
 				server.Limits = rate.NewLimiter(rate.Limit(n), int(n))
 			}
+			defer server.Close()
 			doa.Nil(server.Run())
 		case "czar":
 			server := czar.NewServer(*flListen, *flCipher)
-			defer server.Close()
 			if *flLimits != "" {
 				n := daze.SizeParser(*flLimits)
 				doa.Doa(n <= math.MaxInt)
 				server.Limits = rate.NewLimiter(rate.Limit(n), int(n))
 			}
+			defer server.Close()
 			doa.Nil(server.Run())
 		case "dahlia":
 			server := dahlia.NewServer(*flListen, *flExtend, *flCipher)
-			defer server.Close()
 			if *flLimits != "" {
 				n := daze.SizeParser(*flLimits)
 				doa.Doa(n <= math.MaxInt)
 				server.Limits = rate.NewLimiter(rate.Limit(n), int(n))
 			}
+			defer server.Close()
 			doa.Nil(server.Run())
 		}
 		if *flGpprof != "" {
@@ -174,12 +174,12 @@ func main() {
 				Rule: *flRulels,
 				Cidr: *flCidrls,
 			}))
-			defer locale.Close()
 			if *flLimits != "" {
 				n := daze.SizeParser(*flLimits)
 				doa.Doa(n <= math.MaxInt)
 				locale.Limits = rate.NewLimiter(rate.Limit(n), int(n))
 			}
+			defer locale.Close()
 			doa.Nil(locale.Run())
 		case "baboon":
 			client := baboon.NewClient(*flServer, *flCipher)
@@ -188,12 +188,12 @@ func main() {
 				Rule: *flRulels,
 				Cidr: *flCidrls,
 			}))
-			defer locale.Close()
 			if *flLimits != "" {
 				n := daze.SizeParser(*flLimits)
 				doa.Doa(n <= math.MaxInt)
 				locale.Limits = rate.NewLimiter(rate.Limit(n), int(n))
 			}
+			defer locale.Close()
 			doa.Nil(locale.Run())
 		case "czar":
 			client := czar.NewClient(*flServer, *flCipher)
@@ -203,21 +203,21 @@ func main() {
 				Rule: *flRulels,
 				Cidr: *flCidrls,
 			}))
-			defer locale.Close()
 			if *flLimits != "" {
 				n := daze.SizeParser(*flLimits)
 				doa.Doa(n <= math.MaxInt)
 				locale.Limits = rate.NewLimiter(rate.Limit(n), int(n))
 			}
+			defer locale.Close()
 			doa.Nil(locale.Run())
 		case "dahlia":
 			client := dahlia.NewClient(*flListen, *flServer, *flCipher)
-			defer client.Close()
 			if *flLimits != "" {
 				n := daze.SizeParser(*flLimits)
 				doa.Doa(n <= math.MaxInt)
 				client.Limits = rate.NewLimiter(rate.Limit(n), int(n))
 			}
+			defer client.Close()
 			doa.Nil(client.Run())
 		}
 		if *flGpprof != "" {
