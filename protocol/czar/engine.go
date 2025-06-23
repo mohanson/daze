@@ -135,6 +135,7 @@ func NewServer(listen string, cipher string) *Server {
 type Client struct {
 	Cancel chan struct{}
 	Cipher []byte
+	Limits *rate.Limiter
 	Mux    chan *Mux
 	Server string
 }
@@ -155,9 +156,13 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 		}
 		log.Printf("czar: mux slot stream id=0x%02x", srv.idx)
 		spy := &ashe.Client{Cipher: c.Cipher}
-		con, err := spy.Estab(ctx, srv, network, address)
+		rwc := &daze.RateConn{
+			Conn: srv,
+			Rate: c.Limits,
+		}
+		con, err := spy.Estab(ctx, rwc, network, address)
 		if err != nil {
-			srv.Close()
+			rwc.Close()
 		}
 		return con, err
 	case <-time.After(daze.Conf.DialerTimeout):
@@ -228,6 +233,7 @@ func NewClient(server, cipher string) *Client {
 	client := &Client{
 		Cancel: make(chan struct{}),
 		Cipher: daze.Salt(cipher),
+		Limits: rate.NewLimiter(rate.Inf, 0),
 		Mux:    make(chan *Mux),
 		Server: server,
 	}

@@ -107,8 +107,8 @@ type Server struct {
 	// Cipher is a pre-shared key.
 	Cipher []byte
 	Closer io.Closer
-	Listen string
 	Limits *rate.Limiter
+	Listen string
 }
 
 // Hello creates an encrypted channel.
@@ -256,6 +256,7 @@ func NewServer(listen string, cipher string) *Server {
 type Client struct {
 	// Cipher is a pre-shared key.
 	Cipher []byte
+	Limits *rate.Limiter
 	Server string
 }
 
@@ -344,7 +345,11 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	if err != nil {
 		return nil, err
 	}
-	con, err := c.Estab(ctx, srv, network, address)
+	rwc := &daze.RateConn{
+		Conn: srv,
+		Rate: c.Limits,
+	}
+	con, err := c.Estab(ctx, rwc, network, address)
 	if err != nil {
 		srv.Close()
 	}
@@ -355,6 +360,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 func NewClient(server, cipher string) *Client {
 	return &Client{
 		Cipher: daze.Salt(cipher),
+		Limits: rate.NewLimiter(rate.Inf, 0),
 		Server: server,
 	}
 }

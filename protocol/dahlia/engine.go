@@ -99,6 +99,7 @@ func NewServer(listen string, server string, cipher string) *Server {
 type Client struct {
 	Cipher []byte
 	Closer io.Closer
+	Limits *rate.Limiter
 	Listen string
 	Server string
 }
@@ -146,12 +147,16 @@ func (c *Client) Run() error {
 				}
 				break
 			}
+			rwc := &daze.RateConn{
+				Conn: cli,
+				Rate: c.Limits,
+			}
 			idx++
 			ctx := &daze.Context{Cid: idx}
 			log.Printf("conn: %08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
 			go func() {
 				defer cli.Close()
-				if err := c.Serve(ctx, cli); err != nil {
+				if err := c.Serve(ctx, rwc); err != nil {
 					log.Printf("conn: %08x  error %s", ctx.Cid, err)
 				}
 				log.Printf("conn: %08x closed", ctx.Cid)
@@ -165,6 +170,7 @@ func (c *Client) Run() error {
 func NewClient(listen string, server string, cipher string) *Client {
 	return &Client{
 		Cipher: daze.Salt(cipher),
+		Limits: rate.NewLimiter(rate.Inf, 0),
 		Listen: listen,
 		Server: server,
 	}
