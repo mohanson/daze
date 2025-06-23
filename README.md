@@ -47,6 +47,27 @@ Daze is implemented in pure Go language, so it can run on almost any operating s
 0. Chrome. Chrome does not support setting proxies, so a third-party plugin must be used. [Proxy SwitchyOmega](https://chrome.google.com/webstore/detail/proxy-switchyomega/padekgcemlokbadohgkifijomclgjgif?hl=en) works very well.
 0. Firefox can configure a proxy in `Connection Settings` -> `Manual proxy configuration` -> `SOCKSv5 Host=127.0.0.1` and `Port=1080`. If you see an option `Use remote DNS` on the page, check it.
 
+## Configuration: Bandwidth Limiter
+
+You can limit the maximum bandwidth used by daze. Generally speaking, for daze server, it is recommended to set the bandwidth to a value slightly smaller than the physical bandwidth.
+
+```sh
+# For daze server, set -b 320k if your physical bandwidth is 3M, where 320 = 3 * 1024 / 8 - 64.
+$ daze server ... -b 320k
+# For daze client, in most cases no configuration is necessary.
+$ daze client ...
+```
+
+## Configuration: DNS
+
+The DNS server and DNS protocol used by daze can be specified through command line parameters.
+
+- `DNS: daze ... -dns 1.1.1.1:53`
+- `DoT: daze ... -dns 1.1.1.1:853`
+- `DoH: daze ... -dns https://1.1.1.1/dns-query`
+
+This [article](https://www.cloudflare.com/learning/dns/dns-over-tls/) briefly describes the difference between them.
+
 ## Configuration: Protocols
 
 Daze currently has 4 protocols.
@@ -116,27 +137,6 @@ Glob is supported, such as `R *.google.com`.
 Daze also uses a CIDR(Classless Inter-Domain Routing) file to route addresses. The CIDR file is located at "rule.cidr", and has a lower priority than "rule.ls".
 
 By default, daze has configured rule.cidr for China's mainland. You can update it manually via `daze gen cn`, this will pull the latest data from [http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest](http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest).
-
-## Configuration: DNS
-
-The DNS server and DNS protocol used by daze can be specified through command line parameters.
-
-- `DNS: daze ... -dns 1.1.1.1:53`
-- `DoT: daze ... -dns 1.1.1.1:853`
-- `DoH: daze ... -dns https://1.1.1.1/dns-query`
-
-This [article](https://www.cloudflare.com/learning/dns/dns-over-tls/) briefly describes the difference between them.
-
-## Configuration: Bandwidth Limiter
-
-You can limit the maximum bandwidth used by daze. Generally speaking, for daze server, it is recommended to set the bandwidth to a value slightly smaller than the physical bandwidth.
-
-```sh
-# For daze server, set -b 320k if your physical bandwidth is 3M, where 320 = 3 * 1024 / 8 - 64.
-$ daze server ... -b 320k
-# For daze client, in most cases no configuration is necessary.
-$ daze client ...
-```
 
 ## License
 
