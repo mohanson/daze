@@ -147,7 +147,7 @@ func (c *Client) Run() error {
 				}
 				break
 			}
-			rwc := &daze.RateConn{
+			rtc := &daze.RateConn{
 				Conn: cli,
 				Rate: c.Limits,
 			}
@@ -155,8 +155,8 @@ func (c *Client) Run() error {
 			ctx := &daze.Context{Cid: idx}
 			log.Printf("conn: %08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
 			go func() {
-				defer cli.Close()
-				if err := c.Serve(ctx, rwc); err != nil {
+				defer rtc.Close()
+				if err := c.Serve(ctx, rtc); err != nil {
 					log.Printf("conn: %08x  error %s", ctx.Cid, err)
 				}
 				log.Printf("conn: %08x closed", ctx.Cid)

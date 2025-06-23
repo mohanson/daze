@@ -223,16 +223,16 @@ func (s *Server) Run() error {
 				}
 				break
 			}
-			rwc := &daze.RateConn{
-				Conn: cli,
-				Rate: s.Limits,
-			}
 			idx++
 			ctx := &daze.Context{Cid: idx}
 			log.Printf("conn: %08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
+			rtc := &daze.RateConn{
+				Conn: cli,
+				Rate: s.Limits,
+			}
 			go func() {
-				defer cli.Close()
-				if err := s.Serve(ctx, rwc); err != nil {
+				defer rtc.Close()
+				if err := s.Serve(ctx, rtc); err != nil {
 					log.Printf("conn: %08x  error %s", ctx.Cid, err)
 				}
 				log.Printf("conn: %08x closed", ctx.Cid)
@@ -256,7 +256,6 @@ func NewServer(listen string, cipher string) *Server {
 type Client struct {
 	// Cipher is a pre-shared key.
 	Cipher []byte
-	Limits *rate.Limiter
 	Server string
 }
 
@@ -345,11 +344,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	if err != nil {
 		return nil, err
 	}
-	rwc := &daze.RateConn{
-		Conn: srv,
-		Rate: c.Limits,
-	}
-	con, err := c.Estab(ctx, rwc, network, address)
+	con, err := c.Estab(ctx, srv, network, address)
 	if err != nil {
 		srv.Close()
 	}
@@ -360,7 +355,6 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 func NewClient(server, cipher string) *Client {
 	return &Client{
 		Cipher: daze.Salt(cipher),
-		Limits: rate.NewLimiter(rate.Inf, 0),
 		Server: server,
 	}
 }

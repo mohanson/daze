@@ -190,9 +190,10 @@ func (d *Direct) Dial(ctx *Context, network string, address string) (io.ReadWrit
 
 // Locale is the main process of daze. In most cases, it is usually deployed as a daemon on a local machine.
 type Locale struct {
-	Listen string
-	Dialer Dialer
 	Closer io.Closer
+	Dialer Dialer
+	Limits *rate.Limiter
+	Listen string
 }
 
 // ServeProxy serves traffic in HTTP Proxy/Tunnel format.
@@ -551,6 +552,10 @@ func (l *Locale) Serve(ctx *Context, cli io.ReadWriteCloser) error {
 		buf = make([]byte, 1)
 		err error
 	)
+	cli = &RateConn{
+		Conn: cli,
+		Rate: l.Limits,
+	}
 	_, err = io.ReadFull(cli, buf)
 	if err != nil {
 		// There are some clients that will establish a link in advance without sending any messages so that they can
@@ -621,8 +626,9 @@ func (l *Locale) Run() error {
 // NewLocale returns a Locale.
 func NewLocale(listen string, dialer Dialer) *Locale {
 	return &Locale{
-		Listen: listen,
 		Dialer: dialer,
+		Limits: rate.NewLimiter(rate.Inf, 0),
+		Listen: listen,
 	}
 }
 

@@ -169,46 +169,46 @@ func main() {
 		switch *flProtoc {
 		case "ashe":
 			client := ashe.NewClient(*flServer, *flCipher)
-			if *flLimits != "" {
-				n := daze.SizeParser(*flLimits)
-				doa.Doa(n <= math.MaxInt)
-				client.Limits = rate.NewLimiter(rate.Limit(n), int(n))
-			}
 			locale := daze.NewLocale(*flListen, daze.NewAimbot(client, &daze.AimbotOption{
 				Type: *flFilter,
 				Rule: *flRulels,
 				Cidr: *flCIDRls,
 			}))
 			defer locale.Close()
+			if *flLimits != "" {
+				n := daze.SizeParser(*flLimits)
+				doa.Doa(n <= math.MaxInt)
+				locale.Limits = rate.NewLimiter(rate.Limit(n), int(n))
+			}
 			doa.Nil(locale.Run())
 		case "baboon":
 			client := baboon.NewClient(*flServer, *flCipher)
-			if *flLimits != "" {
-				n := daze.SizeParser(*flLimits)
-				doa.Doa(n <= math.MaxInt)
-				client.Limits = rate.NewLimiter(rate.Limit(n), int(n))
-			}
 			locale := daze.NewLocale(*flListen, daze.NewAimbot(client, &daze.AimbotOption{
 				Type: *flFilter,
 				Rule: *flRulels,
 				Cidr: *flCIDRls,
 			}))
 			defer locale.Close()
+			if *flLimits != "" {
+				n := daze.SizeParser(*flLimits)
+				doa.Doa(n <= math.MaxInt)
+				locale.Limits = rate.NewLimiter(rate.Limit(n), int(n))
+			}
 			doa.Nil(locale.Run())
 		case "czar":
 			client := czar.NewClient(*flServer, *flCipher)
 			defer client.Close()
-			if *flLimits != "" {
-				n := daze.SizeParser(*flLimits)
-				doa.Doa(n <= math.MaxInt)
-				client.Limits = rate.NewLimiter(rate.Limit(n), int(n))
-			}
 			locale := daze.NewLocale(*flListen, daze.NewAimbot(client, &daze.AimbotOption{
 				Type: *flFilter,
 				Rule: *flRulels,
 				Cidr: *flCIDRls,
 			}))
 			defer locale.Close()
+			if *flLimits != "" {
+				n := daze.SizeParser(*flLimits)
+				doa.Doa(n <= math.MaxInt)
+				locale.Limits = rate.NewLimiter(rate.Limit(n), int(n))
+			}
 			doa.Nil(locale.Run())
 		case "dahlia":
 			client := dahlia.NewClient(*flListen, *flServer, *flCipher)

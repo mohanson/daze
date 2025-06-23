@@ -76,14 +76,14 @@ func (s *Server) ServeDaze(w http.ResponseWriter, r *http.Request) {
 		Writer: cc,
 		Closer: cc,
 	}
-	rwc := &daze.RateConn{
-		Conn: cli,
-		Rate: s.Limits,
-	}
 	spy := &ashe.Server{Cipher: s.Cipher}
 	ctx := &daze.Context{Cid: atomic.AddUint32(&s.NextID, 1)}
 	log.Printf("conn: %08x accept remote=%s", ctx.Cid, cc.RemoteAddr())
-	if err := spy.Serve(ctx, rwc); err != nil {
+	rtc := &daze.RateConn{
+		Conn: cli,
+		Rate: s.Limits,
+	}
+	if err := spy.Serve(ctx, rtc); err != nil {
 		log.Printf("conn: %08x  error %s", ctx.Cid, err)
 	}
 	log.Printf("conn: %08x closed", ctx.Cid)
@@ -159,7 +159,6 @@ func NewServer(listen string, cipher string) *Server {
 // Client implemented the baboon protocol.
 type Client struct {
 	Cipher []byte
-	Limits *rate.Limiter
 	Server string
 }
 
@@ -174,10 +173,6 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 	srv, err = daze.Dial("tcp", c.Server)
 	if err != nil {
 		return nil, err
-	}
-	srv = &daze.RateConn{
-		Conn: srv,
-		Rate: c.Limits,
 	}
 	buf = make([]byte, 32)
 	io.ReadFull(&daze.RandomReader{}, buf[:16])
@@ -202,7 +197,6 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 func NewClient(server string, cipher string) *Client {
 	return &Client{
 		Cipher: daze.Salt(cipher),
-		Limits: rate.NewLimiter(rate.Inf, 0),
 		Server: server,
 	}
 }
