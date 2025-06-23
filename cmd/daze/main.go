@@ -67,11 +67,11 @@ func main() {
 	switch subCommand {
 	case "server":
 		var (
+			flCipher = flag.String("k", "daze", "password, should be same with the one specified by client")
 			flDnserv = flag.String("dns", "", "specifies the DNS, DoT or DoH server")
 			flExtend = flag.String("e", "", "extend data for different protocols")
 			flGpprof = flag.String("g", "", "specify an address to enable net/http/pprof")
 			flLimits = flag.String("b", "", "set the maximum bandwidth in bytes per second, for example, 128k or 1.5m")
-			flCipher = flag.String("k", "daze", "password, should be same with the one specified by client")
 			flListen = flag.String("l", "0.0.0.0:1081", "listen address")
 			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon, czar, dahlia}")
 		)
