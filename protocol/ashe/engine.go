@@ -12,6 +12,7 @@ import (
 
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/lib/doa"
+	"github.com/mohanson/daze/lib/rate"
 )
 
 // This document describes a tcp-based cryptographic proxy protocol. The main purpose of this protocol is to bypass
@@ -106,6 +107,7 @@ type Server struct {
 	// Cipher is a pre-shared key.
 	Cipher []byte
 	Closer io.Closer
+	Limits *rate.Limiter
 	Listen string
 }
 
@@ -224,9 +226,13 @@ func (s *Server) Run() error {
 			idx++
 			ctx := &daze.Context{Cid: idx}
 			log.Printf("conn: %08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
+			rtc := &daze.RateConn{
+				Conn: cli,
+				Rate: s.Limits,
+			}
 			go func() {
-				defer cli.Close()
-				if err := s.Serve(ctx, cli); err != nil {
+				defer rtc.Close()
+				if err := s.Serve(ctx, rtc); err != nil {
 					log.Printf("conn: %08x  error %s", ctx.Cid, err)
 				}
 				log.Printf("conn: %08x closed", ctx.Cid)
@@ -240,8 +246,9 @@ func (s *Server) Run() error {
 // NewServer returns a new Server. Cipher is a password in string form, with no length limit.
 func NewServer(listen string, cipher string) *Server {
 	return &Server{
-		Listen: listen,
 		Cipher: daze.Salt(cipher),
+		Limits: rate.NewLimiter(rate.Inf, 0),
+		Listen: listen,
 	}
 }
 
@@ -347,7 +354,7 @@ func (c *Client) Dial(ctx *daze.Context, network string, address string) (io.Rea
 // NewClient returns a new Client. Cipher is a password in string form, with no length limit.
 func NewClient(server, cipher string) *Client {
 	return &Client{
-		Server: server,
 		Cipher: daze.Salt(cipher),
+		Server: server,
 	}
 }

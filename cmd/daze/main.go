@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -14,6 +15,7 @@ import (
 	"github.com/mohanson/daze"
 	"github.com/mohanson/daze/lib/doa"
 	"github.com/mohanson/daze/lib/gracefulexit"
+	"github.com/mohanson/daze/lib/rate"
 	"github.com/mohanson/daze/protocol/ashe"
 	"github.com/mohanson/daze/protocol/baboon"
 	"github.com/mohanson/daze/protocol/czar"
@@ -65,10 +67,11 @@ func main() {
 	switch subCommand {
 	case "server":
 		var (
+			flCipher = flag.String("k", "daze", "password, should be same with the one specified by client")
 			flDnserv = flag.String("dns", "", "specifies the DNS, DoT or DoH server")
 			flExtend = flag.String("e", "", "extend data for different protocols")
 			flGpprof = flag.String("g", "", "specify an address to enable net/http/pprof")
-			flCipher = flag.String("k", "daze", "password, should be same with the one specified by client")
+			flLimits = flag.String("b", "", "set the maximum bandwidth in bytes per second, for example, 128k or 1.5m")
 			flListen = flag.String("l", "0.0.0.0:1081", "listen address")
 			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon, czar, dahlia}")
 		)
@@ -89,6 +92,11 @@ func main() {
 		switch *flProtoc {
 		case "ashe":
 			server := ashe.NewServer(*flListen, *flCipher)
+			if *flLimits != "" {
+				n := daze.SizeParser(*flLimits)
+				doa.Doa(n <= math.MaxInt)
+				server.Limits = rate.NewLimiter(rate.Limit(n), int(n))
+			}
 			defer server.Close()
 			doa.Nil(server.Run())
 		case "baboon":
@@ -96,14 +104,29 @@ func main() {
 			if *flExtend != "" {
 				server.Masker = *flExtend
 			}
+			if *flLimits != "" {
+				n := daze.SizeParser(*flLimits)
+				doa.Doa(n <= math.MaxInt)
+				server.Limits = rate.NewLimiter(rate.Limit(n), int(n))
+			}
 			defer server.Close()
 			doa.Nil(server.Run())
 		case "czar":
 			server := czar.NewServer(*flListen, *flCipher)
+			if *flLimits != "" {
+				n := daze.SizeParser(*flLimits)
+				doa.Doa(n <= math.MaxInt)
+				server.Limits = rate.NewLimiter(rate.Limit(n), int(n))
+			}
 			defer server.Close()
 			doa.Nil(server.Run())
 		case "dahlia":
 			server := dahlia.NewServer(*flListen, *flExtend, *flCipher)
+			if *flLimits != "" {
+				n := daze.SizeParser(*flLimits)
+				doa.Doa(n <= math.MaxInt)
+				server.Limits = rate.NewLimiter(rate.Limit(n), int(n))
+			}
 			defer server.Close()
 			doa.Nil(server.Run())
 		}
@@ -117,11 +140,12 @@ func main() {
 		log.Println("main: exit")
 	case "client":
 		var (
-			flCIDRls = flag.String("c", filepath.Join(resExec, Conf.PathCIDR), "cidr path")
+			flCidrls = flag.String("c", filepath.Join(resExec, Conf.PathCIDR), "cidr path")
+			flCipher = flag.String("k", "daze", "password, should be same with the one specified by server")
 			flDnserv = flag.String("dns", "", "specifies the DNS, DoT or DoH server")
 			flFilter = flag.String("f", "rule", "filter {rule, remote, locale}")
 			flGpprof = flag.String("g", "", "specify an address to enable net/http/pprof")
-			flCipher = flag.String("k", "daze", "password, should be same with the one specified by server")
+			flLimits = flag.String("b", "", "set the maximum bandwidth in bytes per second, for example, 128k or 1.5m")
 			flListen = flag.String("l", "127.0.0.1:1080", "listen address")
 			flProtoc = flag.String("p", "ashe", "protocol {ashe, baboon, czar, dahlia}")
 			flRulels = flag.String("r", filepath.Join(resExec, Conf.PathRule), "rule path")
@@ -148,8 +172,13 @@ func main() {
 			locale := daze.NewLocale(*flListen, daze.NewAimbot(client, &daze.AimbotOption{
 				Type: *flFilter,
 				Rule: *flRulels,
-				Cidr: *flCIDRls,
+				Cidr: *flCidrls,
 			}))
+			if *flLimits != "" {
+				n := daze.SizeParser(*flLimits)
+				doa.Doa(n <= math.MaxInt)
+				locale.Limits = rate.NewLimiter(rate.Limit(n), int(n))
+			}
 			defer locale.Close()
 			doa.Nil(locale.Run())
 		case "baboon":
@@ -157,8 +186,13 @@ func main() {
 			locale := daze.NewLocale(*flListen, daze.NewAimbot(client, &daze.AimbotOption{
 				Type: *flFilter,
 				Rule: *flRulels,
-				Cidr: *flCIDRls,
+				Cidr: *flCidrls,
 			}))
+			if *flLimits != "" {
+				n := daze.SizeParser(*flLimits)
+				doa.Doa(n <= math.MaxInt)
+				locale.Limits = rate.NewLimiter(rate.Limit(n), int(n))
+			}
 			defer locale.Close()
 			doa.Nil(locale.Run())
 		case "czar":
@@ -167,12 +201,22 @@ func main() {
 			locale := daze.NewLocale(*flListen, daze.NewAimbot(client, &daze.AimbotOption{
 				Type: *flFilter,
 				Rule: *flRulels,
-				Cidr: *flCIDRls,
+				Cidr: *flCidrls,
 			}))
+			if *flLimits != "" {
+				n := daze.SizeParser(*flLimits)
+				doa.Doa(n <= math.MaxInt)
+				locale.Limits = rate.NewLimiter(rate.Limit(n), int(n))
+			}
 			defer locale.Close()
 			doa.Nil(locale.Run())
 		case "dahlia":
 			client := dahlia.NewClient(*flListen, *flServer, *flCipher)
+			if *flLimits != "" {
+				n := daze.SizeParser(*flLimits)
+				doa.Doa(n <= math.MaxInt)
+				client.Limits = rate.NewLimiter(rate.Limit(n), int(n))
+			}
 			defer client.Close()
 			doa.Nil(client.Run())
 		}

@@ -8,6 +8,7 @@ import (
 	"net"
 
 	"github.com/mohanson/daze"
+	"github.com/mohanson/daze/lib/rate"
 	"github.com/mohanson/daze/protocol/ashe"
 )
 
@@ -19,6 +20,7 @@ type Server struct {
 	Cipher []byte
 	Closer io.Closer
 	Listen string
+	Limits *rate.Limiter
 	Server string
 }
 
@@ -67,9 +69,13 @@ func (s *Server) Run() error {
 			idx++
 			ctx := &daze.Context{Cid: idx}
 			log.Printf("conn: %08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
+			rtc := &daze.RateConn{
+				Conn: cli,
+				Rate: s.Limits,
+			}
 			go func() {
-				defer cli.Close()
-				if err := s.Serve(ctx, cli); err != nil {
+				defer rtc.Close()
+				if err := s.Serve(ctx, rtc); err != nil {
 					log.Printf("conn: %08x  error %s", ctx.Cid, err)
 				}
 				log.Printf("conn: %08x closed", ctx.Cid)
@@ -84,6 +90,7 @@ func NewServer(listen string, server string, cipher string) *Server {
 	return &Server{
 		Cipher: daze.Salt(cipher),
 		Listen: listen,
+		Limits: rate.NewLimiter(rate.Inf, 0),
 		Server: server,
 	}
 }
@@ -92,6 +99,7 @@ func NewServer(listen string, server string, cipher string) *Server {
 type Client struct {
 	Cipher []byte
 	Closer io.Closer
+	Limits *rate.Limiter
 	Listen string
 	Server string
 }
@@ -139,12 +147,16 @@ func (c *Client) Run() error {
 				}
 				break
 			}
+			rtc := &daze.RateConn{
+				Conn: cli,
+				Rate: c.Limits,
+			}
 			idx++
 			ctx := &daze.Context{Cid: idx}
 			log.Printf("conn: %08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
 			go func() {
-				defer cli.Close()
-				if err := c.Serve(ctx, cli); err != nil {
+				defer rtc.Close()
+				if err := c.Serve(ctx, rtc); err != nil {
 					log.Printf("conn: %08x  error %s", ctx.Cid, err)
 				}
 				log.Printf("conn: %08x closed", ctx.Cid)
@@ -158,6 +170,7 @@ func (c *Client) Run() error {
 func NewClient(listen string, server string, cipher string) *Client {
 	return &Client{
 		Cipher: daze.Salt(cipher),
+		Limits: rate.NewLimiter(rate.Inf, 0),
 		Listen: listen,
 		Server: server,
 	}
