@@ -31,7 +31,7 @@ var Conf = struct {
 }{
 	PathRule: "/rule.ls",
 	PathCIDR: "/rule.cidr",
-	Version:  "v1.23.1",
+	Version:  "v1.24.0",
 }
 
 const helpMsg = `Usage: daze <command> [<args>]
