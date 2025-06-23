@@ -66,16 +66,16 @@ func (s *Server) Run() error {
 				}
 				break
 			}
-			rwc := &daze.RateConn{
-				Conn: cli,
-				Rate: s.Limits,
-			}
 			idx++
 			ctx := &daze.Context{Cid: idx}
 			log.Printf("conn: %08x accept remote=%s", ctx.Cid, cli.RemoteAddr())
+			rtc := &daze.RateConn{
+				Conn: cli,
+				Rate: s.Limits,
+			}
 			go func() {
-				defer cli.Close()
-				if err := s.Serve(ctx, rwc); err != nil {
+				defer rtc.Close()
+				if err := s.Serve(ctx, rtc); err != nil {
 					log.Printf("conn: %08x  error %s", ctx.Cid, err)
 				}
 				log.Printf("conn: %08x closed", ctx.Cid)
