@@ -13,7 +13,6 @@ type Limits struct {
 	addition uint64
 	capacity uint64
 	last     time.Time
-	loop     uint64
 	mu       sync.Mutex
 	size     uint64
 	step     time.Duration
@@ -25,19 +24,19 @@ func (l *Limits) Wait(n uint64) {
 	doa.Doa(l.size <= l.capacity)
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	l.loop = uint64(time.Since(l.last) / l.step)
-	if l.loop > 0 {
-		l.last = l.last.Add(l.step * time.Duration(l.loop))
-		doa.Doa(l.loop <= math.MaxUint64/l.addition)
-		doa.Doa(l.size <= math.MaxUint64-l.addition*l.loop)
-		l.size = l.size + l.addition*l.loop
+	cycles := uint64(time.Since(l.last) / l.step)
+	if cycles > 0 {
+		l.last = l.last.Add(l.step * time.Duration(cycles))
+		doa.Doa(cycles <= math.MaxUint64/l.addition)
+		doa.Doa(l.size <= math.MaxUint64-l.addition*cycles)
+		l.size = l.size + l.addition*cycles
 		l.size = min(l.size, l.capacity)
 	}
 	if l.size < n {
-		l.loop = (n - l.size + l.addition - 1) / l.addition
-		time.Sleep(l.step * time.Duration(l.loop))
-		l.last = l.last.Add(l.step * time.Duration(l.loop))
-		l.size = l.size + l.addition*l.loop
+		cycles = (n - l.size + l.addition - 1) / l.addition
+		time.Sleep(l.step * time.Duration(cycles))
+		l.last = l.last.Add(l.step * time.Duration(cycles))
+		l.size = l.size + l.addition*cycles
 	}
 	l.size -= n
 }
