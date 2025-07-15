@@ -46,12 +46,17 @@ import (
 var Conf = struct {
 	// The newly created stream has a higher write priority.
 	FastWriteDuration time.Duration
+	// If no new data is received for a period of time, close the conn.
+	IdleProbeDuration time.Duration
+	IdleReplyDuration time.Duration
 	// Packet size. Since the size of the packet header is 4, this value must be greater than 4. If the value is too
 	// small, the transmission efficiency will be reduced, and if it is too large, the concurrency capability of mux
 	// will be reduced.
 	PacketSize int
 }{
 	FastWriteDuration: time.Second * 8,
+	IdleProbeDuration: time.Second * 120,
+	IdleReplyDuration: time.Second * 128,
 	PacketSize:        2048,
 }
 

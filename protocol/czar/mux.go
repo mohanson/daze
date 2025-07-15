@@ -204,9 +204,21 @@ func (m *Mux) Recv() {
 		idx uint8
 		msg []byte
 		old *Stream
+		prb = time.AfterFunc(Conf.IdleProbeDuration, func() {
+			if m.pri.Pri(0, func() error {
+				return doa.Err(m.con.Write([]byte{0x00, 0x03, 0x00, 0x00}))
+			}) != nil {
+				m.Close()
+			}
+		})
+		rst = time.AfterFunc(Conf.IdleReplyDuration, func() {
+			m.Close()
+		})
 		stm *Stream
 	)
 	for {
+		prb.Reset(Conf.IdleProbeDuration)
+		rst.Reset(Conf.IdleReplyDuration)
 		_, err = io.ReadFull(m.con, buf[:4])
 		if err != nil {
 			m.rer.Put(err)
@@ -247,7 +259,15 @@ func (m *Mux) Recv() {
 			stm.Esolc()
 			old = NewWither(idx, m)
 			m.usb[idx] = old
-		case cmd >= 0x03:
+		case cmd == 0x03:
+			switch buf[2] {
+			case 0x00:
+				m.pri.Pri(0, func() error {
+					return doa.Err(m.con.Write([]byte{0x00, 0x03, 0x01, 0x00}))
+				})
+			case 0x01:
+			}
+		case cmd >= 0x04:
 			// Packet format error, connection closed.
 			m.con.Close()
 		}
