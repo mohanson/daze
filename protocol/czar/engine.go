@@ -41,17 +41,29 @@ import (
 // +-----+-----+-----+-----+
 // | Sid |  2  | 0/1 | Rsv |
 // +-----+-----+-----+-----+
+//
+// Keep alive probe and reply.
+//
+// +-----+-----+-----+-----+
+// | 0x0 |  3  | 0/1 | Rsv |
+// +-----+-----+-----+-----+
 
 // Conf is acting as package level configuration.
 var Conf = struct {
 	// The newly created stream has a higher write priority.
 	FastWriteDuration time.Duration
+	// The duration a connection needs to be idle before mux begins sending out keep-alive probe.
+	IdleProbeDuration time.Duration
+	// If no data is read for more than this time, the connection is closed.
+	IdleReplyDuration time.Duration
 	// Packet size. Since the size of the packet header is 4, this value must be greater than 4. If the value is too
 	// small, the transmission efficiency will be reduced, and if it is too large, the concurrency capability of mux
 	// will be reduced.
 	PacketSize int
 }{
 	FastWriteDuration: time.Second * 8,
+	IdleProbeDuration: time.Second * 120,
+	IdleReplyDuration: time.Second * 128,
 	PacketSize:        2048,
 }
 
