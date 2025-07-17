@@ -21,7 +21,6 @@ type Limits struct {
 // Wait ensures there are enough resources (n) available, blocking if necessary.
 func (l *Limits) Wait(n uint64) {
 	doa.Doa(n < math.MaxUint64/2)
-	doa.Doa(l.size <= l.capacity)
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	cycles := uint64(time.Since(l.last) / l.step)
@@ -39,6 +38,7 @@ func (l *Limits) Wait(n uint64) {
 		l.size = l.size + l.addition*cycles
 	}
 	l.size -= n
+	doa.Doa(l.size <= l.capacity)
 }
 
 // NewLimits creates a new rate limiter with rate r over period p.
