@@ -106,7 +106,7 @@ func (s *Stream) Write(p []byte) (int, error) {
 		binary.BigEndian.PutUint16(buf[2:4], uint16(l))
 		copy(buf[4:], p[:l])
 		p = p[l:]
-		z = 2 - max(cmp.Compare(Conf.FastWriteDuration-time.Since(s.cat), 0), 0)
+		z = 2 - max(cmp.Compare(Conf.FastWriteDuration, time.Since(s.cat)), 0)
 		doa.Doa(z >= 1)
 		doa.Doa(z <= 2)
 		err := s.mux.pri.Pri(z, func() error {
