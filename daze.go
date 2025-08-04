@@ -11,6 +11,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
+	"expvar"
 	"fmt"
 	"io"
 	"log"
@@ -60,6 +61,29 @@ var Conf = struct {
 	RouterLruSize: 64,
 	// The maximum number of udp connections allowed by socks5.
 	Socks5LruSize: 8,
+}
+
+// Expv is a simple wrapper around the expvars package.
+var Expv = struct {
+	RouterCacheHits *expvar.Int
+	RouterCacheMiss *expvar.Int
+	RouterCacheRate expvar.Func
+}{
+	RouterCacheHits: expvar.NewInt("RouterCache.Hits"),
+	RouterCacheMiss: expvar.NewInt("RouterCache.Miss"),
+	RouterCacheRate: func() expvar.Func {
+		f := expvar.Func(func() any {
+			hits := expvar.Get("RouterCache.Hits").(*expvar.Int).Value()
+			miss := expvar.Get("RouterCache.Miss").(*expvar.Int).Value()
+			alls := hits + miss
+			if alls == 0 {
+				return 0
+			}
+			return float64(hits) / float64(alls)
+		})
+		expvar.Publish("RouterCache.Rate", f)
+		return f
+	}(),
 }
 
 // ResolverDns returns a DNS resolver.
@@ -776,8 +800,10 @@ type RouterCache struct {
 func (r *RouterCache) Road(ctx *Context, host string) Road {
 	a, b := r.Lru.GetExists(host)
 	if b {
+		Expv.RouterCacheHits.Add(1)
 		return a
 	}
+	Expv.RouterCacheMiss.Add(1)
 	c := r.Raw.Road(ctx, host)
 	r.Lru.Set(host, c)
 	return c
