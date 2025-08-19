@@ -5,18 +5,28 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
+
+	"github.com/mohanson/daze/lib/doa"
 )
 
 // Server implemented the etch protocol.
 type Server struct {
 	Closer io.Closer
 	Listen string
+	Server string
 }
 
 // ServeHTTP implements http.Handler.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log.Println(w)
-	log.Println(r)
+	cloud := doa.Try(url.Parse(s.Server))
+	proxy := httputil.NewSingleHostReverseProxy(cloud)
+	proxy.Director = nil
+	proxy.Rewrite = func(r *httputil.ProxyRequest) {
+		r.SetURL(cloud)
+	}
+	proxy.ServeHTTP(w, r)
 }
 
 // Close listener.
@@ -41,8 +51,10 @@ func (s *Server) Run() error {
 }
 
 // NewServer returns a new Server.
-func NewServer(listen string) *Server {
+func NewServer(listen string, server string) *Server {
 	return &Server{
+		Closer: nil,
 		Listen: listen,
+		Server: server,
 	}
 }
