@@ -12,6 +12,7 @@ import (
 const (
 	DazeServerListenOn = "127.0.0.1:28080"
 	CurlDest           = "https://www.zhihu.com"
+	HostLookup         = "google.com"
 )
 
 func TestLocaleHTTP(t *testing.T) {
@@ -64,7 +65,7 @@ func TestLocaleSocks5(t *testing.T) {
 
 func TestResolverDns(t *testing.T) {
 	dns := ResolverDns("1.1.1.1:53")
-	_, err := dns.LookupHost(context.Background(), "google.com")
+	_, err := dns.LookupHost(context.Background(), HostLookup)
 	if err != nil {
 		t.FailNow()
 	}
@@ -72,7 +73,7 @@ func TestResolverDns(t *testing.T) {
 
 func TestResolverDot(t *testing.T) {
 	dot := ResolverDot("1.1.1.1:853")
-	_, err := dot.LookupHost(context.Background(), "google.com")
+	_, err := dot.LookupHost(context.Background(), HostLookup)
 	if err != nil {
 		t.FailNow()
 	}
@@ -80,7 +81,7 @@ func TestResolverDot(t *testing.T) {
 
 func TestResolverDoh(t *testing.T) {
 	doh := ResolverDoh("https://1.1.1.1/dns-query")
-	_, err := doh.LookupHost(context.Background(), "google.com")
+	_, err := doh.LookupHost(context.Background(), HostLookup)
 	if err != nil {
 		t.FailNow()
 	}

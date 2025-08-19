@@ -157,7 +157,12 @@ func (c Cdoh) Write(b []byte) (n int, err error) {
 // ResolverDoh returns a DoH resolver. For further information, see https://datatracker.ietf.org/doc/html/rfc8484.
 func ResolverDoh(addr string) *net.Resolver {
 	urls := doa.Try(url.Parse(addr))
-	urls.Host = doa.Try(net.LookupHost(urls.Hostname()))[0]
+	host := doa.Try(net.LookupHost(urls.Hostname()))[0]
+	port := urls.Port()
+	urls.Host = host
+	if port != "" {
+		urls.Host = host + ":" + port
+	}
 	return &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
