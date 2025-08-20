@@ -121,36 +121,31 @@ func ResolverDot(addr string) *net.Resolver {
 	}
 }
 
-// Cdoh structure can be used for DoH protocol processing.
-type Cdoh struct {
-	Server string
-	Buffer *bytes.Buffer
+// WireConn structure can be used for DoH protocol processing.
+type WireConn struct {
+	Call func(b []byte) ([]byte, error)
+	Data *bytes.Buffer
 }
 
-func (c Cdoh) Read(b []byte) (n int, err error)   { return c.Buffer.Read(b) }
-func (c Cdoh) Close() error                       { return nil }
-func (c Cdoh) LocalAddr() net.Addr                { return nil }
-func (c Cdoh) RemoteAddr() net.Addr               { return nil }
-func (c Cdoh) SetDeadline(t time.Time) error      { return nil }
-func (c Cdoh) SetReadDeadline(t time.Time) error  { return nil }
-func (c Cdoh) SetWriteDeadline(t time.Time) error { return nil }
-func (c Cdoh) Write(b []byte) (n int, err error) {
+func (c *WireConn) Read(b []byte) (n int, err error)   { return c.Data.Read(b) }
+func (c *WireConn) Close() error                       { return nil }
+func (c *WireConn) LocalAddr() net.Addr                { return nil }
+func (c *WireConn) RemoteAddr() net.Addr               { return nil }
+func (c *WireConn) SetDeadline(t time.Time) error      { return nil }
+func (c *WireConn) SetReadDeadline(t time.Time) error  { return nil }
+func (c *WireConn) SetWriteDeadline(t time.Time) error { return nil }
+func (c *WireConn) Write(b []byte) (n int, err error) {
 	size := int(binary.BigEndian.Uint16(b[:2]))
 	doa.Doa(size == len(b)-2)
-	resp, err := http.Post(c.Server, "application/dns-message", bytes.NewReader(b[2:]))
+	r, err := c.Call(b[2:])
 	if err != nil {
-		log.Println("cdoh:", err)
+		log.Println("main:", err)
 		return len(b), nil
 	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Println("cdoh:", err)
-		return len(b), nil
-	}
-	data := make([]byte, 2+len(body))
-	binary.BigEndian.PutUint16(data[:2], uint16(len(body)))
-	copy(data[2:], body)
-	c.Buffer.Write(data)
+	data := make([]byte, 2+len(r))
+	binary.BigEndian.PutUint16(data[:2], uint16(len(r)))
+	copy(data[2:], r)
+	c.Data.Write(data)
 	return len(b), nil
 }
 
@@ -166,9 +161,23 @@ func ResolverDoh(addr string) *net.Resolver {
 	return &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			conn := &Cdoh{
-				Server: urls.String(),
-				Buffer: bytes.NewBuffer([]byte{}),
+			conn := &WireConn{
+				Call: func(b []byte) ([]byte, error) {
+					resp, err := http.Post(urls.String(), "application/dns-message", bytes.NewReader(b))
+					if err != nil {
+						return nil, err
+					}
+					defer resp.Body.Close()
+					body, err := io.ReadAll(resp.Body)
+					if err != nil {
+						return nil, err
+					}
+					if resp.StatusCode != http.StatusOK {
+						return nil, errors.New(string(body))
+					}
+					return body, nil
+				},
+				Data: bytes.NewBuffer([]byte{}),
 			}
 			return conn, nil
 		},
