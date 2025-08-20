@@ -20,7 +20,6 @@ import (
 	"math/rand/v2"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -151,19 +150,12 @@ func (c *WireConn) Write(b []byte) (n int, err error) {
 
 // ResolverDoh returns a DoH resolver. For further information, see https://datatracker.ietf.org/doc/html/rfc8484.
 func ResolverDoh(addr string) *net.Resolver {
-	urls := doa.Try(url.Parse(addr))
-	host := doa.Try(net.LookupHost(urls.Hostname()))[0]
-	port := urls.Port()
-	urls.Host = host
-	if port != "" {
-		urls.Host = host + ":" + port
-	}
 	return &net.Resolver{
 		PreferGo: true,
 		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
 			conn := &WireConn{
 				Call: func(b []byte) ([]byte, error) {
-					resp, err := http.Post(urls.String(), "application/dns-message", bytes.NewReader(b))
+					resp, err := http.Post(addr, "application/dns-message", bytes.NewReader(b))
 					if err != nil {
 						return nil, err
 					}
