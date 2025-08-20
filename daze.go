@@ -139,7 +139,7 @@ func (c *WireConn) Write(b []byte) (n int, err error) {
 	doa.Doa(size == len(b)-2)
 	r, err := c.Call(b[2:])
 	if err != nil {
-		log.Println("daze:", err)
+		log.Println("main:", err)
 		return len(b), nil
 	}
 	data := make([]byte, 2+len(r))
