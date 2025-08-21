@@ -176,6 +176,24 @@ func ResolverDoh(addr string) *net.Resolver {
 	}
 }
 
+// ResolverDot returns a DoT resolver. Depending on the addr entered, the dns, dot or doh protocol will be used
+// automatically.
+//
+// Dns: 1.1.1.1:53
+// Dot: 1.1.1.1:853
+// Doh: https://1.1.1.1/dns-query
+func ResolverAny(addr string) *net.Resolver {
+	switch {
+	case strings.HasSuffix(addr, ":53"):
+		return ResolverDns(addr)
+	case strings.HasSuffix(addr, ":853"):
+		return ResolverDot(addr)
+	case strings.HasPrefix(addr, "https://"):
+		return ResolverDoh(addr)
+	}
+	panic("unreachable")
+}
+
 // Link copies from src to dst and dst to src until either EOF is reached.
 func Link(a, b io.ReadWriteCloser) {
 	w := sync.WaitGroup{}

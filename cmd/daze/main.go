@@ -79,14 +79,7 @@ func main() {
 		log.Println("main: server cipher is", *flCipher)
 		log.Println("main: protocol is used", *flProtoc)
 		if *flDnserv != "" {
-			switch {
-			case strings.HasSuffix(*flDnserv, ":53"):
-				net.DefaultResolver = daze.ResolverDns(*flDnserv)
-			case strings.HasSuffix(*flDnserv, ":853"):
-				net.DefaultResolver = daze.ResolverDot(*flDnserv)
-			case strings.HasPrefix(*flDnserv, "https://"):
-				net.DefaultResolver = daze.ResolverDoh(*flDnserv)
-			}
+			net.DefaultResolver = daze.ResolverAny(*flDnserv)
 			log.Println("main: domain server is", *flDnserv)
 		}
 		if *flLimits != "" {
@@ -151,14 +144,7 @@ func main() {
 		log.Println("main: client cipher is", *flCipher)
 		log.Println("main: protocol is used", *flProtoc)
 		if *flDnserv != "" {
-			switch {
-			case strings.HasSuffix(*flDnserv, ":53"):
-				net.DefaultResolver = daze.ResolverDns(*flDnserv)
-			case strings.HasSuffix(*flDnserv, ":853"):
-				net.DefaultResolver = daze.ResolverDot(*flDnserv)
-			case strings.HasPrefix(*flDnserv, "https://"):
-				net.DefaultResolver = daze.ResolverDoh(*flDnserv)
-			}
+			net.DefaultResolver = daze.ResolverAny(*flDnserv)
 			log.Println("main: domain server is", *flDnserv)
 		}
 		if *flLimits != "" {
