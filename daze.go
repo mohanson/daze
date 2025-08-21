@@ -64,25 +64,26 @@ var Conf = struct {
 
 // Expv is a simple wrapper around the expvars package.
 var Expv = struct {
+	RouterCacheCall *expvar.Int
 	RouterCacheHits *expvar.Int
-	RouterCacheMiss *expvar.Int
 	RouterCacheRate expvar.Func
+	RouterIPNetCall *expvar.Int
+	RouterIPNetTime *expvar.Float
 }{
+	RouterCacheCall: expvar.NewInt("RouterCache.Call"),
 	RouterCacheHits: expvar.NewInt("RouterCache.Hits"),
-	RouterCacheMiss: expvar.NewInt("RouterCache.Miss"),
 	RouterCacheRate: func() expvar.Func {
 		f := expvar.Func(func() any {
 			hits := expvar.Get("RouterCache.Hits").(*expvar.Int).Value()
-			miss := expvar.Get("RouterCache.Miss").(*expvar.Int).Value()
-			alls := hits + miss
-			if alls == 0 {
-				return 0
-			}
-			return float64(hits) / float64(alls)
+			call := expvar.Get("RouterCache.Call").(*expvar.Int).Value()
+			doa.Doa(hits <= call)
+			return float64(hits) / float64(max(1, call))
 		})
 		expvar.Publish("RouterCache.Rate", f)
 		return f
 	}(),
+	RouterIPNetCall: expvar.NewInt("RouterIPNet.Call"),
+	RouterIPNetTime: expvar.NewFloat("RouterIPNet.Time"),
 }
 
 // ResolverDns returns a DNS resolver.
@@ -766,7 +767,15 @@ func (r *RouterIPNet) FromFile(name string) {
 
 // Road implements daze.Router.
 func (r *RouterIPNet) Road(ctx *Context, host string) Road {
-	l, err := net.DefaultResolver.LookupIPAddr(context.Background(), host)
+	l, err := func() ([]net.IPAddr, error) {
+		Expv.RouterIPNetCall.Add(1)
+		t := time.Now()
+		l, err := net.DefaultResolver.LookupIPAddr(context.Background(), host)
+		s := time.Since(t).Seconds()
+		// This is not strictly concurrency-safe, but it won't have much impact on the data.
+		Expv.RouterIPNetTime.Add((s - Expv.RouterIPNetTime.Value()) / 64)
+		return l, err
+	}()
 	if err != nil {
 		log.Printf("conn: %08x  error %s", ctx.Cid, err)
 		return RoadPuzzle
@@ -822,12 +831,12 @@ type RouterCache struct {
 
 // Road implements daze.Router.
 func (r *RouterCache) Road(ctx *Context, host string) Road {
+	Expv.RouterCacheCall.Add(1)
 	a, b := r.Lru.GetExists(host)
 	if b {
 		Expv.RouterCacheHits.Add(1)
 		return a
 	}
-	Expv.RouterCacheMiss.Add(1)
 	c := r.Raw.Road(ctx, host)
 	r.Lru.Set(host, c)
 	return c
