@@ -68,22 +68,13 @@ var Expv = struct {
 	RouterCacheHits *expvar.Int
 	RouterCacheRate expvar.Func
 	RouterIPNetCall *expvar.Int
-	RouterIPNetTime *expvar.Float
+	RouterIPNetTime *ExpvarAverage
 }{
 	RouterCacheCall: expvar.NewInt("RouterCache.Call"),
 	RouterCacheHits: expvar.NewInt("RouterCache.Hits"),
-	RouterCacheRate: func() expvar.Func {
-		f := expvar.Func(func() any {
-			hits := expvar.Get("RouterCache.Hits").(*expvar.Int).Value()
-			call := expvar.Get("RouterCache.Call").(*expvar.Int).Value()
-			doa.Doa(hits <= call)
-			return float64(hits) / float64(max(1, call))
-		})
-		expvar.Publish("RouterCache.Rate", f)
-		return f
-	}(),
+	RouterCacheRate: NewExpvarRate("RouterCache.Rate", "RouterCache.Hits", "RouterCache.Call"),
 	RouterIPNetCall: expvar.NewInt("RouterIPNet.Call"),
-	RouterIPNetTime: expvar.NewFloat("RouterIPNet.Time"),
+	RouterIPNetTime: NewExpvarAverage("RouterIPNet.Time", 64),
 }
 
 // ResolverDns returns a DNS resolver.
@@ -771,9 +762,7 @@ func (r *RouterIPNet) Road(ctx *Context, host string) Road {
 		Expv.RouterIPNetCall.Add(1)
 		t := time.Now()
 		l, err := net.DefaultResolver.LookupIPAddr(context.Background(), host)
-		s := time.Since(t).Seconds()
-		// This is not strictly concurrency-safe, but it won't have much impact on the data.
-		Expv.RouterIPNetTime.Add((s - Expv.RouterIPNetTime.Value()) / 64)
+		Expv.RouterIPNetTime.Add(time.Since(t).Seconds())
 		return l, err
 	}()
 	if err != nil {
@@ -1067,6 +1056,37 @@ func Dial(network string, address string) (net.Conn, error) {
 		Timeout: Conf.DialerTimeout,
 	}
 	return d.Dial(network, address)
+}
+
+// ExpvarAverage is a structure to maintain a running average using expvar.Float.
+type ExpvarAverage struct {
+	F *expvar.Float
+	L float64
+}
+
+// Adds a new value to the running average. This is not strictly concurrency-safe, but it won't have much impact on the
+// data.
+func (e *ExpvarAverage) Add(value float64) {
+	e.F.Add((value - e.F.Value()) / e.L)
+}
+
+// NewExpvarAverage creates and initializes a new ExpvarAverage instance.
+func NewExpvarAverage(name string, length int) *ExpvarAverage {
+	return &ExpvarAverage{
+		F: expvar.NewFloat(name),
+		L: float64(length),
+	}
+}
+
+// NewExpvarRate creates a new expvar.Func that calculates the ratio of two expvar.Int metrics.
+func NewExpvarRate(name string, n string, d string) expvar.Func {
+	f := expvar.Func(func() any {
+		v := expvar.Get(n).(*expvar.Int).Value()
+		w := expvar.Get(d).(*expvar.Int).Value()
+		return float64(v) / float64(max(1, w))
+	})
+	expvar.Publish(name, f)
+	return f
 }
 
 // GravityReader wraps an io.Reader with RC4 crypto.

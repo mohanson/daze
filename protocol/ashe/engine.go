@@ -54,6 +54,13 @@ var Conf = struct {
 	LifeExpired: 120,
 }
 
+// Expv is a simple wrapper around the expvars package.
+var Expv = struct {
+	ServerClockSkew *daze.ExpvarAverage
+}{
+	ServerClockSkew: daze.NewExpvarAverage("Protocol.Ashe.Server.ClockSkew", 64),
+}
+
 // TCPConn is an implementation of the Conn interface for tcp network connections.
 type TCPConn struct {
 	io.ReadWriteCloser
@@ -142,6 +149,7 @@ func (s *Server) Hello(cli io.ReadWriteCloser) (io.ReadWriteCloser, error) {
 	if gap^gapSign-gapSign > int64(Conf.LifeExpired) {
 		return nil, errors.New("daze: request expired")
 	}
+	Expv.ServerClockSkew.Add(float64(gap))
 	return con, nil
 }
 
