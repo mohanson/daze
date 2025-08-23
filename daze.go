@@ -72,7 +72,7 @@ var Expv = struct {
 }{
 	RouterCacheCall: expvar.NewInt("RouterCache.Call"),
 	RouterCacheHits: expvar.NewInt("RouterCache.Hits"),
-	RouterCacheRate: NewExpvarRate("RouterCache.Rate", "RouterCache.Hits", "RouterCache.Call"),
+	RouterCacheRate: NewExpvarPercent("RouterCache.Rate", "RouterCache.Hits", "RouterCache.Call"),
 	RouterIPNetCall: expvar.NewInt("RouterIPNet.Call"),
 	RouterIPNetTime: NewExpvarAverage("RouterIPNet.Time", 64),
 }
@@ -1078,11 +1078,11 @@ func NewExpvarAverage(name string, length int) *ExpvarAverage {
 	}
 }
 
-// NewExpvarRate creates a new expvar.Func that calculates the ratio of two expvar.Int metrics.
-func NewExpvarRate(name string, n string, d string) expvar.Func {
+// NewExpvarPercent creates a new expvar.Func that calculates the ratio of two expvar.Int or expvar.Float metrics.
+func NewExpvarPercent(name string, n string, d string) expvar.Func {
 	f := expvar.Func(func() any {
-		v := expvar.Get(n).(*expvar.Int).Value()
-		w := expvar.Get(d).(*expvar.Int).Value()
+		v := doa.Try(strconv.ParseFloat(expvar.Get(n).String(), 64))
+		w := doa.Try(strconv.ParseFloat(expvar.Get(d).String(), 64))
 		return float64(v) / float64(max(1, w))
 	})
 	expvar.Publish(name, f)
