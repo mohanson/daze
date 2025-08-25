@@ -38,6 +38,6 @@ func main() {
 	<-ctx.Done()
 	fin()
 	for i := range cPriorityLevels {
-		log.Println("main:", i, ret[i])
+		log.Printf("main: report level=%d count=%d", i, ret[i])
 	}
 }

@@ -1,3 +1,4 @@
+// Package priority implements a priority mutex.
 package priority
 
 import (

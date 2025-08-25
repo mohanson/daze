@@ -1,3 +1,3 @@
 # Lru
 
-Package lru implements an lru cache.
+Package lru implements an LRU cache.

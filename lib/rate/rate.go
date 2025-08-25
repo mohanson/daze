@@ -1,11 +1,12 @@
+// Package rate provides a rate limiter. It implements a classic token bucket algorithm, which can achieve functions
+// such as http api speed limit and network bandwidth speed limit.
 package rate
 
 import (
+	"log"
 	"math"
 	"sync"
 	"time"
-
-	"github.com/mohanson/daze/lib/doa"
 )
 
 // Limits represents a rate limiter that controls resource allocation over time.
@@ -25,8 +26,12 @@ func (l *Limits) Peek(n uint64) bool {
 	cycles := uint64(time.Since(l.last) / l.step)
 	if cycles > 0 {
 		l.last = l.last.Add(l.step * time.Duration(cycles))
-		doa.Doa(cycles <= math.MaxUint64/l.addition)
-		doa.Doa(l.size <= math.MaxUint64-l.addition*cycles)
+		if cycles > math.MaxUint64/l.addition {
+			log.Panicln("rate: overflow")
+		}
+		if l.size > math.MaxUint64-l.addition*cycles {
+			log.Panicln("rate: overflow")
+		}
 		l.size = l.size + l.addition*cycles
 		l.size = min(l.size, l.capacity)
 	}
@@ -40,8 +45,12 @@ func (l *Limits) Wait(n uint64) {
 	cycles := uint64(time.Since(l.last) / l.step)
 	if cycles > 0 {
 		l.last = l.last.Add(l.step * time.Duration(cycles))
-		doa.Doa(cycles <= math.MaxUint64/l.addition)
-		doa.Doa(l.size <= math.MaxUint64-l.addition*cycles)
+		if cycles > math.MaxUint64/l.addition {
+			log.Panicln("rate: overflow")
+		}
+		if l.size > math.MaxUint64-l.addition*cycles {
+			log.Panicln("rate: overflow")
+		}
 		l.size = l.size + l.addition*cycles
 		l.size = min(l.size, l.capacity)
 	}
@@ -52,13 +61,10 @@ func (l *Limits) Wait(n uint64) {
 		l.size = l.size + l.addition*cycles
 	}
 	l.size -= n
-	doa.Doa(l.size <= l.capacity)
 }
 
 // NewLimits creates a new rate limiter with rate r over period p.
 func NewLimits(r uint64, p time.Duration) *Limits {
-	doa.Doa(r > 0)
-	doa.Doa(p > 0)
 	gcd := func(a, b uint64) uint64 {
 		t := uint64(0)
 		for b != 0 {
