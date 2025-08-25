@@ -1,4 +1,4 @@
-// A data structure that follows the constraints of a least recently used (lru) cache.
+// Package lru implements an LRU cache.
 package lru
 
 import (
@@ -71,6 +71,17 @@ type Lru[K comparable, V any] struct {
 	M    *sync.Mutex
 }
 
+// Del removes the provided key from the cache.
+func (l *Lru[K, V]) Del(k K) {
+	l.M.Lock()
+	defer l.M.Unlock()
+	if e, ok := l.C[k]; ok {
+		l.Drop(k, e.V)
+		delete(l.C, k)
+		l.List.Remove(e)
+	}
+}
+
 // Get looks up a key's value from the cache.
 func (l *Lru[K, V]) GetExists(k K) (v V, ok bool) {
 	l.M.Lock()
@@ -88,17 +99,6 @@ func (l *Lru[K, V]) GetExists(k K) (v V, ok bool) {
 func (l *Lru[K, V]) Get(k K) (v V) {
 	v, _ = l.GetExists(k)
 	return
-}
-
-// Del removes the provided key from the cache.
-func (l *Lru[K, V]) Del(k K) {
-	l.M.Lock()
-	defer l.M.Unlock()
-	if e, ok := l.C[k]; ok {
-		l.Drop(k, e.V)
-		delete(l.C, k)
-		l.List.Remove(e)
-	}
 }
 
 // Has returns true if a key exists.

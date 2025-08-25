@@ -1,20 +1,18 @@
 # Pretty
 
-Utilities to prettify console output.
+Package pretty provides utilities for beautifying console output.
 
 **Progress**
 
-```
+```sh
 $ go run cmd/progress/main.go
 
 2025/03/12 09:53:42 pretty: [=========================>                   ]  59%
 ```
 
-
-
 **Table**
 
-```
+```sh
 $ go run cmd/table/main.go
 
 2025/03/12 09:51:57 pretty: City name Area Population Annual Rainfall

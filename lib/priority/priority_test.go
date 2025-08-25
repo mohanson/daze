@@ -6,7 +6,7 @@ import (
 
 func BenchmarkPriority(b *testing.B) {
 	pri := NewPriority(3)
-	for range b.N {
+	for b.Loop() {
 		pri.Pri(2, func() error {
 			return nil
 		})

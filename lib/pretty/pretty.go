@@ -1,3 +1,4 @@
+// Package pretty provides utilities for beautifying console output.
 package pretty
 
 import (
@@ -5,13 +6,13 @@ import (
 	"log"
 	"os"
 	"strings"
-
-	"github.com/mohanson/daze/lib/doa"
 )
 
-// PrintProgress draw a progress bar in the terminal. The percent takes values ​​from 0 to 1.
+// PrintProgress draw a progress bar in the terminal. The percent takes values from 0 to 1.
 func PrintProgress(percent float64) {
-	doa.Doa(0 <= percent && percent <= 1)
+	if percent < 0 || percent > 1 {
+		log.Panicln("pretty: the percent takes values from 0 to 1")
+	}
 	out, _ := os.Stdout.Stat()
 	// Identify if we are displaying to a terminal or through a pipe or redirect.
 	if out.Mode()&os.ModeCharDevice == os.ModeCharDevice {
