@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/mohanson/daze/lib/doa"
+	"github.com/libraries/go/doa"
 )
 
 func TestProtocolCzarErr(t *testing.T) {

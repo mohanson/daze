@@ -12,9 +12,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/libraries/go/doa"
+	"github.com/libraries/go/rate"
 	"github.com/mohanson/daze"
-	"github.com/mohanson/daze/lib/doa"
-	"github.com/mohanson/daze/lib/rate"
 	"github.com/mohanson/daze/protocol/ashe"
 )
 

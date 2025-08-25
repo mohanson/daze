@@ -3,7 +3,7 @@ package czar
 import (
 	"testing"
 
-	"github.com/mohanson/daze/lib/doa"
+	"github.com/libraries/go/doa"
 )
 
 func TestProtocolCzarSip(t *testing.T) {

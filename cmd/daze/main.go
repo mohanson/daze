@@ -14,10 +14,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/libraries/go/doa"
+	"github.com/libraries/go/gracefulexit"
+	"github.com/libraries/go/rate"
 	"github.com/mohanson/daze"
-	"github.com/mohanson/daze/lib/doa"
-	"github.com/mohanson/daze/lib/gracefulexit"
-	"github.com/mohanson/daze/lib/rate"
 	"github.com/mohanson/daze/protocol/ashe"
 	"github.com/mohanson/daze/protocol/baboon"
 	"github.com/mohanson/daze/protocol/czar"

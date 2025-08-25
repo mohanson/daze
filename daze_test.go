@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/mohanson/daze/lib/doa"
+	"github.com/libraries/go/doa"
 )
 
 const (

@@ -27,10 +27,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mohanson/daze/lib/doa"
-	"github.com/mohanson/daze/lib/lru"
-	"github.com/mohanson/daze/lib/pretty"
-	"github.com/mohanson/daze/lib/rate"
+	"github.com/libraries/go/doa"
+	"github.com/libraries/go/lru"
+	"github.com/libraries/go/pretty"
+	"github.com/libraries/go/rate"
 )
 
 // ============================================================================

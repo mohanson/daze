@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/mohanson/daze/lib/doa"
-	"github.com/mohanson/daze/lib/priority"
+	"github.com/libraries/go/doa"
+	"github.com/libraries/go/priority"
 )
 
 // A Stream managed by the multiplexer.

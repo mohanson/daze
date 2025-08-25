@@ -9,8 +9,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/libraries/go/rate"
 	"github.com/mohanson/daze"
-	"github.com/mohanson/daze/lib/rate"
 	"github.com/mohanson/daze/protocol/ashe"
 )
 
