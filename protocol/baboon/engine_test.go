@@ -8,8 +8,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/libraries/daze"
 	"github.com/libraries/go/doa"
-	"github.com/mohanson/daze"
 )
 
 const (

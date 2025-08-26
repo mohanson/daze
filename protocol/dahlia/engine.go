@@ -8,9 +8,9 @@ import (
 	"net"
 	"time"
 
+	"github.com/libraries/daze"
+	"github.com/libraries/daze/protocol/ashe"
 	"github.com/libraries/go/rate"
-	"github.com/mohanson/daze"
-	"github.com/mohanson/daze/protocol/ashe"
 )
 
 // Dahlia is an encrypted port forwarding protocol. Unlike common port forwarding tools, it needs to configure a server

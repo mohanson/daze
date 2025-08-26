@@ -9,9 +9,9 @@ import (
 	"net"
 	"time"
 
+	"github.com/libraries/daze"
+	"github.com/libraries/daze/protocol/ashe"
 	"github.com/libraries/go/rate"
-	"github.com/mohanson/daze"
-	"github.com/mohanson/daze/protocol/ashe"
 )
 
 // The czar protocol is a proxy protocol built on tcp multiplexing technology. By establishing multiple tcp connections

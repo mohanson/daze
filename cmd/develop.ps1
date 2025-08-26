@@ -10,4 +10,4 @@ if (!(Test-Path bin/rule.ls)) {
     Copy-Item res/rule.ls -Destination bin/rule.ls
 }
 
-& go build -o bin github.com/mohanson/daze/cmd/daze
+& go build -o bin github.com/libraries/daze/cmd/daze

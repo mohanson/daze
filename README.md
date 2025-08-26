@@ -4,10 +4,10 @@ Daze is a software that helps you pass through firewalls, in other words, a prox
 
 ## Introduction
 
-Daze is designed as a single-file application. First, compile or [download](https://github.com/mohanson/daze/releases) daze:
+Daze is designed as a single-file application. First, compile or [download](https://github.com/libraries/daze/releases) daze:
 
 ```sh
-$ git clone https://github.com/mohanson/daze
+$ git clone https://github.com/libraries/daze
 $ cd daze
 
 # On Linux or macOS
@@ -43,7 +43,7 @@ Daze is still under development. You should make sure that the server and client
 
 Daze is implemented in pure Go language, so it can run on almost any operating system. The following are some of the browsers/operating systems commonly used by me:
 
-0. Android. Cross-compile daze for android: `GOOS=android GOARCH=arm64 go build -o daze github.com/mohanson/daze/cmd/daze`. Push the compiled file to the phone, You can use [adb](https://developer.android.com/studio/command-line/adb) or create an http server and download daze with `wget` in [termux](https://play.google.com/store/apps/details?id=com.termux&hl=en). Run `daze client -l 127.0.0.1:1080 ...` in the termux. Set the proxy for phone: WLAN -> Settings -> Proxy -> Fill in `127.0.0.1:1080`
+0. Android. Cross-compile daze for android: `GOOS=android GOARCH=arm64 go build -o daze github.com/libraries/daze/cmd/daze`. Push the compiled file to the phone, You can use [adb](https://developer.android.com/studio/command-line/adb) or create an http server and download daze with `wget` in [termux](https://play.google.com/store/apps/details?id=com.termux&hl=en). Run `daze client -l 127.0.0.1:1080 ...` in the termux. Set the proxy for phone: WLAN -> Settings -> Proxy -> Fill in `127.0.0.1:1080`
 0. Chrome. Chrome does not support setting proxies, so a third-party plugin must be used. [Proxy SwitchyOmega](https://chrome.google.com/webstore/detail/proxy-switchyomega/padekgcemlokbadohgkifijomclgjgif?hl=en) works very well.
 0. Firefox can configure a proxy in `Connection Settings` -> `Manual proxy configuration` -> `SOCKSv5 Host=127.0.0.1` and `Port=1080`. If you see an option `Use remote DNS` on the page, check it.
 

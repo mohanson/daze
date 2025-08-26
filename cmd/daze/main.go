@@ -14,14 +14,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/libraries/daze"
+	"github.com/libraries/daze/protocol/ashe"
+	"github.com/libraries/daze/protocol/baboon"
+	"github.com/libraries/daze/protocol/czar"
+	"github.com/libraries/daze/protocol/dahlia"
 	"github.com/libraries/go/doa"
 	"github.com/libraries/go/gracefulexit"
 	"github.com/libraries/go/rate"
-	"github.com/mohanson/daze"
-	"github.com/mohanson/daze/protocol/ashe"
-	"github.com/mohanson/daze/protocol/baboon"
-	"github.com/mohanson/daze/protocol/czar"
-	"github.com/mohanson/daze/protocol/dahlia"
 )
 
 // Conf is acting as package level configuration.

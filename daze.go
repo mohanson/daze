@@ -1116,7 +1116,7 @@ func Gravity(conn io.ReadWriteCloser, k []byte) io.ReadWriteCloser {
 //
 // Examples:
 // OpenFile("/etc/hosts")
-// OpenFile("https://raw.githubusercontent.com/mohanson/daze/master/README.md")
+// OpenFile("https://raw.githubusercontent.com/libraries/daze/master/README.md")
 func OpenFile(name string) (io.ReadCloser, error) {
 	if strings.HasPrefix(name, "http://") || strings.HasPrefix(name, "https://") {
 		resp, err := http.Get(name)

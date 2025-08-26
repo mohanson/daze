@@ -6,8 +6,8 @@ import (
 	"math/rand/v2"
 	"testing"
 
+	"github.com/libraries/daze"
 	"github.com/libraries/go/doa"
-	"github.com/mohanson/daze"
 )
 
 const (

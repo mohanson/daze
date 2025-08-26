@@ -12,10 +12,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/libraries/daze"
+	"github.com/libraries/daze/protocol/ashe"
 	"github.com/libraries/go/doa"
 	"github.com/libraries/go/rate"
-	"github.com/mohanson/daze"
-	"github.com/mohanson/daze/protocol/ashe"
 )
 
 // Protocol baboon is the ashe protocol based on http.

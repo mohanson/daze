@@ -12,4 +12,4 @@ if [ ! -f bin/rule.ls ]; then
     cp res/rule.ls bin/rule.ls
 fi
 
-go build -o bin github.com/mohanson/daze/cmd/daze
+go build -o bin github.com/libraries/daze/cmd/daze
